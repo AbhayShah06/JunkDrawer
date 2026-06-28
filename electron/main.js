@@ -5,7 +5,10 @@ const { startServer } = require('./server');
 let win, srv;
 
 const appRoot = () => app.isPackaged ? app.getAppPath() : path.join(__dirname, '..');
-const binDir  = () => app.isPackaged ? path.join(process.resourcesPath, 'bin') : path.join(__dirname, '..', 'resources', 'bin');
+// Packaged: electron-builder's per-platform extraResources copies resources/bin/<os> -> Resources/bin.
+// Dev (npm start): point at the same per-platform source folder so bundled-binary lookup works locally too.
+const devBinSub = process.platform === 'win32' ? 'win' : 'mac';
+const binDir  = () => app.isPackaged ? path.join(process.resourcesPath, 'bin') : path.join(__dirname, '..', 'resources', 'bin', devBinSub);
 
 async function create() {
   const { port, server } = await startServer(appRoot(), binDir());

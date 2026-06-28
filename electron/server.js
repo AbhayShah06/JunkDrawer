@@ -15,14 +15,20 @@ const MIME = { '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javasc
   '.ico':'image/x-icon', '.webmanifest':'application/manifest+json' };
 
 function findBin(name, binDir) {
-  // bundled: prefer the per-architecture folder (resources/bin/arm64|x64), then the flat dir
+  // bundled: prefer the per-architecture folder (resources/bin/arm64|x64), then the flat dir.
+  // On Windows the bundled binaries carry a .exe suffix (yt-dlp.exe, ffmpeg.exe); on macOS
+  // they're suffix-less (or the legacy `_macos` suffix).
+  const win = process.platform === 'win32';
+  const cands = win ? [name+'.exe', name] : [name, name+'_macos'];
   const dirs = [path.join(binDir||'', process.arch), binDir||''];
   for (const d of dirs) {
-    for (const c of [path.join(d, name), path.join(d, name+'_macos')]) {
-      try { if (fs.existsSync(c)) return c; } catch {}
+    for (const c of cands) {
+      const f = path.join(d, c);
+      try { if (fs.existsSync(f)) return f; } catch {}
     }
   }
-  const w = spawnSync(process.platform === 'win32' ? 'where' : 'which', [name], { encoding: 'utf8' });
+  // PATH fallback: `where` on Windows resolves yt-dlp.exe from the bare name already.
+  const w = spawnSync(win ? 'where' : 'which', [name], { encoding: 'utf8' });
   if (w.status === 0) { const p = (w.stdout||'').split('\n')[0].trim(); if (p) return p; }
   return null;
 }
@@ -118,8 +124,16 @@ function handleUpdateCheck(res) {
         let j; try { j = JSON.parse(data); } catch { return finish({}); }
         const latest = (j.tag_name || '').replace(/^v/, '');
         const dmg = (j.assets || []).find(a => /\.dmg$/i.test(a.name || ''));
+        const exe = (j.assets || []).find(a => /\.exe$/i.test(a.name || ''));
+        const dmgUrl = dmg ? dmg.browser_download_url : '';
+        const exeUrl = exe ? exe.browser_download_url : '';
+        // pick the asset that matches the OS this app is running on
+        const installerUrl = process.platform === 'win32' ? exeUrl : dmgUrl;
         finish({ latest, hasUpdate: !!latest && cmpVer(latest, current) > 0,
-          htmlUrl: j.html_url || '', dmgUrl: dmg ? dmg.browser_download_url : '', dmgName: dmg ? dmg.name : '' });
+          htmlUrl: j.html_url || '',
+          dmgUrl, dmgName: dmg ? dmg.name : '',
+          exeUrl, exeName: exe ? exe.name : '',
+          installerUrl });
       });
     });
   req.setTimeout(6000, () => { req.destroy(); finish({}); });

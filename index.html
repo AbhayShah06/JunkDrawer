@@ -783,7 +783,7 @@ fetch('/api/update-check').then(r=>r.ok?r.json():null).then(j=>{
   bar.querySelector('.ub-txt').textContent=`Junk Drawer ${j.latest} is available — you have ${j.current}.`;
   const get=bar.querySelector('.ub-get');
   get.textContent=`Download ${j.latest}`;
-  get.href=j.dmgUrl||j.htmlUrl||'#';
+  get.href=j.installerUrl||j.dmgUrl||j.htmlUrl||'#';
   bar.querySelector('.ub-x').onclick=(e)=>{ e.preventDefault(); localStorage.setItem('jd-skip-update',j.latest); bar.hidden=true; };
   bar.hidden=false;
 }).catch(()=>{});

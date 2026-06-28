@@ -10,7 +10,8 @@
     "start": "electron .",
     "dist:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal",
     "release:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal --publish always",
-    "dist:win": "electron-builder --win nsis"
+    "dist:win": "electron-builder --win nsis",
+    "fetch-bins:win": "node scripts/fetch-bins-win.mjs"
   },
   "devDependencies": {
     "electron": "^33.2.0",
@@ -24,25 +25,22 @@
       "electron/**/*",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "resources/bin",
-        "to": "bin",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
     "mac": {
       "target": [
         "dmg"
       ],
       "category": "public.app-category.utilities",
-      "x64ArchFiles": "**/bin/*"
+      "x64ArchFiles": "**/bin/*",
+      "extraResources": [
+        { "from": "resources/bin/mac", "to": "bin", "filter": ["**/*"] }
+      ]
     },
     "win": {
       "target": [
         "nsis"
+      ],
+      "extraResources": [
+        { "from": "resources/bin/win", "to": "bin", "filter": ["**/*"] }
       ]
     },
     "publish": [
