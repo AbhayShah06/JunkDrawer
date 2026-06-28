@@ -53,6 +53,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def _same_origin(self):
+        # DNS-rebinding defense: we must have been reached via a loopback hostname.
+        host = (self.headers.get("Host") or "").split(":")[0]
+        if host and host not in ("127.0.0.1", "localhost"):
+            return False
+        # CSRF defense: a cross-site page's request carries its own Origin; only ours pass.
         origin = self.headers.get("Origin")
         return origin is None or origin in ALLOWED_ORIGINS
 

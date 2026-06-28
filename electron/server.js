@@ -126,6 +126,20 @@ function handleUpdateCheck(res) {
   req.on('error', () => finish({}));
 }
 
+// Only the app's own loopback page may reach the /api/* backend. Blocks a malicious
+// website from driving the local server (CSRF) and DNS-rebinding attacks that point a
+// hostile hostname at 127.0.0.1.
+function localOnly(req) {
+  const host = (req.headers.host || '').split(':')[0];
+  if (host && host !== '127.0.0.1' && host !== 'localhost') return false;
+  const origin = req.headers.origin;
+  if (origin) {
+    let h; try { h = new URL(origin).hostname; } catch { return false; }
+    if (h !== '127.0.0.1' && h !== 'localhost') return false;
+  }
+  return true;
+}
+
 function startServer(appRoot, binDir) {
   return new Promise(resolve => {
     const server = http.createServer((req, res) => {
@@ -133,6 +147,7 @@ function startServer(appRoot, binDir) {
       res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
       res.setHeader('Cache-Control', 'no-store');
       const url = decodeURIComponent(req.url.split('?')[0]);
+      if (url.startsWith('/api/') && !localOnly(req)) { res.statusCode = 403; return res.end('forbidden'); }
       if (url === '/api/check')
         return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir) });
       if (url === '/api/update-check')

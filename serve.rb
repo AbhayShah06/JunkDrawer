@@ -36,8 +36,11 @@ end
 
 server.mount_proc('/api/download') do |req, res|
   begin
+    # DNS-rebinding defense: the Host we were reached through must be loopback.
+    host = (req['host'] || '').split(':').first
+    # CSRF defense: a cross-site page's request carries its own Origin; only ours pass.
     origin = req['origin']
-    if origin && !ALLOWED.include?(origin)
+    if (host && !['127.0.0.1', 'localhost'].include?(host)) || (origin && !ALLOWED.include?(origin))
       res.status = 403; res['Content-Type'] = 'application/json'
       res.body = { error: 'blocked cross-site request' }.to_json; next
     end
