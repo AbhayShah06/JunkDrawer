@@ -4,7 +4,7 @@
   "description": "Every annoying file tool in one place.",
   "author": "Abhay Shah",
   "license": "MIT",
-  "repository": "github:abhayshah06/junk-drawer",
+  "repository": "github:AbhayShah06/JunkDrawer",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
@@ -29,7 +29,7 @@
       "x64ArchFiles": "**/bin/*"
     },
     "win": { "target": ["nsis"] },
-    "publish": [{ "provider": "github", "owner": "abhayshah06", "repo": "junk-drawer" }],
+    "publish": [{ "provider": "github", "owner": "AbhayShah06", "repo": "JunkDrawer", "releaseType": "release" }],
     "directories": { "output": "dist-app" }
   }
 }

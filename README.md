@@ -42,8 +42,10 @@ npm run release:mac
 ```
 
 Everyone still on the old version sees the update bar the next time they open the app.
-The release target is `abhayshah06/junk-drawer` (set under `build.publish` in
-`package.json`).
+The release target is `AbhayShah06/JunkDrawer` (set under `build.publish` in
+`package.json`, with `releaseType: "release"` so it publishes immediately — not as a
+draft). If a release ever lands as a draft, publish it with
+`gh release edit vX.Y.Z --repo AbhayShah06/JunkDrawer --draft=false`.
 
 > First-time setup: the repo must exist and you must be logged in as that GitHub account
 > (`gh auth login`). The bundled `yt-dlp`/`ffmpeg` in `resources/bin/` are **not** in the
