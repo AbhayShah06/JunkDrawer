@@ -218,28 +218,27 @@
 
 <main>
   <section class="hero">
-    <h1>Every file task, in one tab.</h1>
-    <p>Convert, shrink, extract, clean, and package files. Drop one in and the right drawer opens.
-       Nothing uploads anywhere; everything runs on your machine.</p>
+    <h1>Every annoying file job, in one place.</h1>
+    <p>Fix files without hunting for a website. Drop one in and the right tools open. Everything happens on your Mac, and your files never leave it.</p>
 
     <div id="drop" tabindex="0">
       <div class="stamp">🗃️</div>
       <div class="big">Drop a file here</div>
-      <div class="sub">image · video · audio · PDF · data · zip &nbsp;·&nbsp; click to browse · paste (⌘V)</div>
+      <div class="sub">photo, video, audio, PDF, or zip. Or click to pick one.</div>
     </div>
     <input type="file" id="file" multiple hidden />
 
     <div class="pasterow">
       <button class="pastebtn" id="pasteBtn">📋 Paste an image</button>
-      <span>copied an image from Discord, WhatsApp, Twitter, or Google? click here (or press ⌘V)</span>
+      <span>Copied an image from somewhere? Click here, or press ⌘V.</span>
     </div>
 
     <div class="cmd">
       <span class="pmt">🔍</span>
-      <input id="q" autocomplete="off" placeholder="Search the tools…   (e.g. compress, mp4 to mp3, heic, remove background)" />
+      <input id="q" autocomplete="off" placeholder="Search for what you want to do, like shrink a video or sign a PDF" />
       <div class="pal" id="pal"></div>
     </div>
-    <div class="hints">Search the tools, paste a YouTube or Spotify link, or open a drawer below.</div>
+    <div class="hints">Search, paste a YouTube link, or open a drawer below.</div>
   </section>
 
   <section id="receipt"></section>
@@ -254,8 +253,7 @@
 <footer><div class="wrap">
   <div>Built by <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">Abhay Shah</a>
     · <a href="https://x.com/AbhayShahCA" target="_blank" rel="noopener">@AbhayShahCA</a></div>
-  <div class="cr">Runs in your browser. Files never leave this machine.<br>
-    Open source under the hood: FFmpeg.wasm · @imgly/background-removal · pdf-lib · pdf.js · heic2any · fflate · js-yaml · yt-dlp · spotdl.</div>
+  <div class="cr">Everything runs on your Mac. Your files never leave your computer.</div>
 </div></footer>
 
 <div class="toast" id="toast"></div>
@@ -398,15 +396,15 @@ function showMulti(files,zipName,note){ const z=zipSync(Object.fromEntries(files
 
 /* ================= TOOL REGISTRY ================= */
 const CATS = {
-  web:  {label:'Download',color:'var(--web)',icon:icon('down'), blurb:'pull video & audio from a link'},
-  pdf:  {label:'PDF',   color:'var(--pdf)', icon:icon('doc'),   blurb:'merge, split, shrink, stamp, renumber'},
-  image:{label:'Image', color:'var(--img)', icon:icon('img'),  blurb:'convert, compress, clean, resize, cut out'},
-  video:{label:'Video', color:'var(--vid)', icon:icon('film'), blurb:'gif, compress, trim, mute, grab frames'},
-  audio:{label:'Audio', color:'var(--aud)', icon:icon('music'),blurb:'convert, trim, level, re-encode'},
-  data: {label:'Data',  color:'var(--data)',icon:icon('grid'), blurb:'csv ↔ json, table wrangling'},
-  dev:  {label:'Dev',   color:'var(--dev)', icon:icon('code'), blurb:'json, yaml, base64, hashes, epochs'},
-  arc:  {label:'Archive',color:'var(--arc)',icon:icon('box'),  blurb:'zip / unzip, bundle for sending'},
-  weird:{label:'Weird', color:'var(--weird)',icon:icon('star'),blurb:'the long-tail odd jobs'},
+  web:  {label:'Download',color:'var(--web)',icon:icon('down'), blurb:'save video or sound from a link'},
+  pdf:  {label:'PDF',   color:'var(--pdf)', icon:icon('doc'),   blurb:'sign, merge, split, shrink, and more'},
+  image:{label:'Image', color:'var(--img)', icon:icon('img'),  blurb:'fix, convert, shrink, and clean up photos'},
+  video:{label:'Video', color:'var(--vid)', icon:icon('film'), blurb:'shrink, trim, convert, grab frames'},
+  audio:{label:'Audio', color:'var(--aud)', icon:icon('music'),blurb:'convert, trim, even out, shrink'},
+  data: {label:'Data',  color:'var(--data)',icon:icon('grid'), blurb:'switch between spreadsheet and JSON'},
+  dev:  {label:'Dev',   color:'var(--dev)', icon:icon('code'), blurb:'codes, data files, and QR codes'},
+  arc:  {label:'Archive',color:'var(--arc)',icon:icon('box'),  blurb:'zip and unzip files'},
+  weird:{label:'Weird', color:'var(--weird)',icon:icon('star'),blurb:'the odd jobs'},
 };
 const T = []; // tools
 const add = t => { T.push(t); return t; };
@@ -416,25 +414,25 @@ const oSel=(label,pairs,key)=>()=>{ const s=el('select'); pairs.forEach(([v,l])=
   return {node:el('label',{},[label+' ',s]),get:()=>({[key]:s.value})}; };
 
 /* ---- IMAGE ---- */
-add({cat:'image',kinds:['image'],rec:1,nm:'Background Remover',ds:'Cut out the subject → transparent PNG',kw:'remove background transparent cutout zap',
-  more:'Cuts the subject out of a photo and gives you a transparent PNG. Best for product shots, profile pics, and stickers. Runs an AI model locally (first use downloads it).',
+add({cat:'image',kinds:['image'],rec:1,nm:'Remove Background',ds:'Cut out the subject and get a clear PNG',kw:'remove background transparent cutout zap',
+  more:'Cuts the subject out of a photo and gives you a see-through PNG. Great for product shots, profile pics, and stickers. The first time you use it, it downloads a small helper once.',
   run:async f=>{ const onP=progress('Removing background (first run downloads the model)'); const b=await bgRemove(f,onP);
     showResult(b,base(f.name)+'-nobg.png'); }});
-add({cat:'image',kinds:['image'],rec:1,nm:'Convert Image',ds:'Change to PNG / JPG / WEBP',kw:'convert format png jpg jpeg webp heic',
-  more:'Change an image between PNG, JPG, and WEBP. JPG for photos, PNG for transparency, WEBP for the web.',
+add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'Switch between PNG, JPG, and WEBP',kw:'convert format png jpg jpeg webp heic',
+  more:'Change an image to PNG, JPG, or WEBP. Use JPG for photos, PNG when you need a clear background, and WEBP for websites.',
   opts:oSel('to',[['image/png','PNG'],['image/jpeg','JPG'],['image/webp','WEBP']],'type'),
   run:async (f,o)=>{ const e={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[o.type];
     showResult(await imgConvert(f,{type:o.type}),base(f.name)+'.'+e); }});
-add({cat:'image',kinds:['image'],rec:1,nm:'Compress Image',ds:'Shrink to a target file size',kw:'compress smaller reduce size optimize',
-  more:'Shrink an image to a file-size limit you set (like "under 8 MB"), keeping it as large and sharp as it can while hitting the target.',
+add({cat:'image',kinds:['image'],rec:1,nm:'Shrink File Size',ds:'Squeeze an image under a size you pick',kw:'compress smaller reduce size optimize',
+  more:'Make an image fit a size limit you set, like under 8 MB. It keeps the picture as big and sharp as it can while hitting your target.',
   opts:oNum('target','8','MB','mb',{min:.2,step:.5}),
   run:async (f,o)=>{ showResult(await compressTo(f,(o.mb||8)*1048576,'image/jpeg'),base(f.name)+'-small.jpg',{note:`aimed at ${o.mb} MB`}); }});
-add({cat:'image',kinds:['image'],nm:'Resize Image',ds:'Cap the largest dimension',kw:'resize scale dimensions shrink',
-  more:'Cap the longest side to a pixel limit so the image is no bigger than it needs to be (e.g. 1920px for the web).',
+add({cat:'image',kinds:['image'],nm:'Resize Image',ds:'Set the longest side in pixels',kw:'resize scale dimensions shrink',
+  more:'Set how long the longest side can be, so the image is no bigger than you need. For example, use 1920 pixels for the web.',
   opts:oNum('max side','1920','px','maxDim',{min:16,step:16}),
   run:async (f,o)=>{ showResult(await imgConvert(f,{type:'image/png',maxDim:o.maxDim||1920}),base(f.name)+'-'+(o.maxDim||1920)+'.png'); }});
-add({cat:'image',kinds:['image'],nm:'Rotate / Flip',ds:'Turn or mirror an image',kw:'rotate flip mirror turn',
-  more:'Turn an image 90° or 180°, or mirror it left-right / top-bottom. Handy for sideways phone photos.',
+add({cat:'image',kinds:['image'],nm:'Rotate or Flip',ds:'Turn or mirror an image',kw:'rotate flip mirror turn',
+  more:'Turn an image a quarter or half turn, or mirror it side to side or top to bottom. Handy for sideways phone photos.',
   opts:oSel('do',[['r90','Rotate 90° CW'],['r270','Rotate 90° CCW'],['r180','Rotate 180°'],['fh','Flip horizontal'],['fv','Flip vertical']],'op'),
   run:async (f,o)=>{ const {img,url}=await toImage(f); const swap=o.op==='r90'||o.op==='r270';
     const c=el('canvas'); c.width=swap?img.naturalHeight:img.naturalWidth; c.height=swap?img.naturalWidth:img.naturalHeight;
@@ -443,89 +441,89 @@ add({cat:'image',kinds:['image'],nm:'Rotate / Flip',ds:'Turn or mirror an image'
     else if(o.op==='fh')x.scale(-1,1); else if(o.op==='fv')x.scale(1,-1);
     x.drawImage(img,-img.naturalWidth/2,-img.naturalHeight/2); URL.revokeObjectURL(url);
     showResult(await blobOf(c,'image/png',.95),base(f.name)+'-turned.png'); }});
-add({cat:'image',kinds:['image'],rec:1,nm:'Remove Metadata',ds:'Strip EXIF, GPS & camera data',kw:'remove metadata exif gps location privacy strip clean',
-  more:'Strips hidden EXIF, camera, and GPS-location data by re-encoding the image. Use it before sharing a photo publicly.',
+add({cat:'image',kinds:['image'],rec:1,nm:'Remove Hidden Info',ds:'Drop GPS, camera, and date tags',kw:'remove metadata exif gps location privacy strip clean',
+  more:'Removes hidden tags like your location, camera, and date by saving the image fresh. Do this before you post a photo in public.',
   run:async f=>{ const onP=progress('Scrubbing metadata'); onP(.4);
     const isPng=ext(f.name)==='png'; const b=await imgConvert(f,{type:isPng?'image/png':'image/jpeg',quality:.95});
     showResult(b,base(f.name)+'-clean.'+(isPng?'png':'jpg'),{note:'re-encoded with no embedded metadata.'}); }});
-add({cat:'image',kinds:['image'],nm:'Add Background',ds:'Solid color behind transparency',kw:'white background flatten backdrop solid',
-  more:'Places a solid color behind a transparent image, like a white card behind a logo or a colored backdrop for a cut-out.',
+add({cat:'image',kinds:['image'],nm:'Add a Background',ds:'Put a solid color behind clear areas',kw:'white background flatten backdrop solid',
+  more:'Puts a solid color behind a see-through image, like a white card behind a logo or a colored backdrop behind a cut-out.',
   opts:oSel('color',[['#ffffff','White'],['#000000','Black'],['#e9dec7','Paper'],['#0b57d0','Blue']],'bg'),
   run:async (f,o)=>{ const {img,url}=await toImage(f); const c=el('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
     const x=c.getContext('2d'); x.fillStyle=o.bg; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0); URL.revokeObjectURL(url);
     showResult(await blobOf(c,'image/jpeg',.92),base(f.name)+'-bg.jpg'); }});
-add({cat:'image',kinds:['image'],nm:'Make Favicon / Icons',ds:'Full square icon set (zipped)',kw:'favicon icon app icon set',
-  more:'Generates a set of square icon sizes (16–512px) for a website or app, zipped together.',
+add({cat:'image',kinds:['image'],nm:'Make App Icons',ds:'Square icons in every size, zipped',kw:'favicon icon app icon set',
+  more:'Makes a set of square icons from 16 up to 512 pixels for a website or app, all in one zip file.',
   run:async f=>{ const onP=progress('Stamping icons'); const {img,url}=await toImage(f); const sizes=[16,32,48,64,180,192,512]; const out=[];
     for(let i=0;i<sizes.length;i++){ onP((i+1)/sizes.length); const s=sizes[i]; const c=el('canvas'); c.width=c.height=s;
       c.getContext('2d').drawImage(img,0,0,s,s); const b=await blobOf(c,'image/png',1);
       out.push({name:`icon-${s}.png`,data:new Uint8Array(await b.arrayBuffer())}); }
     URL.revokeObjectURL(url); showMulti(out,base(f.name)+'-icons.zip','7 PNG sizes (16→512). Rename icon-32 to favicon.png for the web.'); }});
-add({cat:'image',kinds:['image'],nm:'Image to PDF',ds:'Wrap an image in a PDF',kw:'image to pdf',
-  more:'Wraps a single image in a one-page PDF, sized to the image.',
+add({cat:'image',kinds:['image'],nm:'Image to PDF',ds:'Turn an image into a one-page PDF',kw:'image to pdf',
+  more:'Puts a single image into a one-page PDF, sized to fit the picture.',
   run:async f=>{ const onP=progress('Making PDF'); onP(.3); const png=await imgConvert(f,{type:'image/png'});
     const pdf=await PDFDocument.create(); const im=await pdf.embedPng(await png.arrayBuffer());
     pdf.addPage([im.width,im.height]).drawImage(im,{x:0,y:0,width:im.width,height:im.height});
     showResult(new Blob([await pdf.save()],{type:'application/pdf'}),base(f.name)+'.pdf'); }});
 
 /* ---- VIDEO ---- */
-add({cat:'video',kinds:['video'],rec:1,nm:'Video to GIF',ds:'Make a looping GIF',kw:'gif convert to gif loop discord',
-  more:'Turns a short clip into a looping GIF for Discord or chat. Pick the frame rate and width to balance smoothness vs. size.',
+add({cat:'video',kinds:['video'],rec:1,nm:'Video to GIF',ds:'Turn a clip into a looping GIF',kw:'gif convert to gif loop discord',
+  more:'Turns a short clip into a looping GIF you can post in a chat. You set the width and smoothness.',
   opts:()=>{ const fps=el('input',{type:'number',value:12,min:4,max:30}); const w=el('input',{type:'number',value:480,min:120,step:20});
     return {node:el('div',{},[el('label',{},['fps ',fps]),el('label',{},['width ',w,' px'])]),get:()=>({fps:+fps.value||12,w:+w.value||480})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.gif',(i,out)=>['-i',i,'-vf',
     `fps=${o.fps},scale=${o.w}:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse`,'-loop','0',out],'Rendering GIF'),base(f.name)+'.gif'); }});
-add({cat:'video',kinds:['video'],rec:1,nm:'Compress Video',ds:'Shrink to a target size',kw:'compress shrink smaller size discord email tiny',
-  more:'Re-encodes a video to land near a size limit you set, so it fits Discord, email, or an upload portal. Reads the clip length to pick the bitrate.',
+add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make the file smaller to send',kw:'compress shrink smaller size discord email tiny',
+  more:'Makes a video small enough to fit an email or upload limit. You pick the size you want in MB.',
   opts:oNum('target','10','MB','mb',{min:1,step:1}),
   run:async (f,o)=>{ const onP=progress('Reading length'); const dur=await videoDuration(f)||30;
     const target=(o.mb||10)*1048576*8; const vkbps=Math.max(150,Math.floor(target/dur/1000-128));
     showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-b:v',vkbps+'k','-maxrate',vkbps+'k',
       '-bufsize',(vkbps*2)+'k','-preset','veryfast','-vf','scale=-2:min(720\\,ih)','-c:a','aac','-b:a','128k',out],'Compressing video'),
       base(f.name)+'-small.mp4',{note:`~${o.mb} MB target (${vkbps}kbps video).`}); }});
-add({cat:'video',kinds:['video'],rec:1,nm:'Extract Audio',ds:'Pull the soundtrack as MP3',kw:'extract audio mp3 sound from video',
-  more:'Pulls just the soundtrack out of a video and saves it as an MP3.',
+add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the sound out as an MP3',kw:'extract audio mp3 sound from video',
+  more:'Takes just the sound from a video and saves it as an MP3 file.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-acodec','libmp3lame','-q:a','2',out],'Extracting audio'),base(f.name)+'.mp3'); }});
-add({cat:'video',kinds:['video'],nm:'Convert to MP4',ds:'Universal-friendly H.264',kw:'convert mp4 h264 mov mkv webm',
-  more:'Re-wraps MOV / MKV / WEBM / AVI into a widely-compatible H.264 MP4 that plays almost anywhere.',
+add({cat:'video',kinds:['video'],nm:'Make It an MP4',ds:'Change a video to MP4',kw:'convert mp4 h264 mov mkv webm',
+  more:'Changes a MOV, MKV, WEBM, or AVI video into an MP4 that plays almost anywhere.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-crf','23','-preset','veryfast','-c:a','aac',out],'Converting to MP4'),base(f.name)+'.mp4'); }});
-add({cat:'video',kinds:['video'],nm:'Trim Video',ds:'Keep just part of the clip',kw:'trim cut clip shorten',
-  more:'Keeps only the part between a start and end time and drops the rest. Times are mm:ss.',
+add({cat:'video',kinds:['video'],nm:'Trim a Video',ds:'Keep just one part of the clip',kw:'trim cut clip shorten',
+  more:'Keeps only the part between a start and end time and drops the rest. Times are in minutes and seconds.',
   opts:()=>{ const a=el('input',{type:'text',value:'00:00',placeholder:'mm:ss'}); const b=el('input',{type:'text',value:'00:10',placeholder:'mm:ss'});
     return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-c:v','libx264','-preset','veryfast','-c:a','aac',out],'Clipping'),base(f.name)+'-clip.mp4'); }});
-add({cat:'video',kinds:['video'],nm:'Remove Audio',ds:'Strip the audio track',kw:'mute remove audio silence',
-  more:'Removes the audio track and keeps the picture. Good for muting background noise before sharing.',
+add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'mute remove audio silence',
+  more:'Removes the sound and keeps the picture. Good for hiding background noise before you share.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
-add({cat:'video',kinds:['video'],nm:'Grab a Frame',ds:'Save a still frame as PNG',kw:'thumbnail frame screenshot still poster',
-  more:'Saves a single still frame from a chosen moment (mm:ss) as a PNG. Handy for thumbnails.',
+add({cat:'video',kinds:['video'],nm:'Save a Photo from a Video',ds:'Save one moment as a picture',kw:'thumbnail frame screenshot still poster',
+  more:'Saves a single still picture from a moment you pick. Good for a thumbnail or poster image.',
   opts:()=>{ const t=el('input',{type:'text',value:'00:01',placeholder:'mm:ss'}); return {node:el('label',{},['at ',t]),get:()=>({t:t.value})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.png',(i,out)=>['-ss',o.t,'-i',i,'-vframes','1',out],'Grabbing frame'),base(f.name)+'-frame.png'); }});
 
 /* ---- AUDIO ---- */
-add({cat:'audio',kinds:['audio'],rec:1,nm:'Convert Audio',ds:'MP3 · WAV · M4A · OGG · FLAC',kw:'convert audio mp3 wav m4a ogg flac',
-  more:'Change audio between MP3, WAV, M4A, OGG, FLAC, and AAC.',
+add({cat:'audio',kinds:['audio'],rec:1,nm:'Convert Audio',ds:'Switch between MP3, WAV, M4A, OGG, FLAC, AAC',kw:'convert audio mp3 wav m4a ogg flac',
+  more:'Turn a sound file into a different format. Pick the type you want and save the new file.',
   opts:oSel('to',[['mp3','MP3'],['wav','WAV'],['m4a','M4A'],['ogg','OGG'],['flac','FLAC'],['aac','AAC']],'e'),
   run:async (f,o)=>{ const c={mp3:['-acodec','libmp3lame','-q:a','2'],wav:[],m4a:['-acodec','aac'],ogg:['-acodec','libvorbis'],flac:['-acodec','flac'],aac:['-acodec','aac']}[o.e];
     showResult(await runFF(f,'out.'+o.e,(i,out)=>['-i',i,...c,out],'Converting audio'),base(f.name)+'.'+o.e); }});
-add({cat:'audio',kinds:['audio'],nm:'Normalize Volume',ds:'Even out the loudness',kw:'normalize volume loudness level',
-  more:'Evens out loudness so quiet and loud parts sit at a consistent level. Good for voice memos and recordings.',
+add({cat:'audio',kinds:['audio'],nm:'Even Out Volume',ds:'Make quiet and loud parts match',kw:'normalize volume loudness level',
+  more:'Levels out the loudness so soft and loud parts sound about the same. Good for voice memos and recordings.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-af','loudnorm','-acodec','libmp3lame','-q:a','2',out],'Normalizing'),base(f.name)+'-leveled.mp3'); }});
-add({cat:'audio',kinds:['audio'],nm:'Trim Audio',ds:'Keep just part of it',kw:'trim cut audio',
-  more:'Keeps only the part between a start and end time (mm:ss).',
+add({cat:'audio',kinds:['audio'],nm:'Trim Audio',ds:'Keep only the part you want',kw:'trim cut audio',
+  more:'Set a start and end time and keep just that stretch of sound. The rest gets cut away.',
   opts:()=>{ const a=el('input',{type:'text',value:'00:00'}); const b=el('input',{type:'text',value:'00:30'});
     return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-acodec','libmp3lame','-q:a','2',out],'Trimming'),base(f.name)+'-trim.mp3'); }});
-add({cat:'audio',kinds:['audio'],nm:'Reduce Bitrate',ds:'Re-encode smaller',kw:'bitrate compress smaller audio',
-  more:'Re-encodes audio at a lower kbps to make the file smaller. Lower bitrate = smaller file, less fidelity.',
+add({cat:'audio',kinds:['audio'],nm:'Shrink Audio File',ds:'Make the file smaller',kw:'bitrate compress smaller audio',
+  more:'Saves the sound at a lower quality so the file takes up less space. Lower quality means a smaller file.',
   opts:oSel('bitrate',[['128','128 kbps'],['96','96 kbps'],['64','64 kbps'],['192','192 kbps']],'kb'),
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-b:a',o.kb+'k','-acodec','libmp3lame',out],'Re-encoding'),base(f.name)+'-'+o.kb+'k.mp3'); }});
 
 /* ---- PDF ---- */
-add({cat:'pdf',kinds:['pdf'],rec:1,custom:f=>pdfSignFill(f),nm:'Sign & Fill PDF',ds:'Add signatures, text & dates',kw:'sign signature fill form text date annotate edit adobe acrobat esign initials',
-  more:'Open a PDF and place your signature (draw, type, or upload), plus text and today’s date, anywhere on the page — then export. Like Adobe Fill & Sign, but everything stays on your machine.'});
-add({cat:'pdf',kinds:['pdf'],rec:1,nm:'Compress PDF',ds:'Make a PDF smaller',kw:'compress shrink pdf smaller size squish',
-  more:'Flattens each page to an image to shrink a heavy PDF. Works best on scanned documents; text stays readable but is no longer selectable.',
+add({cat:'pdf',kinds:['pdf'],rec:1,custom:f=>pdfSignFill(f),nm:'Sign & Fill PDF',ds:'Add a signature, text, and the date',kw:'sign signature fill form text date annotate edit adobe acrobat esign initials',
+  more:'Open a PDF and drop your signature, text, and today\'s date anywhere on the page, then save it. Your file stays on your Mac.'});
+add({cat:'pdf',kinds:['pdf'],rec:1,nm:'Shrink a PDF',ds:'Make a big PDF smaller',kw:'compress shrink pdf smaller size squish',
+  more:'Turns each page into a picture to cut the file size. Best for scanned documents. The text still shows but you can no longer select it.',
   run:async f=>{ const onP=progress('Compressing PDF'); const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
     const pdf=await PDFDocument.create();
     for(let p=1;p<=doc.numPages;p++){ onP(p/doc.numPages); const pg=await doc.getPage(p); const vp=pg.getViewport({scale:1.5});
@@ -533,99 +531,99 @@ add({cat:'pdf',kinds:['pdf'],rec:1,nm:'Compress PDF',ds:'Make a PDF smaller',kw:
       const jpg=await blobOf(c,'image/jpeg',.7); const im=await pdf.embedJpg(await jpg.arrayBuffer());
       pdf.addPage([vp.width,vp.height]).drawImage(im,{x:0,y:0,width:vp.width,height:vp.height}); }
     showResult(new Blob([await pdf.save()],{type:'application/pdf'}),base(f.name)+'-small.pdf'); }});
-add({cat:'pdf',kinds:['pdf'],rec:1,nm:'PDF to Images',ds:'Each page as a PNG (zipped)',kw:'pdf to images png export pages',
-  more:'Renders each page to a high-resolution PNG and zips them. Good for posting pages as pictures.',
+add({cat:'pdf',kinds:['pdf'],rec:1,nm:'PDF to Pictures',ds:'Save each page as a PNG image',kw:'pdf to images png export pages',
+  more:'Turns every page into a sharp PNG picture and puts them in a zip. Handy for sharing pages as images.',
   run:async f=>{ const onP=progress('Rendering pages'); const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise; const out=[];
     for(let p=1;p<=doc.numPages;p++){ onP(p/doc.numPages); const pg=await doc.getPage(p); const vp=pg.getViewport({scale:2});
       const c=el('canvas'); c.width=vp.width; c.height=vp.height; await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
       const b=await blobOf(c,'image/png',.95); out.push({name:`${base(f.name)}-p${String(p).padStart(2,'0')}.png`,data:new Uint8Array(await b.arrayBuffer())}); }
     out.length===1?showResult(new Blob([out[0].data],{type:'image/png'}),out[0].name):showMulti(out,base(f.name)+'-pages.zip'); }});
-add({cat:'pdf',kinds:['pdf'],nm:'Split into Pages',ds:'One PDF per page (zipped)',kw:'split pages separate pdf',
-  more:'Breaks a PDF into one file per page, zipped together.',
+add({cat:'pdf',kinds:['pdf'],nm:'Split into Single Pages',ds:'Make one PDF per page',kw:'split pages separate pdf',
+  more:'Breaks a PDF into a separate file for each page and puts them all in a zip.',
   run:async f=>{ const onP=progress('Splitting'); const src=await PDFDocument.load(await f.arrayBuffer()); const n=src.getPageCount(); const out=[];
     for(let i=0;i<n;i++){ onP((i+1)/n); const d=await PDFDocument.create(); const [pg]=await d.copyPages(src,[i]); d.addPage(pg);
       out.push({name:`${base(f.name)}-p${String(i+1).padStart(2,'0')}.pdf`,data:await d.save()}); }
     showMulti(out,base(f.name)+'-split.zip'); }});
-add({cat:'pdf',kinds:['pdf'],nm:'Rotate Pages',ds:'Turn every page',kw:'rotate pages turn orientation',
-  more:'Turns every page 90° or 180°, e.g. to fix a sideways scan.',
+add({cat:'pdf',kinds:['pdf'],nm:'Turn Pages',ds:'Turn every page the right way up',kw:'rotate pages turn orientation',
+  more:'Turns every page 90 or 180 degrees. Fixes a scan that came out sideways or upside down.',
   opts:oSel('turn',[['90','90° clockwise'],['270','90° counter-clockwise'],['180','180°']],'deg'),
   run:async (f,o)=>{ const onP=progress('Rotating'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
     d.getPages().forEach(p=>p.setRotation(degrees((p.getRotation().angle+ +o.deg)%360)));
     showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-rotated.pdf'); }});
-add({cat:'pdf',kinds:['pdf'],nm:'Add Page Numbers',ds:'Stamp page numbers',kw:'page numbers number stamp footer',
-  more:'Stamps "n / total" at the bottom-center of every page.',
+add({cat:'pdf',kinds:['pdf'],nm:'Add Page Numbers',ds:'Number every page',kw:'page numbers number stamp footer',
+  more:'Stamps the page number at the bottom of each page, like 3 / 12.',
   run:async f=>{ const onP=progress('Numbering'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
     const font=await d.embedFont(StandardFonts.Helvetica); const ps=d.getPages();
     ps.forEach((p,i)=>{ const {width}=p.getSize(); p.drawText(`${i+1} / ${ps.length}`,{x:width/2-14,y:18,size:10,font,color:rgb(.2,.2,.2)}); });
     showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-numbered.pdf'); }});
-add({cat:'pdf',kinds:['pdf'],nm:'Add Watermark',ds:'Stamp text across pages',kw:'watermark stamp text overlay draft confidential',
-  more:'Prints faint diagonal text (like CONFIDENTIAL or DRAFT) across every page.',
+add({cat:'pdf',kinds:['pdf'],nm:'Add a Watermark',ds:'Stamp text across every page',kw:'watermark stamp text overlay draft confidential',
+  more:'Prints faint slanted text across every page, like CONFIDENTIAL or DRAFT. Type your own words.',
   opts:()=>{ const t=el('input',{type:'text',value:'CONFIDENTIAL'}); return {node:el('label',{},['text ',t]),get:()=>({t:t.value||'DRAFT'})}; },
   run:async (f,o)=>{ const onP=progress('Stamping'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
     const font=await d.embedFont(StandardFonts.HelveticaBold);
     d.getPages().forEach(p=>{ const {width,height}=p.getSize();
       p.drawText(o.t,{x:width/2-120,y:height/2,size:50,font,color:rgb(.6,.1,.1),opacity:.18,rotate:degrees(35)}); });
     showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-marked.pdf'); }});
-add({cat:'pdf',kinds:['pdf'],nm:'Delete Pages',ds:'Remove pages by number',kw:'delete remove pages drop',
-  more:'Removes specific pages by number. Use commas and ranges, e.g. 1,3,5-7.',
+add({cat:'pdf',kinds:['pdf'],nm:'Delete Pages',ds:'Take out pages you don\'t want',kw:'delete remove pages drop',
+  more:'Removes the pages you name. Type page numbers with commas and ranges, like 1,3,5-7.',
   opts:()=>{ const t=el('input',{type:'text',value:'1',placeholder:'e.g. 1,3,5-7'}); return {node:el('label',{},['remove ',t]),get:()=>({spec:t.value})}; },
   run:async (f,o)=>{ const onP=progress('Removing'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
     const drop=new Set(); o.spec.split(',').forEach(s=>{ s=s.trim(); if(s.includes('-')){ const [a,b]=s.split('-').map(Number);
       for(let i=a;i<=b;i++)drop.add(i-1);} else if(s)drop.add(+s-1); });
     [...drop].sort((a,b)=>b-a).forEach(i=>{ if(i>=0&&i<d.getPageCount())d.removePage(i); });
     showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-trimmed.pdf'); }});
-add({cat:'pdf',kinds:['pdf'],multi:1,nm:'Merge PDFs',ds:'Combine several PDFs in order',kw:'merge combine join pdf',
-  more:'Joins several PDFs into one, in the order you pick them. Drop multiple PDFs at once to use this.',
+add({cat:'pdf',kinds:['pdf'],multi:1,nm:'Combine PDFs',ds:'Join several PDFs into one',kw:'merge combine join pdf',
+  more:'Joins your PDFs into a single file, in the order you pick them. Drop in more than one PDF to use this.',
   run:async fs=>{ const onP=progress('Merging'); const m=await PDFDocument.create();
     for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); const d=await PDFDocument.load(await fs[i].arrayBuffer());
       (await m.copyPages(d,d.getPageIndices())).forEach(p=>m.addPage(p)); }
     showResult(new Blob([await m.save()],{type:'application/pdf'}),'merged.pdf'); }});
 
 /* ---- DATA ---- */
-add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'CSV to JSON',ds:'Table → array of objects',kw:'csv json convert data table',
-  more:'Turns a spreadsheet-style CSV into a JSON array of objects, using the first row as keys.',
+add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'CSV to JSON',ds:'Turn a spreadsheet into JSON',kw:'csv json convert data table',
+  more:'Takes a spreadsheet-style CSV and turns it into JSON. The first row becomes the field names.',
   fileToText:1, run:(text)=>showText(csvToJSON(text),'data.json')});
-add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'JSON to CSV',ds:'Array of objects → table',kw:'json csv convert data table',
-  more:'Turns a JSON array of objects into a CSV table, with a header row from the keys.',
+add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'JSON to CSV',ds:'Turn JSON into a spreadsheet',kw:'json csv convert data table',
+  more:'Takes a JSON list and turns it into a CSV you can open in a spreadsheet. The field names become the top row.',
   fileToText:1, run:(text)=>showText(jsonToCSV(text),'data.csv')});
 
 /* ---- DEV (text in / text out) ---- */
-add({cat:'dev',input:'text',nm:'Format JSON',ds:'Prettify or minify JSON',kw:'json format pretty minify beautify tidy',
-  more:'Prettifies messy JSON with indentation, or minifies it to a single line. Also validates it.',
+add({cat:'dev',input:'text',nm:'Tidy Up JSON',ds:'Clean up or shrink a JSON file',kw:'json format pretty minify beautify tidy',
+  more:'Paste messy JSON and get it laid out neatly, or squeezed onto one line. It also tells you if the JSON has a mistake.',
   opts:oSel('mode',[['pretty','Prettify'],['min','Minify']],'m'),
   run:(text,o)=>showText(JSON.stringify(JSON.parse(text),null,o.m==='min'?0:2),'tidy.json')});
-add({cat:'dev',input:'text',nm:'JSON ⇄ YAML',ds:'Convert between JSON and YAML',kw:'json yaml convert',
-  more:'Converts config back and forth between JSON and YAML.',
+add({cat:'dev',input:'text',nm:'Switch Between JSON and YAML',ds:'Turn JSON into YAML or back again',kw:'json yaml convert',
+  more:'Converts a settings file between the two common formats, JSON and YAML. Pick which way to convert and paste your text.',
   opts:oSel('direction',[['j2y','JSON → YAML'],['y2j','YAML → JSON']],'d'),
   run:async (text,o)=>{ const YAML=await import("https://esm.sh/js-yaml@4.1.0");
     if(o.d==='j2y') showText(YAML.dump(JSON.parse(text)),'out.yaml'); else showText(JSON.stringify(YAML.load(text),null,2),'out.json'); }});
-add({cat:'dev',input:'text',nm:'Base64 Encode / Decode',ds:'Encode or decode text',kw:'base64 encode decode',
-  more:'Encodes text to Base64, or decodes Base64 back to text.',
+add({cat:'dev',input:'text',nm:'Scramble Text to Base64',ds:'Turn text into Base64 or back',kw:'base64 encode decode',
+  more:'Turns plain text into Base64, a scrambled form some apps and emails use. It can also turn Base64 back into normal text.',
   opts:oSel('do',[['enc','Encode'],['dec','Decode']],'d'),
   run:(text,o)=>showText(o.d==='enc'?btoa(unescape(encodeURIComponent(text))):decodeURIComponent(escape(atob(text.trim()))),'base64.txt')});
-add({cat:'dev',input:'text',nm:'URL Encode / Decode',ds:'Percent-encode or decode',kw:'url encode decode percent escape',
-  more:'Percent-encodes text so it is safe in a URL, or decodes it back.',
+add({cat:'dev',input:'text',nm:'Make Text Safe for a Web Link',ds:'Fix text so it works in a web link',kw:'url encode decode percent escape',
+  more:'Rewrites spaces and symbols so your text fits safely inside a web link. It can also turn an encoded link back into plain text.',
   opts:oSel('do',[['enc','Encode'],['dec','Decode']],'d'),
   run:(text,o)=>showText(o.d==='enc'?encodeURIComponent(text):decodeURIComponent(text),'url.txt')});
-add({cat:'dev',input:'text',nm:'Hash Text',ds:'SHA-256 / SHA-1 / SHA-512',kw:'hash sha256 sha1 checksum digest',
-  more:'Computes a cryptographic digest (SHA-256, SHA-1, or SHA-512) of whatever you paste.',
+add({cat:'dev',input:'text',nm:'Make a Text Fingerprint',ds:'Get a unique code for your text',kw:'hash sha256 sha1 checksum digest',
+  more:'Turns your text into a fixed string of letters and numbers that acts like a fingerprint. The same text always gives the same code, so you can check if two things match.',
   opts:oSel('algo',[['SHA-256','SHA-256'],['SHA-1','SHA-1'],['SHA-512','SHA-512']],'a'),
   run:async (text,o)=>{ const buf=await crypto.subtle.digest(o.a,new TextEncoder().encode(text));
     showText([...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''),'hash.txt'); }});
-add({cat:'dev',input:'text',nm:'Unix Time Converter',ds:'Timestamp ⇄ date',kw:'timestamp epoch unix date time convert',
-  more:'Converts a Unix timestamp to a readable date, or a date string back to a timestamp.',
+add({cat:'dev',input:'text',nm:'Read a Computer Timestamp',ds:'Turn a number timestamp into a date',kw:'timestamp epoch unix date time convert',
+  more:'Computers often store time as a long number of seconds. This turns that number into a readable date, or turns a date back into the number.',
   opts:oSel('dir',[['t2d','Timestamp → date'],['d2t','Date → timestamp']],'d'),
   run:(text,o)=>{ const v=text.trim(); if(o.d==='t2d'){ const n=+v; const ms=v.length>11?n:n*1000;
     showText(new Date(ms).toString()+'\n'+new Date(ms).toISOString(),'date.txt'); }
     else showText(String(Math.floor(new Date(v).getTime()/1000)),'epoch.txt'); }});
-add({cat:'dev',input:'text',rec:1,nm:'QR Code Generator',ds:'Turn a URL or text into a QR',kw:'qr code generate make url link create barcode',
-  more:'Type a URL or any text and get a QR code PNG you can download, copy, or drag out. Bigger size = easier to scan from a distance.',
+add({cat:'dev',input:'text',rec:1,nm:'Make a QR Code',ds:'Turn a link or text into a QR code',kw:'qr code generate make url link create barcode',
+  more:'Type a web link or any text and get a QR code picture you can save or share. Pick a bigger size to make it easy to scan from far away.',
   opts:oSel('size',[['8','Medium'],['5','Small'],['13','Large']],'scale'),
   run:async (text,o)=>{ const t=(text||'').trim(); if(!t) throw new Error('Type a URL or some text first.');
     const QR=await qrGen(); const dataUrl=await QR.toDataURL(t,{margin:2,scale:+o.scale||8,errorCorrectionLevel:'M'});
     showResult(await (await fetch(dataUrl)).blob(),'qr.png',{note:'Scan to open: '+(t.length>60?t.slice(0,60)+'…':t)}); }});
-add({cat:'dev',kinds:['image'],rec:1,nm:'QR Code Reader',ds:'Decode a QR from an image',kw:'qr code read scan decode reverse barcode image',
-  more:'Drop a photo or screenshot containing a QR code and it reads out the URL or text. The reverse of the generator.',
+add({cat:'dev',kinds:['image'],rec:1,nm:'Read a QR Code',ds:'Pull the link out of a QR code image',kw:'qr code read scan decode reverse barcode image',
+  more:'Drop in a photo or screenshot with a QR code and it shows you the link or text inside. This is the reverse of making a QR code.',
   run:async f=>{ const onP=progress('Reading QR'); onP(.3); const {img,url}=await toImage(f);
     const c=canvasOf(img,1600); const d=c.getContext('2d').getImageData(0,0,c.width,c.height); URL.revokeObjectURL(url);
     const jsQR=await qrDec(); const res=jsQR(d.data,c.width,c.height);
@@ -633,21 +631,21 @@ add({cat:'dev',kinds:['image'],rec:1,nm:'QR Code Reader',ds:'Decode a QR from an
     showText(res.data,'qr.txt'); }});
 
 /* ---- ARCHIVE ---- */
-add({cat:'arc',kinds:['archive'],rec:1,nm:'Unzip Archive',ds:'Pull files out of a .zip',kw:'unzip extract archive open zip',
-  more:'Opens a .zip and repackages its contents (Mac __MACOSX junk removed). Only .zip is supported here.',
+add({cat:'arc',kinds:['archive'],rec:1,nm:'Unzip a File',ds:'Pull the files out of a .zip',kw:'unzip extract archive open zip',
+  more:'Opens a .zip and pulls the files back out. It also clears out the hidden Mac junk that zips often carry.',
   run:async f=>{ const onP=progress('Unpacking'); onP(.3); const data=new Uint8Array(await f.arrayBuffer()); const files=unzipSync(data);
     const out=Object.entries(files).filter(([n])=>!n.endsWith('/')&&!n.startsWith('__MACOSX')).map(([name,d])=>({name,data:d}));
     if(!out.length)throw new Error('Empty or unsupported archive (only .zip is supported here).');
     showMulti(out,base(f.name)+'-unpacked.zip',`unpacked ${out.length} files (re-zipped, junk removed).`); }});
-add({cat:'arc',multi:1,nm:'Zip Files',ds:'Bundle files into one .zip',kw:'zip compress archive bundle package',
-  more:'Bundles several files into a single .zip for sending. Drop multiple files at once to use this.',
+add({cat:'arc',multi:1,nm:'Zip Files',ds:'Put several files into one .zip',kw:'zip compress archive bundle package',
+  more:'Bundles the files you drop in into one .zip, handy for sending. Drop more than one file to use it.',
   run:async fs=>{ const onP=progress('Zipping'); const entries={};
     for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); entries[fs[i].name]=new Uint8Array(await fs[i].arrayBuffer()); }
     showMulti(Object.entries(entries).map(([name,data])=>({name,data})),'bundle.zip'); }});
 
 /* ---- WEIRD ---- */
-add({cat:'weird',kinds:['any'],rec:1,nm:'Inspect File',ds:'What is this file, really?',kw:'inspect identify type metadata what is detective info magic',
-  more:'Reads the first bytes to tell you what a file truly is, regardless of its extension, plus its size, dimensions/length, and SHA-256.',
+add({cat:'weird',kinds:['any'],rec:1,nm:'Look Inside a File',ds:'See what a file really is',kw:'inspect identify type metadata what is detective info magic',
+  more:'Tells you what a file truly is even when its name lies, plus its size and a unique fingerprint. The file stays on your Mac.',
   run:async f=>{ const onP=progress('Investigating'); onP(.3); const buf=new Uint8Array(await f.slice(0,16).arrayBuffer());
     const hex=[...buf].map(b=>b.toString(16).padStart(2,'0')).join(' ');
     const sig=magic(buf); let extra='';
@@ -665,20 +663,18 @@ true type    ${sig||'unknown / plain data'}
 mime (os)    ${f.type||'-'}
 ${extra}magic bytes  ${hex}
 sha-256      ${sha}`, base(f.name)+'-report.txt'); }});
-add({cat:'weird',kinds:['video','image'],nm:'GIF to MP4',ds:'Animated GIF → tiny MP4',kw:'gif to mp4 convert animation',
-  more:'Converts an animated GIF into a much smaller MP4 (great for sharing big GIFs).',
+add({cat:'weird',kinds:['video','image'],nm:'GIF to Video',ds:'Turn a GIF into a small video',kw:'gif to mp4 convert animation',
+  more:'Turns an animated GIF into a small MP4 video that is easy to share. Runs on your Mac.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-movflags','faststart','-pix_fmt','yuv420p','-vf','scale=trunc(iw/2)*2:trunc(ih/2)*2',out],'Converting'),base(f.name)+'.mp4'); }});
-add({cat:'weird',kinds:['image'],nm:'HEIC to JPG',ds:'iPhone HEIC → JPG',kw:'heic heif iphone jpg convert',
-  more:'Converts iPhone HEIC photos into ordinary JPG that opens anywhere.',
+add({cat:'weird',kinds:['image'],nm:'iPhone Photo to JPG',ds:'Change an iPhone HEIC photo to JPG',kw:'heic heif iphone jpg convert',
+  more:'Changes an iPhone HEIC photo into a normal JPG that opens on any device. The photo stays on your Mac.',
   run:async f=>{ showResult(await imgConvert(f,{type:'image/jpeg',quality:.92}),base(f.name)+'.jpg'); }});
 
 /* ---- WEB / DOWNLOAD (link in, file out; needs the local server) ---- */
-add({cat:'web',input:'url',mode:'video',needs:'ytdlp',nm:'YouTube → Video',ds:'Download a video as MP4',kw:'youtube download video mp4 vimeo twitch save',
-  more:'Saves a YouTube (or any yt-dlp-supported site) video as an MP4. Runs yt-dlp on your machine.'});
-add({cat:'web',input:'url',mode:'audio',needs:'ytdlp',nm:'YouTube → MP3',ds:'Download just the audio',kw:'youtube download audio mp3 song music rip',
-  more:'Pulls the audio out of a video and saves it as an MP3 (yt-dlp + ffmpeg).'});
-add({cat:'web',input:'url',mode:'spotify',needs:'spotdl',nm:'Spotify → MP3',ds:'Download a track or playlist',kw:'spotify download music mp3 track playlist song',
-  more:'Uses spotdl to find and download matching audio. A playlist comes back as a zip.'});
+add({cat:'web',input:'url',mode:'video',needs:'ytdlp',nm:'YouTube to Video',ds:'Save a video as an MP4 file',kw:'youtube download video mp4 vimeo twitch save',
+  more:'Paste a YouTube link and save the video to your Mac as an MP4. Works with many other video sites too.'});
+add({cat:'web',input:'url',mode:'audio',needs:'ytdlp',nm:'YouTube to MP3',ds:'Save just the sound as an MP3',kw:'youtube download audio mp3 song music rip',
+  more:'Paste a video link and save only the sound as an MP3 file. Good for songs, talks, and podcasts.'});
 
 /* magic byte sniffer */
 function magic(b){ const s=(...x)=>x.every((v,i)=>b[i]===v);
@@ -789,11 +785,10 @@ fetch('/api/update-check').then(r=>r.ok?r.json():null).then(j=>{
 }).catch(()=>{});
 function codeLine(cmd){ return el('div',{style:'font:12px var(--mono);background:var(--well);border:2px solid;border-color:var(--sb);padding:8px 10px;margin:6px 0'},cmd); }
 function installPanel(p,needs){
-  const tool = needs==='spotdl' ? 'spotdl' : 'yt-dlp';
+  const tool = 'yt-dlp';
   p.append(el('div',{className:'ds',style:'margin-bottom:8px'},`${tool} isn’t installed on this machine, so this tool can’t run yet.`));
   const box=el('div',{className:'opts',style:'font:13px var(--sans)'});
-  if(needs==='ytdlp'){ box.append(el('div',{},'Install it once in Terminal:'), codeLine('brew install yt-dlp ffmpeg')); }
-  else { box.append(el('div',{},'Install it once in Terminal:'), codeLine('pip3 install spotdl'), el('div',{className:'note'},'spotdl also needs ffmpeg: brew install ffmpeg')); }
+  box.append(el('div',{},'Install it once in Terminal:'), codeLine('brew install yt-dlp ffmpeg'));
   box.append(el('div',{className:'note',style:'margin-top:8px'},'Then quit start.command, run it again, and reload this page.'));
   p.append(box);
   p.append(el('div',{className:'runrow'},[ (()=>{ const b=el('button',{className:'btn ghost',textContent:'Close'}); b.onclick=resetStage; return b; })() ]));
@@ -870,7 +865,7 @@ function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
   card.append(el('div',{className:'want',textContent:'batch actions:'}));
   const rr=el('div',{className:'recos'});
   rr.append(reco('Zip Files',()=>{ const t=T.find(x=>x.nm==='Zip Files'); renderRun(t,fs); $('#panel .btn').click(); }));
-  if(allPdf) rr.append(reco('Merge PDFs',()=>{ const t=T.find(x=>x.nm==='Merge PDFs'); renderRun(t,fs); $('#panel .btn').click(); }));
+  if(allPdf) rr.append(reco('Merge PDFs',()=>{ const t=T.find(x=>x.nm==='Combine PDFs'); renderRun(t,fs); $('#panel .btn').click(); }));
   if(allImg) rr.append(reco('Images → one PDF',()=>imagesToPdf(fs)));
   card.append(rr); r.append(card); r.scrollIntoView({behavior:'smooth'});
 }
@@ -1029,8 +1024,7 @@ function search(input){ const raw=input.trim(); const str=raw.toLowerCase(); if(
   const mbMatch=str.match(/(\d+(?:\.\d+)?)\s*(mb|mega)/); const isUrl=/^https?:\/\//i.test(raw);
   let items=T.map(t=>({t,score:scoreTool(t,str)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).map(x=>x.t);
   // surface the download tools when a link is in the box
-  if(/youtu\.?be|youtube\.com/i.test(raw)) items=[T.find(x=>x.nm==='YouTube → Video'),T.find(x=>x.nm==='YouTube → MP3'),...items];
-  else if(/open\.spotify\.com|spotify/i.test(raw)) items=[T.find(x=>x.nm==='Spotify → MP3'),...items];
+  if(/youtu\.?be|youtube\.com/i.test(raw)) items=[T.find(x=>x.nm==='YouTube to Video'),T.find(x=>x.nm==='YouTube to MP3'),...items];
   items=[...new Set(items.filter(Boolean))].slice(0,7);
   palItems=items; palSel=0;
   pal.innerHTML=''; if(!items.length){ pal.innerHTML=`<div class="row"><span class="ds">no tool matches “${str}”. try a file type or action</span></div>`; pal.classList.add('show'); return; }

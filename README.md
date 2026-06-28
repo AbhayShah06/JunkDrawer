@@ -25,7 +25,7 @@ Drop a file and the matching tools open. Search by name if you know what you wan
 - **Audio**: convert, normalize, trim, lower the bitrate
 - **Data**: CSV to JSON and back
 - **Dev**: format JSON, JSON ⇄ YAML, Base64, URL encoding, hashes, timestamps, QR code generator and reader
-- **Download**: save a YouTube video as MP4 or MP3, save a Spotify track
+- **Download**: save a YouTube video as MP4, or just the sound as MP3
 - **Archive**: zip and unzip
 - **Weird**: find out what a file really is, GIF to MP4, HEIC to JPG
 
