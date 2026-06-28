@@ -177,6 +177,24 @@
   #updateBar .ub-get:active{border-color:var(--sh2) var(--hi) var(--hi) var(--sh2)}
   #updateBar .ub-x{color:var(--ink2); text-decoration:none; font-weight:bold; padding:0 4px}
   #updateBar .ub-x:hover{color:var(--ink)}
+  /* PDF Sign & Fill editor */
+  .pdfedit-toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0}
+  .pdfedit-hint{font:11px var(--sans); color:var(--ink2); margin-left:auto}
+  .pdfedit-scroll{max-height:62vh; overflow:auto; background:#5a5e63; border:2px solid; border-color:var(--sb); padding:14px; margin-top:6px}
+  .pdfedit-stack{position:relative; width:820px; max-width:100%; margin:0 auto}
+  .pdfedit-page{display:block; width:100%; box-shadow:0 1px 5px rgba(0,0,0,.4); margin-bottom:12px; background:#fff}
+  .pdfedit-overlay{position:absolute; inset:0; pointer-events:none}
+  .pdfedit-item{position:absolute; pointer-events:auto; border:1px dashed #2b6fd6; box-sizing:border-box}
+  .pdfedit-item .grip{display:flex; justify-content:space-between; align-items:center; gap:8px; font:10px var(--sans); background:#2b6fd6; color:#fff; cursor:move; padding:1px 4px 1px 6px; user-select:none}
+  .pdfedit-item .grip .del{cursor:pointer; font-weight:bold; padding:0 3px}
+  .pdfedit-item .grip .del:hover{color:#ffd0d0}
+  .pdfedit-item .txt{min-width:30px; outline:none; padding:2px 4px; color:#111; font-family:var(--sans); white-space:pre-wrap; line-height:1.15}
+  .pdfedit-item img{display:block; width:100%; height:100%; pointer-events:none}
+  .pdfedit-item .hdl{position:absolute; right:-6px; bottom:-6px; width:12px; height:12px; background:#2b6fd6; border:1px solid #fff; cursor:nwse-resize}
+  .pdfedit-sigpad{border:2px solid; border-color:var(--sb); background:var(--well); padding:12px; margin:8px 0}
+  .pdfedit-sigpad canvas{background:#fff; border:1px solid var(--line); width:100%; max-width:460px; height:160px; touch-action:none; cursor:crosshair; display:block}
+  .pdfedit-tabs{display:flex; gap:6px; margin-bottom:8px}
+  .pdfedit-tabs .on{outline:2px solid #2b6fd6}
   @media(max-width:620px){ .hero h1{font-size:18px} nav{display:none} .result .row{flex-direction:column} }
 </style>
 </head>
@@ -271,6 +289,9 @@ function kind(f){ const e=ext(f.name);
 let _bg=null;
 async function bgRemove(blob,onP){ if(!_bg) _bg=(await import("https://esm.sh/@imgly/background-removal@1.5.5")).removeBackground;
   return _bg(blob,{progress:(k,c,t)=>onP&&onP(c/t)}); }
+let _qrgen=null, _qrdec=null;
+async function qrGen(){ if(!_qrgen) _qrgen=(await import("https://esm.sh/qrcode@1.5.3")).default; return _qrgen; }
+async function qrDec(){ if(!_qrdec) _qrdec=(await import("https://esm.sh/jsqr@1.4.0")).default; return _qrdec; }
 let _ff=null, _ffutil=null;
 async function ffutil(){ if(!_ffutil) _ffutil=await import("https://esm.sh/@ffmpeg/util@0.12.1"); return _ffutil; }
 async function getFF(onP){
@@ -501,6 +522,8 @@ add({cat:'audio',kinds:['audio'],nm:'Reduce Bitrate',ds:'Re-encode smaller',kw:'
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-b:a',o.kb+'k','-acodec','libmp3lame',out],'Re-encoding'),base(f.name)+'-'+o.kb+'k.mp3'); }});
 
 /* ---- PDF ---- */
+add({cat:'pdf',kinds:['pdf'],rec:1,custom:f=>pdfSignFill(f),nm:'Sign & Fill PDF',ds:'Add signatures, text & dates',kw:'sign signature fill form text date annotate edit adobe acrobat esign initials',
+  more:'Open a PDF and place your signature (draw, type, or upload), plus text and today’s date, anywhere on the page — then export. Like Adobe Fill & Sign, but everything stays on your machine.'});
 add({cat:'pdf',kinds:['pdf'],rec:1,nm:'Compress PDF',ds:'Make a PDF smaller',kw:'compress shrink pdf smaller size squish',
   more:'Flattens each page to an image to shrink a heavy PDF. Works best on scanned documents; text stays readable but is no longer selectable.',
   run:async f=>{ const onP=progress('Compressing PDF'); const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
@@ -595,6 +618,19 @@ add({cat:'dev',input:'text',nm:'Unix Time Converter',ds:'Timestamp ⇄ date',kw:
   run:(text,o)=>{ const v=text.trim(); if(o.d==='t2d'){ const n=+v; const ms=v.length>11?n:n*1000;
     showText(new Date(ms).toString()+'\n'+new Date(ms).toISOString(),'date.txt'); }
     else showText(String(Math.floor(new Date(v).getTime()/1000)),'epoch.txt'); }});
+add({cat:'dev',input:'text',rec:1,nm:'QR Code Generator',ds:'Turn a URL or text into a QR',kw:'qr code generate make url link create barcode',
+  more:'Type a URL or any text and get a QR code PNG you can download, copy, or drag out. Bigger size = easier to scan from a distance.',
+  opts:oSel('size',[['8','Medium'],['5','Small'],['13','Large']],'scale'),
+  run:async (text,o)=>{ const t=(text||'').trim(); if(!t) throw new Error('Type a URL or some text first.');
+    const QR=await qrGen(); const dataUrl=await QR.toDataURL(t,{margin:2,scale:+o.scale||8,errorCorrectionLevel:'M'});
+    showResult(await (await fetch(dataUrl)).blob(),'qr.png',{note:'Scan to open: '+(t.length>60?t.slice(0,60)+'…':t)}); }});
+add({cat:'dev',kinds:['image'],rec:1,nm:'QR Code Reader',ds:'Decode a QR from an image',kw:'qr code read scan decode reverse barcode image',
+  more:'Drop a photo or screenshot containing a QR code and it reads out the URL or text. The reverse of the generator.',
+  run:async f=>{ const onP=progress('Reading QR'); onP(.3); const {img,url}=await toImage(f);
+    const c=canvasOf(img,1600); const d=c.getContext('2d').getImageData(0,0,c.width,c.height); URL.revokeObjectURL(url);
+    const jsQR=await qrDec(); const res=jsQR(d.data,c.width,c.height);
+    if(!res||!res.data) throw new Error('No QR code found. Try a sharper image or crop closer to the code.');
+    showText(res.data,'qr.txt'); }});
 
 /* ---- ARCHIVE ---- */
 add({cat:'arc',kinds:['archive'],rec:1,nm:'Unzip Archive',ds:'Pull files out of a .zip',kw:'unzip extract archive open zip',
@@ -695,8 +731,8 @@ function openTool(t){
   const f=state.file;
   const ok = f && (t.kinds.includes('any') || t.kinds.includes(kind(f)));
   if(t.fileToText){ if(ok){ f.text().then(txt=>renderText(t,txt)); return; } return renderText(t); }
-  if(ok) return renderRun(t,f);
-  state.pending=t; pickFiles(false, fs=>{ state.file=fs[0]; state.pending=null; renderRun(t,fs[0]); });
+  if(ok) return t.custom ? t.custom(f) : renderRun(t,f);
+  state.pending=t; pickFiles(false, fs=>{ state.file=fs[0]; state.pending=null; t.custom ? t.custom(fs[0]) : renderRun(t,fs[0]); });
 }
 function pickFiles(multiple,cb){ const inp=$('#file'); inp.multiple=multiple; inp.value='';
   inp.onchange=e=>{ const fs=[...e.target.files]; if(fs.length)cb(fs); }; inp.click(); }
@@ -839,6 +875,148 @@ function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
   card.append(rr); r.append(card); r.scrollIntoView({behavior:'smooth'});
 }
 const reco=(label,fn)=>{ const b=el('button',{className:'reco',textContent:label}); b.onclick=fn; return b; };
+/* ===== PDF Sign & Fill (interactive editor) ===== */
+async function pdfSignFill(file){
+  openStage();
+  const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.pdf.color); $('#output').innerHTML=''; clearStatus();
+  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Sign & Fill PDF'}),el('span',{className:'badge',textContent:'PDF'})]));
+  p.append(el('div',{className:'ds',textContent:'Add your signature, text, or today’s date, drag each into place, then export. Nothing leaves your machine.'}));
+
+  const onP=progress('Opening PDF'); onP(.15);
+  let pdoc;
+  try{ pdoc=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise; }
+  catch{ fail(new Error('Could not open that PDF.')); return; }
+
+  const scroll=el('div',{className:'pdfedit-scroll'});
+  const stack=el('div',{className:'pdfedit-stack'});
+  const overlay=el('div',{className:'pdfedit-overlay'});
+  const pages=[]; // {wPt,hPt,cv, top,left,w,h}
+  for(let i=1;i<=pdoc.numPages;i++){ onP(.15+.7*i/pdoc.numPages);
+    const pg=await pdoc.getPage(i); const vp1=pg.getViewport({scale:1}); const scale=820/vp1.width; const vp=pg.getViewport({scale});
+    const cv=el('canvas',{className:'pdfedit-page'}); cv.width=vp.width; cv.height=vp.height;
+    await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+    stack.append(cv); pages.push({wPt:vp1.width,hPt:vp1.height,cv});
+  }
+  stack.append(overlay); scroll.append(stack); clearStatus();
+  const measure=()=>pages.forEach(pg=>{ pg.top=pg.cv.offsetTop; pg.left=pg.cv.offsetLeft; pg.w=pg.cv.offsetWidth; pg.h=pg.cv.offsetHeight; });
+
+  const items=[]; // {type:'text'|'sig', node, content, x,y, size, dataUrl, w,h, ratio}
+  function dragGrip(grip,node,it){ grip.addEventListener('pointerdown',e=>{ if(e.target.classList.contains('del'))return;
+    e.preventDefault(); grip.setPointerCapture(e.pointerId); const sx=e.clientX,sy=e.clientY,ox=node.offsetLeft,oy=node.offsetTop;
+    const mv=ev=>{ it.x=Math.max(0,ox+ev.clientX-sx); it.y=Math.max(0,oy+ev.clientY-sy); node.style.left=it.x+'px'; node.style.top=it.y+'px'; };
+    const up=()=>{ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); };
+    window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up); }); }
+  function resizeHandle(hdl,img,it){ hdl.addEventListener('pointerdown',e=>{ e.preventDefault(); e.stopPropagation(); hdl.setPointerCapture(e.pointerId);
+    const sx=e.clientX, ow=img.offsetWidth, r=it.ratio||(ow/img.offsetHeight);
+    const mv=ev=>{ const w=Math.max(40,ow+ev.clientX-sx); it.w=w; it.h=w/r; img.style.width=w+'px'; img.style.height=(w/r)+'px'; };
+    const up=()=>{ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); };
+    window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up); }); }
+  function addItem(opts){
+    const it=Object.assign({x:60,y:70,size:18,type:'text'},opts);
+    const node=el('div',{className:'pdfedit-item'}); node.style.left=it.x+'px'; node.style.top=it.y+'px';
+    const right=el('span',{style:'display:flex;gap:5px;align-items:center'});
+    if(it.type==='text'){ const am=el('span',{className:'del',textContent:'A−',title:'Smaller'}), ap=el('span',{className:'del',textContent:'A+',title:'Bigger'});
+      am.onclick=()=>{ it.size=Math.max(8,it.size-2); it.content.style.fontSize=it.size+'px'; };
+      ap.onclick=()=>{ it.size+=2; it.content.style.fontSize=it.size+'px'; }; right.append(am,ap); }
+    const del=el('span',{className:'del',textContent:'✕',title:'Remove'}); right.append(del);
+    const grip=el('div',{className:'grip'},[el('span',{textContent:it.type==='text'?'✎':'✍'}),right]); node.append(grip);
+    if(it.type==='text'){ const t=el('div',{className:'txt',contentEditable:'true',textContent:it.text||'Type here'}); t.style.fontSize=it.size+'px'; node.append(t); it.content=t; }
+    else { const img=el('img',{src:it.dataUrl}); img.style.width=it.w+'px'; img.style.height=it.h+'px'; node.append(img); it.content=img;
+      const hdl=el('div',{className:'hdl'}); node.append(hdl); resizeHandle(hdl,img,it); }
+    it.node=node; dragGrip(grip,node,it);
+    del.onclick=()=>{ const k=items.indexOf(it); if(k>=0)items.splice(k,1); node.remove(); };
+    overlay.append(node); items.push(it);
+    if(it.type==='text') setTimeout(()=>{ const r=document.createRange(); r.selectNodeContents(it.content); const s=getSelection(); s.removeAllRanges(); s.addRange(r); it.content.focus(); },0);
+    return it;
+  }
+
+  const bar=el('div',{className:'pdfedit-toolbar'});
+  const bSig=el('button',{className:'btn ghost',textContent:'✍ Signature'});
+  const bText=el('button',{className:'btn ghost',textContent:'✎ Text'});
+  const bDate=el('button',{className:'btn ghost',textContent:'📅 Date'});
+  const bExport=el('button',{className:'btn',textContent:'⬇ Export signed PDF'});
+  const bClose=el('button',{className:'btn ghost',textContent:'↺ Drawers'}); bClose.onclick=resetStage;
+  bar.append(bSig,bText,bDate,bExport,bClose,el('span',{className:'pdfedit-hint',textContent:`${pages.length} page${pages.length>1?'s':''} · drag items by the blue bar`}));
+  const sigHost=el('div');
+  bText.onclick=()=>{ measure(); addItem({type:'text',text:'Type here',size:18}); };
+  bDate.onclick=()=>{ measure(); addItem({type:'text',size:16,text:new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'})}); };
+  bSig.onclick=()=>{ if(sigHost.firstChild){ sigHost.innerHTML=''; return; }
+    signaturePad(sigHost, dataUrl=>{ sigHost.innerHTML=''; measure(); const im=new Image(); im.onload=()=>{ const r=(im.width/im.height)||3; addItem({type:'sig',dataUrl,w:200,h:Math.round(200/r),ratio:r}); }; im.src=dataUrl; }); };
+
+  p.append(bar, sigHost, scroll);
+  requestAnimationFrame(measure);
+
+  bExport.onclick=async()=>{
+    if(!items.length){ toast('Add a signature or text first'); return; }
+    bExport.disabled=true; const onP2=progress('Building signed PDF'); onP2(.25);
+    try{
+      measure();
+      const out=await PDFDocument.load(await file.arrayBuffer());
+      const helv=await out.embedFont(StandardFonts.Helvetica); const opages=out.getPages();
+      for(const it of items){
+        const cTop=it.node.offsetTop+it.content.offsetTop, cLeft=it.node.offsetLeft+it.content.offsetLeft;
+        let pi=0; for(let k=0;k<pages.length;k++){ if(cTop>=pages[k].top-2) pi=k; }
+        const pg=pages[pi], page=opages[pi]; if(!page) continue;
+        const sx=pg.wPt/pg.w, localX=(cLeft-pg.left)*sx, localTop=(cTop-pg.top)*sx;
+        if(it.type==='text'){
+          const sizePt=it.size*sx; const lines=(it.content.innerText||'').replace(/ /g,' ').replace(/\r/g,'').split('\n');
+          lines.forEach((ln,li)=>{ ln=ln.replace(/[^\x20-\x7E\xA0-\xFF]/g,''); if(!ln) return;
+            const baseline=pg.hPt-(localTop+li*sizePt*1.18+sizePt*0.80);
+            page.drawText(ln,{x:localX,y:baseline,size:sizePt,font:helv,color:rgb(.06,.06,.06)}); });
+        } else {
+          const wPt=it.content.offsetWidth*sx, hPt=it.content.offsetHeight*sx; const png=await out.embedPng(it.dataUrl);
+          page.drawImage(png,{x:localX,y:pg.hPt-(localTop+hPt),width:wPt,height:hPt});
+        }
+      }
+      showResult(new Blob([await out.save()],{type:'application/pdf'}), base(file.name)+'-signed.pdf', {note:'Your signature & text are flattened onto the PDF.'});
+    }catch(e){ fail(e); } finally{ bExport.disabled=false; }
+  };
+}
+
+/* signature pad: draw / type / upload → transparent PNG dataURL */
+function signaturePad(host, onUse){
+  host.innerHTML=''; const box=el('div',{className:'pdfedit-sigpad'}); const area=el('div');
+  const tDraw=el('button',{className:'btn ghost on',textContent:'✍ Draw'}), tType=el('button',{className:'btn ghost',textContent:'⌨ Type'}), tUp=el('button',{className:'btn ghost',textContent:'🖼 Upload'});
+  box.append(el('div',{className:'pdfedit-tabs'},[tDraw,tType,tUp]),area); host.append(box);
+
+  // DRAW
+  const cv=el('canvas'); cv.width=920; cv.height=320; const ctx=cv.getContext('2d');
+  ctx.lineWidth=4; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#0b1c3a';
+  let drawing=false,last=null,any=false;
+  const pos=e=>{ const r=cv.getBoundingClientRect(); return [(e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height]; };
+  cv.addEventListener('pointerdown',e=>{ drawing=true; any=true; last=pos(e); cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove',e=>{ if(!drawing)return; const pt=pos(e); ctx.beginPath(); ctx.moveTo(last[0],last[1]); ctx.lineTo(pt[0],pt[1]); ctx.stroke(); last=pt; });
+  cv.addEventListener('pointerup',()=>drawing=false);
+  function trimmed(){ const d=ctx.getImageData(0,0,cv.width,cv.height).data; let a=cv.width,b=cv.height,c=0,e=0,f=false;
+    for(let y=0;y<cv.height;y++)for(let x=0;x<cv.width;x++){ if(d[(y*cv.width+x)*4+3]>10){ f=true; if(x<a)a=x; if(x>c)c=x; if(y<b)b=y; if(y>e)e=y; } }
+    if(!f)return null; const pad=10; a=Math.max(0,a-pad); b=Math.max(0,b-pad); c=Math.min(cv.width,c+pad); e=Math.min(cv.height,e+pad);
+    const o=el('canvas'); o.width=c-a; o.height=e-b; o.getContext('2d').drawImage(cv,a,b,c-a,e-b,0,0,c-a,e-b); return o.toDataURL('image/png'); }
+  const drawPane=el('div',{},[cv]);
+  const bUse=el('button',{className:'btn',textContent:'Use signature'}), bClr=el('button',{className:'btn ghost',textContent:'Clear'});
+  bClr.onclick=()=>{ ctx.clearRect(0,0,cv.width,cv.height); any=false; };
+  bUse.onclick=()=>{ if(!any){ toast('Draw your signature first'); return; } const u=trimmed(); if(u)onUse(u); };
+  drawPane.append(el('div',{className:'runrow',style:'margin-top:8px'},[bUse,bClr]));
+
+  // TYPE
+  const ti=el('input',{type:'text',placeholder:'Type your name',style:'font:26px "Snell Roundhand","Brush Script MT",cursive;width:100%;max-width:460px;padding:8px;background:#fff;color:#111;border:1px solid var(--line)'});
+  const bUse2=el('button',{className:'btn',textContent:'Use signature'});
+  bUse2.onclick=()=>{ const txt=ti.value.trim(); if(!txt){ toast('Type your name first'); return; }
+    const font='64px "Snell Roundhand","Brush Script MT","Apple Chancery",cursive'; const m=el('canvas').getContext('2d'); m.font=font;
+    const o=el('canvas'); o.width=Math.ceil(m.measureText(txt).width)+40; o.height=110; const c2=o.getContext('2d');
+    c2.font=font; c2.fillStyle='#0b1c3a'; c2.textBaseline='middle'; c2.fillText(txt,20,58); onUse(o.toDataURL('image/png')); };
+  const typePane=el('div',{},[ti,el('div',{className:'runrow',style:'margin-top:8px'},[bUse2])]);
+
+  // UPLOAD
+  const upBtn=el('button',{className:'btn ghost',textContent:'Choose image…'});
+  upBtn.onclick=()=>{ const inp=el('input',{type:'file',accept:'image/*'}); inp.onchange=async e=>{ const f=e.target.files[0]; if(!f)return;
+    try{ const {img,url}=await toImage(f); const c=canvasOf(img,800); URL.revokeObjectURL(url); onUse(c.toDataURL('image/png')); }catch{ toast('Could not read that image'); } }; inp.click(); };
+  const upPane=el('div',{},[upBtn,el('div',{className:'note',style:'margin-top:6px',textContent:'A photo of a signature on white paper works best.'})]);
+
+  const show=w=>{ area.innerHTML=''; [tDraw,tType,tUp].forEach(b=>b.classList.remove('on'));
+    if(w==='type'){ tType.classList.add('on'); area.append(typePane); } else if(w==='up'){ tUp.classList.add('on'); area.append(upPane); } else { tDraw.classList.add('on'); area.append(drawPane); } };
+  tDraw.onclick=()=>show('draw'); tType.onclick=()=>show('type'); tUp.onclick=()=>show('up'); show('draw');
+}
+
 async function imagesToPdf(fs){ openStage(); const onP=progress('Building PDF'); const pdf=await PDFDocument.create();
   try{ for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); const png=await imgConvert(fs[i],{type:'image/png'});
     const im=await pdf.embedPng(await png.arrayBuffer()); pdf.addPage([im.width,im.height]).drawImage(im,{x:0,y:0,width:im.width,height:im.height}); }
