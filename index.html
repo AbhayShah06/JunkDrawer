@@ -1,0 +1,962 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Junk Drawer · every annoying file tool in one place</title>
+<script>try{var t=localStorage.getItem('jd-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}</script>
+<style>
+  :root{
+    --desk:#64777e; --face:#d9d5cc; --faceD:#cfcabf; --well:#fffdf7;
+    --hi:#f7f4ed; --sh:#9c968b; --sh2:#6e6a60; --ink:#201e18; --ink2:#5a564c; --line:#b7b1a5;
+    --pdf:#9a3f29; --img:#566b3f; --vid:#3f6173; --aud:#977720; --data:#6b6c66;
+    --dev:#34312b; --arc:#a85d28; --weird:#7c5a30; --web:#2d6a72; --ok:#3f7a3f;
+    --mono:"Monaco","Courier New",monospace;
+    --sans:"Tahoma","Geneva","Segoe UI",Verdana,sans-serif;
+    --rb:var(--hi) var(--sh2) var(--sh2) var(--hi);  /* raised bevel */
+    --sb:var(--sh2) var(--hi) var(--hi) var(--sh2);  /* sunken bevel */
+  }
+  :root[data-theme="dark"]{
+    --desk:#23262b; --face:#3a3d43; --faceD:#34373c; --well:#272a2e;
+    --hi:#50555c; --sh:#202327; --sh2:#16181b; --ink:#e9e6dd; --ink2:#a6a194; --line:#4a4e54;
+    --pdf:#c1573c; --img:#6f8a4e; --vid:#5183a0; --aud:#b08a2e; --data:#7f8189;
+    --dev:#6c6f78; --arc:#c06a30; --weird:#8f6a3c; --web:#3f8f96; --ok:#5b9a4c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0; min-height:100%}
+  body{font:13px/1.5 var(--sans); color:var(--ink); background:var(--desk);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");}
+  a{color:var(--vid)} a:hover{color:#2c4a59}
+  /* ---- title bar ---- */
+  header{background:var(--face); border-bottom:2px solid var(--sh2); box-shadow:0 1px 0 var(--hi) inset;
+    background-image:repeating-linear-gradient(0deg,#0000000d 0 1px,transparent 1px 3px)}
+  .topbar{max-width:1020px; margin:0 auto; display:flex; align-items:center; gap:12px; padding:7px 14px}
+  .brand{font:bold 15px var(--sans); display:flex; align-items:center; gap:8px}
+  .brand .mk{display:inline-grid; place-items:center; width:22px; height:22px; background:var(--face);
+    border:2px solid; border-color:var(--rb); border-radius:3px; font-size:13px}
+  .brand small{font-weight:normal; color:var(--ink2); font-size:11px; margin-left:4px}
+  nav{margin-left:auto; display:flex; gap:5px}
+  nav a{color:var(--ink); text-decoration:none; font-size:12px; padding:3px 10px; border:2px solid transparent; border-radius:3px}
+  nav a:hover{border-color:var(--rb); background:var(--face)}
+  nav a:active{border-color:var(--sb)}
+  main{max-width:1020px; margin:14px auto; padding:0 14px}
+  /* ---- panels ---- */
+  .hero,.cabinet,.receipt,.panel{background:var(--face); border:2px solid; border-color:var(--rb)}
+  .hero{padding:16px 16px 14px; margin-bottom:14px}
+  .hero h1{font:bold 21px var(--sans); margin:0 0 6px}
+  .hero p{color:var(--ink2); margin:0 0 14px; max-width:70ch; font-size:12.5px}
+  /* drop well */
+  #drop{background:var(--well); border:2px solid; border-color:var(--sb); padding:18px; text-align:center; cursor:pointer}
+  #drop:hover{background:#fff}
+  #drop.hot{background:#eef3da}
+  #drop .stamp{font-size:26px}
+  #drop .big{font:bold 15px var(--sans); margin-top:4px}
+  #drop .sub{color:var(--ink2); font-size:11.5px; margin-top:5px}
+  .pasterow{display:flex; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap}
+  .pastebtn{font:bold 12px var(--sans); background:var(--face); color:var(--ink);
+    border:2px solid; border-color:var(--rb); padding:6px 12px; cursor:pointer; border-radius:2px}
+  .pastebtn:active{border-color:var(--sb)}
+  .pasterow span{font-size:11px; color:var(--ink2); max-width:48ch}
+  /* search */
+  .cmd{display:flex; align-items:center; gap:8px; margin-top:14px; position:relative}
+  .cmd .pmt{font-size:14px}
+  #q{flex:1; font:12.5px var(--mono); background:var(--well); color:var(--ink); padding:6px 9px;
+    border:2px solid; border-color:var(--sb)}
+  #q:focus{outline:1px dotted var(--ink2); outline-offset:2px}
+  .pal{position:absolute; top:34px; left:0; right:0; z-index:30; background:var(--well); border:2px solid; border-color:var(--rb);
+    box-shadow:3px 3px 0 #0003; display:none}
+  .pal.show{display:block}
+  .pal .row{display:flex; gap:10px; align-items:center; padding:7px 11px; cursor:pointer; border-bottom:1px solid var(--line)}
+  .pal .row:last-child{border-bottom:0}
+  .pal .row:hover,.pal .row.sel{background:#e7eef6}
+  .pal .nm{font-weight:bold; font-size:12.5px} .pal .ds{color:var(--ink2); font-size:11px}
+  .pal .tag{margin-left:auto; font:bold 9px var(--mono); text-transform:uppercase; letter-spacing:.5px; padding:2px 6px; color:#fff}
+  .hints{margin-top:8px; color:var(--ink2); font-size:11px}
+  .hints b{color:var(--ink)}
+  /* ---- receipt ---- */
+  #receipt{display:none; margin-bottom:14px}
+  .receipt{padding:14px 16px; font-family:var(--mono)}
+  .receipt .hd{display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid var(--line); padding-bottom:7px; margin-bottom:8px}
+  .receipt .hd b{font:bold 11px var(--mono); letter-spacing:.5px; text-transform:uppercase}
+  .receipt .meta{font-size:12px; color:var(--ink); line-height:1.7; background:var(--well); border:2px solid; border-color:var(--sb); padding:9px 11px}
+  .receipt .meta .k{color:var(--ink2)}
+  .receipt .want{margin-top:12px; font:bold 11px var(--mono); text-transform:uppercase; letter-spacing:.5px; color:var(--ink2)}
+  .recos{display:flex; flex-wrap:wrap; gap:7px; margin-top:8px}
+  .reco{font:bold 12px var(--sans); background:var(--face); color:var(--ink); border:2px solid; border-color:var(--rb);
+    padding:6px 11px; cursor:pointer; border-radius:2px}
+  .reco:active{border-color:var(--sb)}
+  .clearbtn{font:11px var(--mono); background:var(--face); border:2px solid; border-color:var(--rb); color:var(--ink);
+    padding:3px 9px; cursor:pointer; border-radius:2px}
+  .clearbtn:active{border-color:var(--sb)}
+  /* ---- cabinet / drawers ---- */
+  .cabinet{padding:14px 16px; margin-bottom:14px}
+  .cabinet h2{font:bold 11px var(--mono); letter-spacing:1px; text-transform:uppercase; color:var(--ink2);
+    margin:0 0 12px; border-bottom:1px solid var(--line); padding-bottom:6px}
+  .drawer{margin-bottom:7px; border:2px solid; border-color:var(--rb); background:var(--faceD)}
+  .drawer-tab{display:flex; align-items:center; gap:11px; width:100%; text-align:left; cursor:pointer; background:transparent;
+    border:none; padding:9px 11px; font:inherit; color:var(--ink)}
+  .drawer-tab:hover{background:#0000000a}
+  .drawer-tab .label{font:bold 10px var(--mono); letter-spacing:1px; text-transform:uppercase; color:#fff;
+    background:var(--c); padding:3px 8px; border-radius:2px}
+  .drawer-tab .ico{color:var(--c); display:flex}
+  .drawer-tab .ttl{font-weight:bold; font-size:12.5px}
+  .drawer-tab .cnt{color:var(--ink2); font:11px var(--mono)}
+  .drawer-tab .chev{margin-left:auto; color:var(--ink2); font-size:12px; transition:.15s}
+  .drawer.open .chev{transform:rotate(90deg)}
+  .drawer-body{display:none; padding:4px 11px 12px; background:var(--face); border-top:1px solid var(--line)}
+  .drawer.open .drawer-body{display:block}
+  .tools{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:7px; margin-top:8px}
+  .tool{display:flex; gap:9px; align-items:flex-start; background:var(--well); border:2px solid; border-color:var(--rb);
+    padding:9px 10px; cursor:pointer}
+  .tool:hover{background:#fffef9}
+  .tool:active{border-color:var(--sb)}
+  .tool .dot{width:8px; height:8px; background:var(--c,#888); margin-top:4px; flex:0 0 auto; transform:rotate(45deg)}
+  .tool .nm{font-weight:bold; font-size:12.5px}
+  .tool .ds{color:var(--ink2); font-size:11px; line-height:1.3}
+  /* ---- stage / panel ---- */
+  #stage{margin-bottom:14px; display:none}
+  .panel{padding:16px 18px}
+  .panel .ph{display:flex; align-items:center; gap:10px; margin-bottom:4px}
+  .panel .ph .nm{font:bold 17px var(--sans)}
+  .panel .ph .badge{font:bold 9px var(--mono); text-transform:uppercase; letter-spacing:.5px; color:#fff;
+    background:var(--c,#666); padding:3px 7px; border-radius:2px}
+  .panel .ds{color:var(--ink2); margin-bottom:12px; font-size:12.5px}
+  .filechip{display:inline-flex; align-items:center; gap:8px; font:12px var(--mono); background:var(--well);
+    border:2px solid; border-color:var(--sb); padding:6px 10px; margin-bottom:6px}
+  .opts label{display:flex; align-items:center; gap:8px; margin:8px 0; font-size:12.5px; flex-wrap:wrap}
+  .opts input[type=number],.opts input[type=text]{font:12.5px var(--mono); width:120px; background:var(--well);
+    border:2px solid; border-color:var(--sb); padding:5px 7px; color:var(--ink)}
+  .opts input[type=range]{flex:1; accent-color:var(--vid)}
+  .opts select{font:12.5px var(--sans); background:var(--well); border:2px solid; border-color:var(--sb); padding:5px 6px; color:var(--ink)}
+  .opts textarea{width:100%; min-height:150px; font:12px var(--mono); background:var(--well); border:2px solid; border-color:var(--sb);
+    padding:9px; color:var(--ink); resize:vertical}
+  .btn{font:bold 12.5px var(--sans); background:var(--face); color:var(--ink); border:2px solid; border-color:var(--rb);
+    padding:7px 16px; cursor:pointer; border-radius:2px}
+  .btn:active{border-color:var(--sb)}
+  .btn:not(.ghost){box-shadow:0 0 0 1px var(--sh2)}
+  .btn:disabled{color:var(--ink2); cursor:wait}
+  .btn.ghost{background:var(--faceD)}
+  .runrow{display:flex; gap:10px; align-items:center; margin-top:14px; flex-wrap:wrap}
+  /* progress */
+  #status{margin:14px 0}
+  .spin{display:inline-block; width:13px; height:13px; border:2px solid var(--line); border-top-color:var(--pdf);
+    border-radius:50%; animation:spin .8s linear infinite; vertical-align:-2px; margin-right:7px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .prog{height:14px; background:var(--well); border:2px solid; border-color:var(--sb); overflow:hidden; margin-top:9px}
+  .prog>i{display:block; height:100%; width:0; background:var(--vid); transition:width .2s;
+    background-image:linear-gradient(90deg,#0000 0 50%,#ffffff22 50% 100%); background-size:12px 100%}
+  .err{color:var(--pdf); font:bold 12.5px var(--sans); margin-top:9px}
+  /* result */
+  .result{background:var(--face); border:2px solid var(--ok); padding:14px 16px; margin-top:14px}
+  .result h3{margin:0 0 3px; font:bold 14px var(--sans)}
+  .result .sz{font:11.5px var(--mono); color:var(--ink2)}
+  .result .row{display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; margin-top:12px}
+  .result .preview{max-width:230px; max-height:230px; border:2px solid; border-color:var(--sb); cursor:grab;
+    background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="10" height="10" fill="%23e3dccc"/><rect x="10" y="10" width="10" height="10" fill="%23e3dccc"/></svg>')}
+  .actions{display:flex; gap:9px; flex-wrap:wrap; margin-top:4px}
+  .note{color:var(--ink2); font-size:11.5px; margin-top:8px; font-family:var(--mono)}
+  /* tooltip (balloon help) */
+  .tip{position:fixed; z-index:60; max-width:280px; background:#fbf6cf; color:#201e18; border:1px solid #8a8266;
+    padding:6px 9px; font:11px/1.4 var(--sans); box-shadow:2px 2px 0 #0003; pointer-events:none; display:none}
+  .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--face); color:var(--ink);
+    border:2px solid; border-color:var(--rb); padding:8px 16px; font-weight:bold; font-size:12px; opacity:0; transition:.2s;
+    pointer-events:none; z-index:50; box-shadow:2px 2px 0 #0004}
+  .toast.show{opacity:1}
+  /* status-bar footer */
+  footer{background:var(--face); border-top:2px solid var(--hi); box-shadow:0 -1px 0 var(--sh2) inset}
+  footer .wrap{max-width:1020px; margin:0 auto; padding:5px 14px; display:flex; justify-content:space-between; gap:12px;
+    flex-wrap:wrap; align-items:center; font-size:11px; color:var(--ink2)}
+  footer a{color:var(--ink); font-weight:bold; text-decoration:none} footer a:hover{text-decoration:underline}
+  footer .cr{font:10.5px var(--mono); max-width:440px; text-align:right; line-height:1.5}
+  /* update notifier bar */
+  #updateBar{display:flex; align-items:center; justify-content:center; gap:12px;
+    background:var(--faceD); border-bottom:2px solid var(--sh2); box-shadow:0 1px 0 var(--hi) inset;
+    padding:6px 14px; font:12px var(--sans); color:var(--ink)}
+  #updateBar .ub-get{font-weight:bold; color:var(--ink); text-decoration:none; background:var(--face);
+    border:2px solid; border-color:var(--hi) var(--sh2) var(--sh2) var(--hi); padding:3px 12px}
+  #updateBar .ub-get:active{border-color:var(--sh2) var(--hi) var(--hi) var(--sh2)}
+  #updateBar .ub-x{color:var(--ink2); text-decoration:none; font-weight:bold; padding:0 4px}
+  #updateBar .ub-x:hover{color:var(--ink)}
+  @media(max-width:620px){ .hero h1{font-size:18px} nav{display:none} .result .row{flex-direction:column} }
+</style>
+</head>
+<body>
+<header><div class="topbar">
+  <div class="brand"><span class="mk">🗄️</span>Junk&nbsp;Drawer
+    <small>every annoying file tool in one place</small></div>
+  <nav>
+    <a href="#" id="themeToggle">◐ Theme</a>
+    <a href="#cabinet">Tools</a>
+    <a href="#" id="navPrivacy">Privacy</a>
+    <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">About</a>
+  </nav>
+</div></header>
+
+<div id="updateBar" hidden>
+  <span class="ub-txt"></span>
+  <a href="#" class="ub-get" target="_blank" rel="noopener">Download update</a>
+  <a href="#" class="ub-x" title="Dismiss until the next version">✕</a>
+</div>
+
+<main>
+  <section class="hero">
+    <h1>Every file task, in one tab.</h1>
+    <p>Convert, shrink, extract, clean, and package files. Drop one in and the right drawer opens.
+       Nothing uploads anywhere; everything runs on your machine.</p>
+
+    <div id="drop" tabindex="0">
+      <div class="stamp">🗃️</div>
+      <div class="big">Drop a file here</div>
+      <div class="sub">image · video · audio · PDF · data · zip &nbsp;·&nbsp; click to browse · paste (⌘V)</div>
+    </div>
+    <input type="file" id="file" multiple hidden />
+
+    <div class="pasterow">
+      <button class="pastebtn" id="pasteBtn">📋 Paste an image</button>
+      <span>copied an image from Discord, WhatsApp, Twitter, or Google? click here (or press ⌘V)</span>
+    </div>
+
+    <div class="cmd">
+      <span class="pmt">🔍</span>
+      <input id="q" autocomplete="off" placeholder="Search the tools…   (e.g. compress, mp4 to mp3, heic, remove background)" />
+      <div class="pal" id="pal"></div>
+    </div>
+    <div class="hints">Search the tools, paste a YouTube or Spotify link, or open a drawer below.</div>
+  </section>
+
+  <section id="receipt"></section>
+  <section id="stage"><div class="panel" id="panel"></div><div id="status"></div><div id="output"></div></section>
+
+  <section class="cabinet" id="cabinet">
+    <h2>the drawers · {N} tools</h2>
+    <div id="drawers"></div>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <div>Built by <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">Abhay Shah</a>
+    · <a href="https://x.com/AbhayShahCA" target="_blank" rel="noopener">@AbhayShahCA</a></div>
+  <div class="cr">Runs in your browser. Files never leave this machine.<br>
+    Open source under the hood: FFmpeg.wasm · @imgly/background-removal · pdf-lib · pdf.js · heic2any · fflate · js-yaml · yt-dlp · spotdl.</div>
+</div></footer>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { PDFDocument, degrees, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
+import * as pdfjsLib from "https://esm.sh/pdfjs-dist@4.0.379";
+import { zipSync, unzipSync, strFromU8 } from "https://esm.sh/fflate@0.8.2";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs";
+
+/* ---------------- helpers ---------------- */
+const $ = s => document.querySelector(s);
+const el = (t, p={}, kids=[]) => { const e=document.createElement(t);
+  for(const k in p){ if(k==='style') e.style.cssText=p[k]; else if(k in e) e[k]=p[k]; else e.setAttribute(k,p[k]); }
+  for(const c of [].concat(kids)) if(c!=null) e.append(c); return e; };
+const fmt = b => b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(2)+' MB';
+const ext = n => (n.split('.').pop()||'').toLowerCase();
+const base = n => n.replace(/\.[^.]+$/,'');
+const toast = m => { const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1700); };
+
+const IMG=['png','jpg','jpeg','webp','gif','bmp','heic','heif','avif','tif','tiff','ico'];
+const VID=['mp4','mov','mkv','webm','avi','flv','wmv','m4v','3gp','mpeg','mpg','ts','m2ts','ogv'];
+const AUD=['mp3','wav','aac','m4a','flac','ogg','opus','wma','aiff','aif'];
+const DAT=['csv','tsv','json','xml','yaml','yml','toml','xlsx','xls','ods'];
+const ARC=['zip','7z','rar','tar','gz','tgz','bz2','xz'];
+function kind(f){ const e=ext(f.name);
+  if(IMG.includes(e))return'image'; if(VID.includes(e))return'video'; if(AUD.includes(e))return'audio';
+  if(e==='pdf')return'pdf'; if(DAT.includes(e))return'data'; if(ARC.includes(e))return'archive'; return'other'; }
+
+/* ---------------- lazy heavy deps ---------------- */
+let _bg=null;
+async function bgRemove(blob,onP){ if(!_bg) _bg=(await import("https://esm.sh/@imgly/background-removal@1.5.5")).removeBackground;
+  return _bg(blob,{progress:(k,c,t)=>onP&&onP(c/t)}); }
+let _ff=null, _ffutil=null;
+async function ffutil(){ if(!_ffutil) _ffutil=await import("https://esm.sh/@ffmpeg/util@0.12.1"); return _ffutil; }
+async function getFF(onP){
+  if(_ff) return _ff;
+  const { FFmpeg } = await import("https://esm.sh/@ffmpeg/ffmpeg@0.12.10");
+  const { toBlobURL } = await ffutil();
+  const ff = new FFmpeg(); ff.on('progress',({progress})=>onP&&onP(Math.min(progress,1)));
+  const mt = self.crossOriginIsolated;
+  const b = `https://unpkg.com/${mt?'@ffmpeg/core-mt':'@ffmpeg/core'}@0.12.6/dist/umd`;
+  const cfg = { coreURL: await toBlobURL(`${b}/ffmpeg-core.js`,'text/javascript'),
+                wasmURL: await toBlobURL(`${b}/ffmpeg-core.wasm`,'application/wasm') };
+  if(mt) cfg.workerURL = await toBlobURL(`${b}/ffmpeg-core.worker.js`,'text/javascript');
+  await ff.load(cfg); _ff=ff; return ff;
+}
+async function runFF(file,outName,argsFn,label){
+  const onP=progress(label); const ff=await getFF(onP); const { fetchFile }=await ffutil();
+  const inName='in.'+ext(file.name);
+  await ff.writeFile(inName, await fetchFile(file));
+  await ff.exec(argsFn(inName,outName));
+  const data=await ff.readFile(outName);
+  ff.deleteFile(inName).catch(()=>{}); ff.deleteFile(outName).catch(()=>{});
+  return new Blob([data.buffer],{type:mimeOf(outName)});
+}
+const mimeOf = n => ({gif:'image/gif',mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',png:'image/png',
+  jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',mp3:'audio/mpeg',wav:'audio/wav',m4a:'audio/mp4',
+  aac:'audio/aac',ogg:'audio/ogg',flac:'audio/flac',pdf:'application/pdf',json:'application/json',
+  csv:'text/csv',zip:'application/zip',txt:'text/plain'}[ext(n)]||'application/octet-stream');
+function videoDuration(file){ return new Promise(res=>{ const v=document.createElement('video'); v.preload='metadata';
+  v.onloadedmetadata=()=>{ const d=v.duration; URL.revokeObjectURL(v.src); res(d||0); };
+  v.onerror=()=>res(0); v.src=URL.createObjectURL(file); }); }
+
+/* ---------------- image primitives ---------------- */
+async function toImage(file){ let src=file; const e=ext(file.name);
+  if(e==='heic'||e==='heif'){ const h=(await import("https://esm.sh/heic2any@0.0.4")).default;
+    src=await h({blob:file,toType:'image/png'}); }
+  const url=URL.createObjectURL(src); const img=new Image();
+  await new Promise((ok,no)=>{ img.onload=ok; img.onerror=()=>no(new Error('Could not read that image')); img.src=url; });
+  return {img,url}; }
+function canvasOf(img,maxDim){ let w=img.naturalWidth,h=img.naturalHeight;
+  if(maxDim&&Math.max(w,h)>maxDim){ const s=maxDim/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+  const c=el('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); return c; }
+const blobOf=(c,t,q)=>new Promise(r=>c.toBlob(r,t,q));
+async function imgConvert(file,{type='image/png',quality=.92,maxDim=0}={}){
+  const {img,url}=await toImage(file); const c=canvasOf(img,maxDim);
+  const b=await blobOf(c,type,quality); URL.revokeObjectURL(url); return b; }
+async function compressTo(file,target,type='image/jpeg'){
+  const {img,url}=await toImage(file); let maxDim=Math.max(img.naturalWidth,img.naturalHeight); let best=null;
+  for(let p=0;p<8;p++){ const c=canvasOf(img,maxDim);
+    for(let q=.95;q>=.3;q-=.07){ const b=await blobOf(c,type,q); if(b.size<=target){URL.revokeObjectURL(url);return b;} best=b; }
+    maxDim=Math.round(maxDim*.82); }
+  URL.revokeObjectURL(url); return best; }
+
+/* ---------------- CSV helpers ---------------- */
+function parseCSV(text,delim=','){ const rows=[]; let i=0,f='',row=[],q=false;
+  while(i<text.length){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else { if(c==='"')q=true; else if(c===delim){row.push(f);f='';} else if(c==='\n'){row.push(f);rows.push(row);row=[];f='';}
+      else if(c==='\r'){} else f+=c; }
+    i++; }
+  if(f.length||row.length){ row.push(f); rows.push(row); } return rows; }
+function csvToJSON(text){ const r=parseCSV(text); const h=r[0]; return JSON.stringify(
+  r.slice(1).filter(x=>x.length>1||x[0]!=='').map(x=>Object.fromEntries(h.map((k,i)=>[k,x[i]??'']))),null,2); }
+function jsonToCSV(text){ const a=JSON.parse(text); if(!Array.isArray(a))throw new Error('JSON must be an array of objects');
+  const keys=[...new Set(a.flatMap(o=>Object.keys(o)))]; const esc=v=>{ v=v==null?'':String(v);
+    return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  return [keys.join(','),...a.map(o=>keys.map(k=>esc(o[k])).join(','))].join('\n'); }
+
+/* ---------------- progress + results ---------------- */
+function progress(label){ $('#status').innerHTML=`<div><span class="spin"></span>${label} …</div><div class="prog"><i id="bar"></i></div>`;
+  return p=>{ const b=$('#bar'); if(b)b.style.width=Math.round((p||0)*100)+'%'; }; }
+const clearStatus=()=>{ $('#status').innerHTML=''; };
+function fail(e){ clearStatus(); $('#output').innerHTML=''; $('#status').innerHTML=`<div class="err">⚠ ${e.message||e}</div>`; }
+function showResult(blob,filename,{note}={}){
+  clearStatus(); const out=$('#output'); out.innerHTML='';
+  const url=URL.createObjectURL(blob), isImg=/^image\//.test(blob.type);
+  const box=el('div',{className:'result'});
+  box.append(el('h3',{textContent:'✓ done · '+filename}), el('div',{className:'sz',textContent:fmt(blob.size)}));
+  const row=el('div',{className:'row'});
+  if(isImg){ const im=el('img',{className:'preview',src:url,draggable:true,title:'Drag me into Discord / Finder'});
+    im.addEventListener('dragstart',e=>e.dataTransfer.setData('DownloadURL',`${blob.type}:${filename}:${url}`)); row.append(im); }
+  const right=el('div',{style:'flex:1;min-width:210px'});
+  const actions=el('div',{className:'actions'},[el('a',{className:'btn',href:url,download:filename,textContent:'⬇ Download'})]);
+  if(isImg){ const cp=el('button',{className:'btn ghost',textContent:'📋 Copy'});
+    cp.onclick=async()=>{ try{ await navigator.clipboard.write([new ClipboardItem({[blob.type]:blob})]); toast('Copied. Paste into Discord'); }
+      catch{ toast('Copy unsupported here. Use Download'); } }; actions.append(cp); }
+  const ag=el('button',{className:'btn ghost',textContent:'↺ Drawers'}); ag.onclick=resetStage; actions.append(ag);
+  right.append(actions);
+  if(isImg) right.append(el('div',{className:'note',textContent:'tip: drag the preview straight into Discord, no download needed.'}));
+  if(note) right.append(el('div',{className:'note',textContent:note}));
+  row.append(right); box.append(row); out.append(box); out.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function showText(str,filename){
+  clearStatus(); const out=$('#output'); out.innerHTML='';
+  const box=el('div',{className:'result'});
+  box.append(el('h3',{textContent:'✓ '+filename}));
+  const ta=el('textarea',{value:str,readOnly:true,style:'width:100%;min-height:160px;font:12px var(--mono);margin-top:10px;background:var(--well);border:2px solid;border-color:var(--sb);padding:9px;color:var(--ink)'});
+  box.append(ta);
+  const cp=el('button',{className:'btn ghost',textContent:'📋 Copy'}); cp.onclick=()=>{ navigator.clipboard.writeText(str); toast('Copied'); };
+  const dl=el('a',{className:'btn',textContent:'⬇ Download',download:filename,href:URL.createObjectURL(new Blob([str],{type:mimeOf(filename)}))});
+  box.append(el('div',{className:'actions',style:'margin-top:10px'},[dl,cp])); out.append(box);
+}
+function showMulti(files,zipName,note){ const z=zipSync(Object.fromEntries(files.map(f=>[f.name,f.data])),{level:0});
+  showResult(new Blob([z],{type:'application/zip'}),zipName,{note:note||`${files.length} files, zipped.`}); }
+
+/* ================= TOOL REGISTRY ================= */
+const CATS = {
+  web:  {label:'Download',color:'var(--web)',icon:icon('down'), blurb:'pull video & audio from a link'},
+  pdf:  {label:'PDF',   color:'var(--pdf)', icon:icon('doc'),   blurb:'merge, split, shrink, stamp, renumber'},
+  image:{label:'Image', color:'var(--img)', icon:icon('img'),  blurb:'convert, compress, clean, resize, cut out'},
+  video:{label:'Video', color:'var(--vid)', icon:icon('film'), blurb:'gif, compress, trim, mute, grab frames'},
+  audio:{label:'Audio', color:'var(--aud)', icon:icon('music'),blurb:'convert, trim, level, re-encode'},
+  data: {label:'Data',  color:'var(--data)',icon:icon('grid'), blurb:'csv ↔ json, table wrangling'},
+  dev:  {label:'Dev',   color:'var(--dev)', icon:icon('code'), blurb:'json, yaml, base64, hashes, epochs'},
+  arc:  {label:'Archive',color:'var(--arc)',icon:icon('box'),  blurb:'zip / unzip, bundle for sending'},
+  weird:{label:'Weird', color:'var(--weird)',icon:icon('star'),blurb:'the long-tail odd jobs'},
+};
+const T = []; // tools
+const add = t => { T.push(t); return t; };
+const oNum=(before,val,after,key,attr={})=>()=>{ const n=el('input',{type:'number',value:val,...attr});
+  return {node:el('label',{},[before+' ',n,after?(' '+after):'']),get:()=>({[key]:parseFloat(n.value)})}; };
+const oSel=(label,pairs,key)=>()=>{ const s=el('select'); pairs.forEach(([v,l])=>s.append(el('option',{value:v,textContent:l})));
+  return {node:el('label',{},[label+' ',s]),get:()=>({[key]:s.value})}; };
+
+/* ---- IMAGE ---- */
+add({cat:'image',kinds:['image'],rec:1,nm:'Background Remover',ds:'Cut out the subject → transparent PNG',kw:'remove background transparent cutout zap',
+  more:'Cuts the subject out of a photo and gives you a transparent PNG. Best for product shots, profile pics, and stickers. Runs an AI model locally (first use downloads it).',
+  run:async f=>{ const onP=progress('Removing background (first run downloads the model)'); const b=await bgRemove(f,onP);
+    showResult(b,base(f.name)+'-nobg.png'); }});
+add({cat:'image',kinds:['image'],rec:1,nm:'Convert Image',ds:'Change to PNG / JPG / WEBP',kw:'convert format png jpg jpeg webp heic',
+  more:'Change an image between PNG, JPG, and WEBP. JPG for photos, PNG for transparency, WEBP for the web.',
+  opts:oSel('to',[['image/png','PNG'],['image/jpeg','JPG'],['image/webp','WEBP']],'type'),
+  run:async (f,o)=>{ const e={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[o.type];
+    showResult(await imgConvert(f,{type:o.type}),base(f.name)+'.'+e); }});
+add({cat:'image',kinds:['image'],rec:1,nm:'Compress Image',ds:'Shrink to a target file size',kw:'compress smaller reduce size optimize',
+  more:'Shrink an image to a file-size limit you set (like "under 8 MB"), keeping it as large and sharp as it can while hitting the target.',
+  opts:oNum('target','8','MB','mb',{min:.2,step:.5}),
+  run:async (f,o)=>{ showResult(await compressTo(f,(o.mb||8)*1048576,'image/jpeg'),base(f.name)+'-small.jpg',{note:`aimed at ${o.mb} MB`}); }});
+add({cat:'image',kinds:['image'],nm:'Resize Image',ds:'Cap the largest dimension',kw:'resize scale dimensions shrink',
+  more:'Cap the longest side to a pixel limit so the image is no bigger than it needs to be (e.g. 1920px for the web).',
+  opts:oNum('max side','1920','px','maxDim',{min:16,step:16}),
+  run:async (f,o)=>{ showResult(await imgConvert(f,{type:'image/png',maxDim:o.maxDim||1920}),base(f.name)+'-'+(o.maxDim||1920)+'.png'); }});
+add({cat:'image',kinds:['image'],nm:'Rotate / Flip',ds:'Turn or mirror an image',kw:'rotate flip mirror turn',
+  more:'Turn an image 90° or 180°, or mirror it left-right / top-bottom. Handy for sideways phone photos.',
+  opts:oSel('do',[['r90','Rotate 90° CW'],['r270','Rotate 90° CCW'],['r180','Rotate 180°'],['fh','Flip horizontal'],['fv','Flip vertical']],'op'),
+  run:async (f,o)=>{ const {img,url}=await toImage(f); const swap=o.op==='r90'||o.op==='r270';
+    const c=el('canvas'); c.width=swap?img.naturalHeight:img.naturalWidth; c.height=swap?img.naturalWidth:img.naturalHeight;
+    const x=c.getContext('2d'); x.translate(c.width/2,c.height/2);
+    if(o.op==='r90')x.rotate(Math.PI/2); else if(o.op==='r270')x.rotate(-Math.PI/2); else if(o.op==='r180')x.rotate(Math.PI);
+    else if(o.op==='fh')x.scale(-1,1); else if(o.op==='fv')x.scale(1,-1);
+    x.drawImage(img,-img.naturalWidth/2,-img.naturalHeight/2); URL.revokeObjectURL(url);
+    showResult(await blobOf(c,'image/png',.95),base(f.name)+'-turned.png'); }});
+add({cat:'image',kinds:['image'],rec:1,nm:'Remove Metadata',ds:'Strip EXIF, GPS & camera data',kw:'remove metadata exif gps location privacy strip clean',
+  more:'Strips hidden EXIF, camera, and GPS-location data by re-encoding the image. Use it before sharing a photo publicly.',
+  run:async f=>{ const onP=progress('Scrubbing metadata'); onP(.4);
+    const isPng=ext(f.name)==='png'; const b=await imgConvert(f,{type:isPng?'image/png':'image/jpeg',quality:.95});
+    showResult(b,base(f.name)+'-clean.'+(isPng?'png':'jpg'),{note:'re-encoded with no embedded metadata.'}); }});
+add({cat:'image',kinds:['image'],nm:'Add Background',ds:'Solid color behind transparency',kw:'white background flatten backdrop solid',
+  more:'Places a solid color behind a transparent image, like a white card behind a logo or a colored backdrop for a cut-out.',
+  opts:oSel('color',[['#ffffff','White'],['#000000','Black'],['#e9dec7','Paper'],['#0b57d0','Blue']],'bg'),
+  run:async (f,o)=>{ const {img,url}=await toImage(f); const c=el('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
+    const x=c.getContext('2d'); x.fillStyle=o.bg; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0); URL.revokeObjectURL(url);
+    showResult(await blobOf(c,'image/jpeg',.92),base(f.name)+'-bg.jpg'); }});
+add({cat:'image',kinds:['image'],nm:'Make Favicon / Icons',ds:'Full square icon set (zipped)',kw:'favicon icon app icon set',
+  more:'Generates a set of square icon sizes (16–512px) for a website or app, zipped together.',
+  run:async f=>{ const onP=progress('Stamping icons'); const {img,url}=await toImage(f); const sizes=[16,32,48,64,180,192,512]; const out=[];
+    for(let i=0;i<sizes.length;i++){ onP((i+1)/sizes.length); const s=sizes[i]; const c=el('canvas'); c.width=c.height=s;
+      c.getContext('2d').drawImage(img,0,0,s,s); const b=await blobOf(c,'image/png',1);
+      out.push({name:`icon-${s}.png`,data:new Uint8Array(await b.arrayBuffer())}); }
+    URL.revokeObjectURL(url); showMulti(out,base(f.name)+'-icons.zip','7 PNG sizes (16→512). Rename icon-32 to favicon.png for the web.'); }});
+add({cat:'image',kinds:['image'],nm:'Image to PDF',ds:'Wrap an image in a PDF',kw:'image to pdf',
+  more:'Wraps a single image in a one-page PDF, sized to the image.',
+  run:async f=>{ const onP=progress('Making PDF'); onP(.3); const png=await imgConvert(f,{type:'image/png'});
+    const pdf=await PDFDocument.create(); const im=await pdf.embedPng(await png.arrayBuffer());
+    pdf.addPage([im.width,im.height]).drawImage(im,{x:0,y:0,width:im.width,height:im.height});
+    showResult(new Blob([await pdf.save()],{type:'application/pdf'}),base(f.name)+'.pdf'); }});
+
+/* ---- VIDEO ---- */
+add({cat:'video',kinds:['video'],rec:1,nm:'Video to GIF',ds:'Make a looping GIF',kw:'gif convert to gif loop discord',
+  more:'Turns a short clip into a looping GIF for Discord or chat. Pick the frame rate and width to balance smoothness vs. size.',
+  opts:()=>{ const fps=el('input',{type:'number',value:12,min:4,max:30}); const w=el('input',{type:'number',value:480,min:120,step:20});
+    return {node:el('div',{},[el('label',{},['fps ',fps]),el('label',{},['width ',w,' px'])]),get:()=>({fps:+fps.value||12,w:+w.value||480})}; },
+  run:async (f,o)=>{ showResult(await runFF(f,'out.gif',(i,out)=>['-i',i,'-vf',
+    `fps=${o.fps},scale=${o.w}:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse`,'-loop','0',out],'Rendering GIF'),base(f.name)+'.gif'); }});
+add({cat:'video',kinds:['video'],rec:1,nm:'Compress Video',ds:'Shrink to a target size',kw:'compress shrink smaller size discord email tiny',
+  more:'Re-encodes a video to land near a size limit you set, so it fits Discord, email, or an upload portal. Reads the clip length to pick the bitrate.',
+  opts:oNum('target','10','MB','mb',{min:1,step:1}),
+  run:async (f,o)=>{ const onP=progress('Reading length'); const dur=await videoDuration(f)||30;
+    const target=(o.mb||10)*1048576*8; const vkbps=Math.max(150,Math.floor(target/dur/1000-128));
+    showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-b:v',vkbps+'k','-maxrate',vkbps+'k',
+      '-bufsize',(vkbps*2)+'k','-preset','veryfast','-vf','scale=-2:min(720\\,ih)','-c:a','aac','-b:a','128k',out],'Compressing video'),
+      base(f.name)+'-small.mp4',{note:`~${o.mb} MB target (${vkbps}kbps video).`}); }});
+add({cat:'video',kinds:['video'],rec:1,nm:'Extract Audio',ds:'Pull the soundtrack as MP3',kw:'extract audio mp3 sound from video',
+  more:'Pulls just the soundtrack out of a video and saves it as an MP3.',
+  run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-acodec','libmp3lame','-q:a','2',out],'Extracting audio'),base(f.name)+'.mp3'); }});
+add({cat:'video',kinds:['video'],nm:'Convert to MP4',ds:'Universal-friendly H.264',kw:'convert mp4 h264 mov mkv webm',
+  more:'Re-wraps MOV / MKV / WEBM / AVI into a widely-compatible H.264 MP4 that plays almost anywhere.',
+  run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-crf','23','-preset','veryfast','-c:a','aac',out],'Converting to MP4'),base(f.name)+'.mp4'); }});
+add({cat:'video',kinds:['video'],nm:'Trim Video',ds:'Keep just part of the clip',kw:'trim cut clip shorten',
+  more:'Keeps only the part between a start and end time and drops the rest. Times are mm:ss.',
+  opts:()=>{ const a=el('input',{type:'text',value:'00:00',placeholder:'mm:ss'}); const b=el('input',{type:'text',value:'00:10',placeholder:'mm:ss'});
+    return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
+  run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-c:v','libx264','-preset','veryfast','-c:a','aac',out],'Clipping'),base(f.name)+'-clip.mp4'); }});
+add({cat:'video',kinds:['video'],nm:'Remove Audio',ds:'Strip the audio track',kw:'mute remove audio silence',
+  more:'Removes the audio track and keeps the picture. Good for muting background noise before sharing.',
+  run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
+add({cat:'video',kinds:['video'],nm:'Grab a Frame',ds:'Save a still frame as PNG',kw:'thumbnail frame screenshot still poster',
+  more:'Saves a single still frame from a chosen moment (mm:ss) as a PNG. Handy for thumbnails.',
+  opts:()=>{ const t=el('input',{type:'text',value:'00:01',placeholder:'mm:ss'}); return {node:el('label',{},['at ',t]),get:()=>({t:t.value})}; },
+  run:async (f,o)=>{ showResult(await runFF(f,'out.png',(i,out)=>['-ss',o.t,'-i',i,'-vframes','1',out],'Grabbing frame'),base(f.name)+'-frame.png'); }});
+
+/* ---- AUDIO ---- */
+add({cat:'audio',kinds:['audio'],rec:1,nm:'Convert Audio',ds:'MP3 · WAV · M4A · OGG · FLAC',kw:'convert audio mp3 wav m4a ogg flac',
+  more:'Change audio between MP3, WAV, M4A, OGG, FLAC, and AAC.',
+  opts:oSel('to',[['mp3','MP3'],['wav','WAV'],['m4a','M4A'],['ogg','OGG'],['flac','FLAC'],['aac','AAC']],'e'),
+  run:async (f,o)=>{ const c={mp3:['-acodec','libmp3lame','-q:a','2'],wav:[],m4a:['-acodec','aac'],ogg:['-acodec','libvorbis'],flac:['-acodec','flac'],aac:['-acodec','aac']}[o.e];
+    showResult(await runFF(f,'out.'+o.e,(i,out)=>['-i',i,...c,out],'Converting audio'),base(f.name)+'.'+o.e); }});
+add({cat:'audio',kinds:['audio'],nm:'Normalize Volume',ds:'Even out the loudness',kw:'normalize volume loudness level',
+  more:'Evens out loudness so quiet and loud parts sit at a consistent level. Good for voice memos and recordings.',
+  run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-af','loudnorm','-acodec','libmp3lame','-q:a','2',out],'Normalizing'),base(f.name)+'-leveled.mp3'); }});
+add({cat:'audio',kinds:['audio'],nm:'Trim Audio',ds:'Keep just part of it',kw:'trim cut audio',
+  more:'Keeps only the part between a start and end time (mm:ss).',
+  opts:()=>{ const a=el('input',{type:'text',value:'00:00'}); const b=el('input',{type:'text',value:'00:30'});
+    return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
+  run:async (f,o)=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-acodec','libmp3lame','-q:a','2',out],'Trimming'),base(f.name)+'-trim.mp3'); }});
+add({cat:'audio',kinds:['audio'],nm:'Reduce Bitrate',ds:'Re-encode smaller',kw:'bitrate compress smaller audio',
+  more:'Re-encodes audio at a lower kbps to make the file smaller. Lower bitrate = smaller file, less fidelity.',
+  opts:oSel('bitrate',[['128','128 kbps'],['96','96 kbps'],['64','64 kbps'],['192','192 kbps']],'kb'),
+  run:async (f,o)=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-b:a',o.kb+'k','-acodec','libmp3lame',out],'Re-encoding'),base(f.name)+'-'+o.kb+'k.mp3'); }});
+
+/* ---- PDF ---- */
+add({cat:'pdf',kinds:['pdf'],rec:1,nm:'Compress PDF',ds:'Make a PDF smaller',kw:'compress shrink pdf smaller size squish',
+  more:'Flattens each page to an image to shrink a heavy PDF. Works best on scanned documents; text stays readable but is no longer selectable.',
+  run:async f=>{ const onP=progress('Compressing PDF'); const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
+    const pdf=await PDFDocument.create();
+    for(let p=1;p<=doc.numPages;p++){ onP(p/doc.numPages); const pg=await doc.getPage(p); const vp=pg.getViewport({scale:1.5});
+      const c=el('canvas'); c.width=vp.width; c.height=vp.height; await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+      const jpg=await blobOf(c,'image/jpeg',.7); const im=await pdf.embedJpg(await jpg.arrayBuffer());
+      pdf.addPage([vp.width,vp.height]).drawImage(im,{x:0,y:0,width:vp.width,height:vp.height}); }
+    showResult(new Blob([await pdf.save()],{type:'application/pdf'}),base(f.name)+'-small.pdf'); }});
+add({cat:'pdf',kinds:['pdf'],rec:1,nm:'PDF to Images',ds:'Each page as a PNG (zipped)',kw:'pdf to images png export pages',
+  more:'Renders each page to a high-resolution PNG and zips them. Good for posting pages as pictures.',
+  run:async f=>{ const onP=progress('Rendering pages'); const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise; const out=[];
+    for(let p=1;p<=doc.numPages;p++){ onP(p/doc.numPages); const pg=await doc.getPage(p); const vp=pg.getViewport({scale:2});
+      const c=el('canvas'); c.width=vp.width; c.height=vp.height; await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+      const b=await blobOf(c,'image/png',.95); out.push({name:`${base(f.name)}-p${String(p).padStart(2,'0')}.png`,data:new Uint8Array(await b.arrayBuffer())}); }
+    out.length===1?showResult(new Blob([out[0].data],{type:'image/png'}),out[0].name):showMulti(out,base(f.name)+'-pages.zip'); }});
+add({cat:'pdf',kinds:['pdf'],nm:'Split into Pages',ds:'One PDF per page (zipped)',kw:'split pages separate pdf',
+  more:'Breaks a PDF into one file per page, zipped together.',
+  run:async f=>{ const onP=progress('Splitting'); const src=await PDFDocument.load(await f.arrayBuffer()); const n=src.getPageCount(); const out=[];
+    for(let i=0;i<n;i++){ onP((i+1)/n); const d=await PDFDocument.create(); const [pg]=await d.copyPages(src,[i]); d.addPage(pg);
+      out.push({name:`${base(f.name)}-p${String(i+1).padStart(2,'0')}.pdf`,data:await d.save()}); }
+    showMulti(out,base(f.name)+'-split.zip'); }});
+add({cat:'pdf',kinds:['pdf'],nm:'Rotate Pages',ds:'Turn every page',kw:'rotate pages turn orientation',
+  more:'Turns every page 90° or 180°, e.g. to fix a sideways scan.',
+  opts:oSel('turn',[['90','90° clockwise'],['270','90° counter-clockwise'],['180','180°']],'deg'),
+  run:async (f,o)=>{ const onP=progress('Rotating'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
+    d.getPages().forEach(p=>p.setRotation(degrees((p.getRotation().angle+ +o.deg)%360)));
+    showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-rotated.pdf'); }});
+add({cat:'pdf',kinds:['pdf'],nm:'Add Page Numbers',ds:'Stamp page numbers',kw:'page numbers number stamp footer',
+  more:'Stamps "n / total" at the bottom-center of every page.',
+  run:async f=>{ const onP=progress('Numbering'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
+    const font=await d.embedFont(StandardFonts.Helvetica); const ps=d.getPages();
+    ps.forEach((p,i)=>{ const {width}=p.getSize(); p.drawText(`${i+1} / ${ps.length}`,{x:width/2-14,y:18,size:10,font,color:rgb(.2,.2,.2)}); });
+    showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-numbered.pdf'); }});
+add({cat:'pdf',kinds:['pdf'],nm:'Add Watermark',ds:'Stamp text across pages',kw:'watermark stamp text overlay draft confidential',
+  more:'Prints faint diagonal text (like CONFIDENTIAL or DRAFT) across every page.',
+  opts:()=>{ const t=el('input',{type:'text',value:'CONFIDENTIAL'}); return {node:el('label',{},['text ',t]),get:()=>({t:t.value||'DRAFT'})}; },
+  run:async (f,o)=>{ const onP=progress('Stamping'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
+    const font=await d.embedFont(StandardFonts.HelveticaBold);
+    d.getPages().forEach(p=>{ const {width,height}=p.getSize();
+      p.drawText(o.t,{x:width/2-120,y:height/2,size:50,font,color:rgb(.6,.1,.1),opacity:.18,rotate:degrees(35)}); });
+    showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-marked.pdf'); }});
+add({cat:'pdf',kinds:['pdf'],nm:'Delete Pages',ds:'Remove pages by number',kw:'delete remove pages drop',
+  more:'Removes specific pages by number. Use commas and ranges, e.g. 1,3,5-7.',
+  opts:()=>{ const t=el('input',{type:'text',value:'1',placeholder:'e.g. 1,3,5-7'}); return {node:el('label',{},['remove ',t]),get:()=>({spec:t.value})}; },
+  run:async (f,o)=>{ const onP=progress('Removing'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
+    const drop=new Set(); o.spec.split(',').forEach(s=>{ s=s.trim(); if(s.includes('-')){ const [a,b]=s.split('-').map(Number);
+      for(let i=a;i<=b;i++)drop.add(i-1);} else if(s)drop.add(+s-1); });
+    [...drop].sort((a,b)=>b-a).forEach(i=>{ if(i>=0&&i<d.getPageCount())d.removePage(i); });
+    showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-trimmed.pdf'); }});
+add({cat:'pdf',kinds:['pdf'],multi:1,nm:'Merge PDFs',ds:'Combine several PDFs in order',kw:'merge combine join pdf',
+  more:'Joins several PDFs into one, in the order you pick them. Drop multiple PDFs at once to use this.',
+  run:async fs=>{ const onP=progress('Merging'); const m=await PDFDocument.create();
+    for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); const d=await PDFDocument.load(await fs[i].arrayBuffer());
+      (await m.copyPages(d,d.getPageIndices())).forEach(p=>m.addPage(p)); }
+    showResult(new Blob([await m.save()],{type:'application/pdf'}),'merged.pdf'); }});
+
+/* ---- DATA ---- */
+add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'CSV to JSON',ds:'Table → array of objects',kw:'csv json convert data table',
+  more:'Turns a spreadsheet-style CSV into a JSON array of objects, using the first row as keys.',
+  fileToText:1, run:(text)=>showText(csvToJSON(text),'data.json')});
+add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'JSON to CSV',ds:'Array of objects → table',kw:'json csv convert data table',
+  more:'Turns a JSON array of objects into a CSV table, with a header row from the keys.',
+  fileToText:1, run:(text)=>showText(jsonToCSV(text),'data.csv')});
+
+/* ---- DEV (text in / text out) ---- */
+add({cat:'dev',input:'text',nm:'Format JSON',ds:'Prettify or minify JSON',kw:'json format pretty minify beautify tidy',
+  more:'Prettifies messy JSON with indentation, or minifies it to a single line. Also validates it.',
+  opts:oSel('mode',[['pretty','Prettify'],['min','Minify']],'m'),
+  run:(text,o)=>showText(JSON.stringify(JSON.parse(text),null,o.m==='min'?0:2),'tidy.json')});
+add({cat:'dev',input:'text',nm:'JSON ⇄ YAML',ds:'Convert between JSON and YAML',kw:'json yaml convert',
+  more:'Converts config back and forth between JSON and YAML.',
+  opts:oSel('direction',[['j2y','JSON → YAML'],['y2j','YAML → JSON']],'d'),
+  run:async (text,o)=>{ const YAML=await import("https://esm.sh/js-yaml@4.1.0");
+    if(o.d==='j2y') showText(YAML.dump(JSON.parse(text)),'out.yaml'); else showText(JSON.stringify(YAML.load(text),null,2),'out.json'); }});
+add({cat:'dev',input:'text',nm:'Base64 Encode / Decode',ds:'Encode or decode text',kw:'base64 encode decode',
+  more:'Encodes text to Base64, or decodes Base64 back to text.',
+  opts:oSel('do',[['enc','Encode'],['dec','Decode']],'d'),
+  run:(text,o)=>showText(o.d==='enc'?btoa(unescape(encodeURIComponent(text))):decodeURIComponent(escape(atob(text.trim()))),'base64.txt')});
+add({cat:'dev',input:'text',nm:'URL Encode / Decode',ds:'Percent-encode or decode',kw:'url encode decode percent escape',
+  more:'Percent-encodes text so it is safe in a URL, or decodes it back.',
+  opts:oSel('do',[['enc','Encode'],['dec','Decode']],'d'),
+  run:(text,o)=>showText(o.d==='enc'?encodeURIComponent(text):decodeURIComponent(text),'url.txt')});
+add({cat:'dev',input:'text',nm:'Hash Text',ds:'SHA-256 / SHA-1 / SHA-512',kw:'hash sha256 sha1 checksum digest',
+  more:'Computes a cryptographic digest (SHA-256, SHA-1, or SHA-512) of whatever you paste.',
+  opts:oSel('algo',[['SHA-256','SHA-256'],['SHA-1','SHA-1'],['SHA-512','SHA-512']],'a'),
+  run:async (text,o)=>{ const buf=await crypto.subtle.digest(o.a,new TextEncoder().encode(text));
+    showText([...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''),'hash.txt'); }});
+add({cat:'dev',input:'text',nm:'Unix Time Converter',ds:'Timestamp ⇄ date',kw:'timestamp epoch unix date time convert',
+  more:'Converts a Unix timestamp to a readable date, or a date string back to a timestamp.',
+  opts:oSel('dir',[['t2d','Timestamp → date'],['d2t','Date → timestamp']],'d'),
+  run:(text,o)=>{ const v=text.trim(); if(o.d==='t2d'){ const n=+v; const ms=v.length>11?n:n*1000;
+    showText(new Date(ms).toString()+'\n'+new Date(ms).toISOString(),'date.txt'); }
+    else showText(String(Math.floor(new Date(v).getTime()/1000)),'epoch.txt'); }});
+
+/* ---- ARCHIVE ---- */
+add({cat:'arc',kinds:['archive'],rec:1,nm:'Unzip Archive',ds:'Pull files out of a .zip',kw:'unzip extract archive open zip',
+  more:'Opens a .zip and repackages its contents (Mac __MACOSX junk removed). Only .zip is supported here.',
+  run:async f=>{ const onP=progress('Unpacking'); onP(.3); const data=new Uint8Array(await f.arrayBuffer()); const files=unzipSync(data);
+    const out=Object.entries(files).filter(([n])=>!n.endsWith('/')&&!n.startsWith('__MACOSX')).map(([name,d])=>({name,data:d}));
+    if(!out.length)throw new Error('Empty or unsupported archive (only .zip is supported here).');
+    showMulti(out,base(f.name)+'-unpacked.zip',`unpacked ${out.length} files (re-zipped, junk removed).`); }});
+add({cat:'arc',multi:1,nm:'Zip Files',ds:'Bundle files into one .zip',kw:'zip compress archive bundle package',
+  more:'Bundles several files into a single .zip for sending. Drop multiple files at once to use this.',
+  run:async fs=>{ const onP=progress('Zipping'); const entries={};
+    for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); entries[fs[i].name]=new Uint8Array(await fs[i].arrayBuffer()); }
+    showMulti(Object.entries(entries).map(([name,data])=>({name,data})),'bundle.zip'); }});
+
+/* ---- WEIRD ---- */
+add({cat:'weird',kinds:['any'],rec:1,nm:'Inspect File',ds:'What is this file, really?',kw:'inspect identify type metadata what is detective info magic',
+  more:'Reads the first bytes to tell you what a file truly is, regardless of its extension, plus its size, dimensions/length, and SHA-256.',
+  run:async f=>{ const onP=progress('Investigating'); onP(.3); const buf=new Uint8Array(await f.slice(0,16).arrayBuffer());
+    const hex=[...buf].map(b=>b.toString(16).padStart(2,'0')).join(' ');
+    const sig=magic(buf); let extra='';
+    if(kind(f)==='image'){ try{ const {img,url}=await toImage(f); extra=`dimensions   ${img.naturalWidth} × ${img.naturalHeight}px\n`; URL.revokeObjectURL(url);}catch{} }
+    if(kind(f)==='video'){ const d=await videoDuration(f); if(d)extra=`duration     ${d.toFixed(1)}s\n`; }
+    const full=new Uint8Array(await f.arrayBuffer()); const h=await crypto.subtle.digest('SHA-256',full);
+    const sha=[...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('');
+    showText(
+`FILE REPORT
+──────────────────────────────
+name         ${f.name}
+size         ${fmt(f.size)} (${f.size} bytes)
+ext claims   .${ext(f.name)}  →  ${kind(f)}
+true type    ${sig||'unknown / plain data'}
+mime (os)    ${f.type||'-'}
+${extra}magic bytes  ${hex}
+sha-256      ${sha}`, base(f.name)+'-report.txt'); }});
+add({cat:'weird',kinds:['video','image'],nm:'GIF to MP4',ds:'Animated GIF → tiny MP4',kw:'gif to mp4 convert animation',
+  more:'Converts an animated GIF into a much smaller MP4 (great for sharing big GIFs).',
+  run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-movflags','faststart','-pix_fmt','yuv420p','-vf','scale=trunc(iw/2)*2:trunc(ih/2)*2',out],'Converting'),base(f.name)+'.mp4'); }});
+add({cat:'weird',kinds:['image'],nm:'HEIC to JPG',ds:'iPhone HEIC → JPG',kw:'heic heif iphone jpg convert',
+  more:'Converts iPhone HEIC photos into ordinary JPG that opens anywhere.',
+  run:async f=>{ showResult(await imgConvert(f,{type:'image/jpeg',quality:.92}),base(f.name)+'.jpg'); }});
+
+/* ---- WEB / DOWNLOAD (link in, file out; needs the local server) ---- */
+add({cat:'web',input:'url',mode:'video',needs:'ytdlp',nm:'YouTube → Video',ds:'Download a video as MP4',kw:'youtube download video mp4 vimeo twitch save',
+  more:'Saves a YouTube (or any yt-dlp-supported site) video as an MP4. Runs yt-dlp on your machine.'});
+add({cat:'web',input:'url',mode:'audio',needs:'ytdlp',nm:'YouTube → MP3',ds:'Download just the audio',kw:'youtube download audio mp3 song music rip',
+  more:'Pulls the audio out of a video and saves it as an MP3 (yt-dlp + ffmpeg).'});
+add({cat:'web',input:'url',mode:'spotify',needs:'spotdl',nm:'Spotify → MP3',ds:'Download a track or playlist',kw:'spotify download music mp3 track playlist song',
+  more:'Uses spotdl to find and download matching audio. A playlist comes back as a zip.'});
+
+/* magic byte sniffer */
+function magic(b){ const s=(...x)=>x.every((v,i)=>b[i]===v);
+  if(s(0xFF,0xD8,0xFF))return'JPEG image'; if(s(0x89,0x50,0x4E,0x47))return'PNG image';
+  if(s(0x47,0x49,0x46))return'GIF image'; if(s(0x25,0x50,0x44,0x46))return'PDF document';
+  if(s(0x50,0x4B,0x03,0x04))return'ZIP / Office / archive'; if(s(0x52,0x61,0x72,0x21))return'RAR archive';
+  if(b[4]===0x66&&b[5]===0x74&&b[6]===0x79&&b[7]===0x70)return'MP4 / MOV video'; if(s(0x49,0x44,0x33))return'MP3 audio';
+  if(s(0x52,0x49,0x46,0x46))return'RIFF (WAV / AVI / WEBP)'; if(s(0x1A,0x45,0xDF,0xA3))return'Matroska / WEBM';
+  if(s(0x42,0x4D))return'BMP image'; return null; }
+
+/* ================= UI WIRING ================= */
+const state={ file:null, files:null, pending:null };
+
+/* balloon-help tooltip */
+const tipEl=el('div',{className:'tip'}); document.body.append(tipEl);
+function bindTip(node,text){ if(!text)return;
+  node.addEventListener('mouseenter',()=>{ tipEl.textContent=text; tipEl.style.display='block'; });
+  node.addEventListener('mousemove',e=>{ tipEl.style.left=Math.min(e.clientX+14,innerWidth-296)+'px'; tipEl.style.top=(e.clientY+18)+'px'; });
+  node.addEventListener('mouseleave',()=>{ tipEl.style.display='none'; }); }
+
+/* drawers */
+function buildDrawers(){
+  const host=$('#drawers');
+  for(const id in CATS){ const c=CATS[id]; const tools=T.filter(t=>t.cat===id);
+    const d=el('div',{className:'drawer'}); d.style.setProperty('--c',c.color);
+    const tab=el('button',{className:'drawer-tab'},[
+      el('span',{className:'ico'},[svg(c.icon)]),
+      el('span',{className:'label',textContent:c.label}),
+      el('span',{className:'ttl',textContent:c.blurb}),
+      el('span',{className:'cnt',textContent:tools.length+' tools'}),
+      el('span',{className:'chev',textContent:'▸'}) ]);
+    const body=el('div',{className:'drawer-body'});
+    const grid=el('div',{className:'tools'});
+    tools.forEach(t=>grid.append(toolCard(t,c.color)));
+    body.append(grid); tab.onclick=()=>d.classList.toggle('open');
+    d.append(tab,body); d.dataset.cat=id; host.append(d);
+  }
+  $('.cabinet h2').textContent=`the drawers · ${T.length} tools`;
+}
+function toolCard(t,color){ const c=el('div',{className:'tool'}); c.style.setProperty('--c',color);
+  c.append(el('span',{className:'dot'}), el('div',{},[el('div',{className:'nm',textContent:t.nm}),el('div',{className:'ds',textContent:t.ds})]));
+  bindTip(c, t.more||t.ds); c.onclick=()=>openTool(t); return c; }
+function openDrawer(id){ document.querySelectorAll('.drawer').forEach(d=>d.classList.toggle('open',d.dataset.cat===id)); }
+
+/* open a tool */
+function openTool(t){
+  if(t.input==='url'){ return renderUrl(t); }
+  if(t.input==='text' && !t.fileToText){ return renderText(t); }
+  if(t.multi){ return pickFiles(true, fs=>renderRun(t,fs)); }
+  const f=state.file;
+  const ok = f && (t.kinds.includes('any') || t.kinds.includes(kind(f)));
+  if(t.fileToText){ if(ok){ f.text().then(txt=>renderText(t,txt)); return; } return renderText(t); }
+  if(ok) return renderRun(t,f);
+  state.pending=t; pickFiles(false, fs=>{ state.file=fs[0]; state.pending=null; renderRun(t,fs[0]); });
+}
+function pickFiles(multiple,cb){ const inp=$('#file'); inp.multiple=multiple; inp.value='';
+  inp.onchange=e=>{ const fs=[...e.target.files]; if(fs.length)cb(fs); }; inp.click(); }
+
+/* run panel for file tools */
+function renderRun(t,fileOrFiles){
+  const multi=Array.isArray(fileOrFiles); const f=multi?fileOrFiles[0]:fileOrFiles;
+  const color=CATS[t.cat].color; openStage();
+  const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',color);
+  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:t.nm}),el('span',{className:'badge',textContent:CATS[t.cat].label})]));
+  p.append(el('div',{className:'ds',textContent:t.more||t.ds}));
+  p.append(el('div',{className:'filechip'},[svg(icon('clip')), multi?`${fileOrFiles.length} files`:`${f.name} · ${fmt(f.size)}`]));
+  let get=()=>({});
+  if(t.opts){ const o=t.opts(); const wrap=el('div',{className:'opts'}); wrap.append(o.node); p.append(wrap); get=o.get; }
+  const ni=p.querySelector('input[type=number]');
+  if(state.pendingMb!=null && ni){ ni.value=state.pendingMb; state.pendingMb=null; }
+  const go=el('button',{className:'btn',textContent:'Run '+t.nm});
+  const ch=el('button',{className:'btn ghost',textContent:'Choose different file'}); ch.onclick=()=>openTool(t);
+  go.onclick=async()=>{ go.disabled=true; clearStatus(); $('#output').innerHTML='';
+    try{ await t.run(fileOrFiles,get()); }catch(e){ fail(e); } finally{ go.disabled=false; } };
+  p.append(el('div',{className:'runrow'},[go, t.multi?null:ch]));
+}
+
+/* text tool panel */
+function renderText(t,prefill=''){ const color=CATS[t.cat].color; openStage();
+  const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',color);
+  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:t.nm}),el('span',{className:'badge',textContent:CATS[t.cat].label})]));
+  p.append(el('div',{className:'ds',textContent:t.more||t.ds}));
+  const ta=el('textarea',{value:prefill,placeholder:t.fileToText?'paste CSV/JSON here, or drop a file on the page':'paste text here'});
+  const wrap=el('div',{className:'opts'}); wrap.append(ta);
+  let get=()=>({}); if(t.opts){ const o=t.opts(); wrap.append(o.node); get=o.get; }
+  p.append(wrap);
+  const go=el('button',{className:'btn',textContent:'Run '+t.nm});
+  go.onclick=async()=>{ go.disabled=true; clearStatus(); $('#output').innerHTML='';
+    try{ await t.run(ta.value, get()); }catch(e){ fail(e); } finally{ go.disabled=false; } };
+  p.append(el('div',{className:'runrow'},[go]));
+}
+
+/* link-download panel (YouTube / Spotify, via the local server) */
+let backend={ ok:{ytdlp:false,spotdl:false,ffmpeg:false}, up:false };
+fetch('/api/check').then(r=>r.ok?r.json():null).then(j=>{ if(j){ backend.ok=j; backend.up=true; } }).catch(()=>{});
+
+/* update notifier — checks GitHub releases, shows an out-of-the-way banner if a newer version exists */
+fetch('/api/update-check').then(r=>r.ok?r.json():null).then(j=>{
+  if(!j || !j.hasUpdate) return;
+  if(localStorage.getItem('jd-skip-update')===j.latest) return;   // user dismissed this exact version
+  const bar=$('#updateBar'); if(!bar) return;
+  bar.querySelector('.ub-txt').textContent=`Junk Drawer ${j.latest} is available — you have ${j.current}.`;
+  const get=bar.querySelector('.ub-get');
+  get.textContent=`Download ${j.latest}`;
+  get.href=j.dmgUrl||j.htmlUrl||'#';
+  bar.querySelector('.ub-x').onclick=(e)=>{ e.preventDefault(); localStorage.setItem('jd-skip-update',j.latest); bar.hidden=true; };
+  bar.hidden=false;
+}).catch(()=>{});
+function codeLine(cmd){ return el('div',{style:'font:12px var(--mono);background:var(--well);border:2px solid;border-color:var(--sb);padding:8px 10px;margin:6px 0'},cmd); }
+function installPanel(p,needs){
+  const tool = needs==='spotdl' ? 'spotdl' : 'yt-dlp';
+  p.append(el('div',{className:'ds',style:'margin-bottom:8px'},`${tool} isn’t installed on this machine, so this tool can’t run yet.`));
+  const box=el('div',{className:'opts',style:'font:13px var(--sans)'});
+  if(needs==='ytdlp'){ box.append(el('div',{},'Install it once in Terminal:'), codeLine('brew install yt-dlp ffmpeg')); }
+  else { box.append(el('div',{},'Install it once in Terminal:'), codeLine('pip3 install spotdl'), el('div',{className:'note'},'spotdl also needs ffmpeg: brew install ffmpeg')); }
+  box.append(el('div',{className:'note',style:'margin-top:8px'},'Then quit start.command, run it again, and reload this page.'));
+  p.append(box);
+  p.append(el('div',{className:'runrow'},[ (()=>{ const b=el('button',{className:'btn ghost',textContent:'Close'}); b.onclick=resetStage; return b; })() ]));
+}
+function renderUrl(t){ const color=CATS[t.cat].color; openStage();
+  const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',color);
+  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:t.nm}),el('span',{className:'badge',textContent:CATS[t.cat].label})]));
+  p.append(el('div',{className:'ds',textContent:t.more||t.ds}));
+  if(!backend.up){ p.append(el('div',{className:'opts'},[el('div',{},'The link-download tools need the local server. Launch the app with start.command (not by opening index.html directly), then reload.')]));
+    p.append(el('div',{className:'runrow'},[ (()=>{ const b=el('button',{className:'btn ghost',textContent:'Close'}); b.onclick=resetStage; return b; })() ])); return; }
+  if(t.needs && !backend.ok[t.needs]){ return installPanel(p,t.needs); }
+  if(!backend.ok.ffmpeg){ p.append(el('div',{className:'note',style:'margin:2px 0 6px'},'Heads up: ffmpeg isn’t installed. It’s needed to merge HD video and to make MP3s. Run: brew install ffmpeg')); }
+  const inp=el('input',{type:'text',placeholder: t.mode==='spotify'?'https://open.spotify.com/track/…':'https://www.youtube.com/watch?v=…', style:'width:460px;max-width:100%'});
+  if(state.pendingUrl){ inp.value=state.pendingUrl; state.pendingUrl=null; }
+  p.append(el('div',{className:'opts'},[el('label',{},['link ',inp])]));
+  const go=el('button',{className:'btn',textContent:'Download'});
+  go.onclick=async()=>{ const url=inp.value.trim(); if(!/^https?:/i.test(url)){ toast('Paste a full https:// link'); return; }
+    go.disabled=true; clearStatus(); $('#output').innerHTML='';
+    try{ await postDownload(url,t.mode); }catch(e){ fail(e); } finally{ go.disabled=false; } };
+  p.append(el('div',{className:'runrow'},[go]));
+  setTimeout(()=>inp.focus(),0);
+}
+async function postDownload(url,mode){
+  progress('Fetching from the web (this can take a while for video)');
+  const r=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,mode})});
+  if(!r.ok){ let msg; try{ const j=await r.json();
+      if(j.error==='ytdlp-missing') msg='yt-dlp isn’t installed. Run: brew install yt-dlp ffmpeg';
+      else if(j.error==='spotdl-missing') msg='spotdl isn’t installed. Run: pip3 install spotdl';
+      else if(j.error==='tool-failed') msg='The downloader errored. Last lines:\n'+(j.detail||'').split('\n').filter(Boolean).slice(-4).join('\n');
+      else msg=j.error||('HTTP '+r.status);
+    }catch{ msg='HTTP '+r.status; } throw new Error(msg); }
+  const blob=await r.blob();
+  const fn=decodeURIComponent(r.headers.get('X-Filename')||('download.'+(mode==='video'?'mp4':mode==='spotify'?'zip':'mp3')));
+  showResult(blob, fn);
+}
+
+function openStage(){ $('#stage').style.display='block'; $('#stage').scrollIntoView({behavior:'smooth',block:'start'}); }
+function resetStage(){ $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; }
+
+/* receipt after a file is dropped */
+function showReceipt(file){
+  state.file=file; state.files=null; resetStage();
+  const k=kind(file); const r=$('#receipt'); r.style.display='block'; r.innerHTML='';
+  const card=el('div',{className:'receipt'});
+  card.append(el('div',{className:'hd'},[el('b',{textContent:'▸ file detected'}),
+    el('button',{className:'clearbtn',textContent:'✕ clear'},[])]));
+  card.querySelector('.clearbtn').onclick=clearAll;
+  meta(file,k).then(m=>{ const md=el('div',{className:'meta'}); md.innerHTML=m; card.insertBefore(md,card.children[1]||null);
+    const recos=T.filter(t=>t.rec && (t.kinds&&(t.kinds.includes(k)||t.kinds.includes('any'))));
+    if(recos.length){ card.append(el('div',{className:'want',textContent:'likely what you want:'}));
+      const rr=el('div',{className:'recos'}); recos.slice(0,6).forEach(t=>{ const b=el('button',{className:'reco',textContent:t.nm});
+        bindTip(b, t.more||t.ds); b.onclick=()=>openTool(t); rr.append(b); }); card.append(rr); }
+    openDrawer(k);
+  });
+  r.append(card); r.scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function meta(file,k){ let extra='';
+  try{ if(k==='image'){ const {img,url}=await toImage(file); extra=`<div><span class="k">size  </span> ${img.naturalWidth}×${img.naturalHeight}px</div>`; URL.revokeObjectURL(url); }
+    if(k==='video'){ const d=await videoDuration(file); if(d)extra=`<div><span class="k">length</span> ${d.toFixed(1)}s</div>`; } }catch{}
+  return `<div><span class="k">name  </span> ${file.name}</div><div><span class="k">type  </span> ${k} · .${ext(file.name)}</div><div><span class="k">weight</span> ${fmt(file.size)}</div>${extra}`;
+}
+
+/* file intake */
+function intake(list){ const fs=[...list]; if(!fs.length)return;
+  if(fs.length===1){ showReceipt(fs[0]); } else { multiReceipt(fs); } }
+function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
+  const allPdf=fs.every(f=>ext(f.name)==='pdf'), allImg=fs.every(f=>kind(f)==='image');
+  const r=$('#receipt'); r.style.display='block'; r.innerHTML='';
+  const card=el('div',{className:'receipt'});
+  card.append(el('div',{className:'hd'},[el('b',{textContent:`▸ ${fs.length} files detected`}),
+    el('button',{className:'clearbtn',textContent:'✕ clear'})]));
+  card.querySelector('.clearbtn').onclick=clearAll;
+  card.append(el('div',{className:'meta',innerHTML:fs.map(f=>`<div>${f.name} <span class="k">(${fmt(f.size)})</span></div>`).join('')}));
+  card.append(el('div',{className:'want',textContent:'batch actions:'}));
+  const rr=el('div',{className:'recos'});
+  rr.append(reco('Zip Files',()=>{ const t=T.find(x=>x.nm==='Zip Files'); renderRun(t,fs); $('#panel .btn').click(); }));
+  if(allPdf) rr.append(reco('Merge PDFs',()=>{ const t=T.find(x=>x.nm==='Merge PDFs'); renderRun(t,fs); $('#panel .btn').click(); }));
+  if(allImg) rr.append(reco('Images → one PDF',()=>imagesToPdf(fs)));
+  card.append(rr); r.append(card); r.scrollIntoView({behavior:'smooth'});
+}
+const reco=(label,fn)=>{ const b=el('button',{className:'reco',textContent:label}); b.onclick=fn; return b; };
+async function imagesToPdf(fs){ openStage(); const onP=progress('Building PDF'); const pdf=await PDFDocument.create();
+  try{ for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); const png=await imgConvert(fs[i],{type:'image/png'});
+    const im=await pdf.embedPng(await png.arrayBuffer()); pdf.addPage([im.width,im.height]).drawImage(im,{x:0,y:0,width:im.width,height:im.height}); }
+    showResult(new Blob([await pdf.save()],{type:'application/pdf'}),'images.pdf'); }catch(e){fail(e);} }
+function clearAll(){ state.file=state.files=null; $('#receipt').style.display='none'; $('#receipt').innerHTML=''; resetStage(); }
+
+/* ---- tool search ---- */
+const q=$('#q'), pal=$('#pal'); let palItems=[],palSel=0;
+function search(input){ const raw=input.trim(); const str=raw.toLowerCase(); if(!str){ pal.classList.remove('show'); return; }
+  const mbMatch=str.match(/(\d+(?:\.\d+)?)\s*(mb|mega)/); const isUrl=/^https?:\/\//i.test(raw);
+  let items=T.map(t=>({t,score:scoreTool(t,str)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).map(x=>x.t);
+  // surface the download tools when a link is in the box
+  if(/youtu\.?be|youtube\.com/i.test(raw)) items=[T.find(x=>x.nm==='YouTube → Video'),T.find(x=>x.nm==='YouTube → MP3'),...items];
+  else if(/open\.spotify\.com|spotify/i.test(raw)) items=[T.find(x=>x.nm==='Spotify → MP3'),...items];
+  items=[...new Set(items.filter(Boolean))].slice(0,7);
+  palItems=items; palSel=0;
+  pal.innerHTML=''; if(!items.length){ pal.innerHTML=`<div class="row"><span class="ds">no tool matches “${str}”. try a file type or action</span></div>`; pal.classList.add('show'); return; }
+  items.forEach((t,i)=>{ const row=el('div',{className:'row'+(i===0?' sel':'')});
+    row.append(el('div',{},[el('div',{className:'nm',textContent:t.nm}),el('div',{className:'ds',textContent:t.ds})]));
+    const tag=el('span',{className:'tag',textContent:CATS[t.cat].label}); tag.style.background=CATS[t.cat].color; row.append(tag);
+    row.onclick=()=>{ pal.classList.remove('show'); q.value='';
+      if(isUrl && t.input==='url') state.pendingUrl=raw;
+      else if(mbMatch&&['image','video','pdf'].includes(t.kinds?.[0])) state.pendingMb=+mbMatch[1];
+      openTool(t); };
+    pal.append(row); });
+  pal.classList.add('show');
+}
+function scoreTool(t,str){ const hay=(t.nm+' '+t.ds+' '+(t.kw||'')+' '+CATS[t.cat].label).toLowerCase(); let s=0;
+  str.split(/\s+/).forEach(w=>{ if(!w)return; if(t.nm.toLowerCase().includes(w))s+=3; else if(hay.includes(w))s+=1; });
+  return s; }
+q.addEventListener('input',e=>search(e.target.value));
+q.addEventListener('keydown',e=>{ if(!pal.classList.contains('show'))return;
+  if(e.key==='ArrowDown'){ e.preventDefault(); palSel=Math.min(palSel+1,palItems.length-1); markSel(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); palSel=Math.max(palSel-1,0); markSel(); }
+  else if(e.key==='Enter'){ e.preventDefault(); const t=palItems[palSel]; if(t){ const raw=q.value.trim(); pal.classList.remove('show'); q.value='';
+    if(/^https?:\/\//i.test(raw)&&t.input==='url') state.pendingUrl=raw; openTool(t); } }
+  else if(e.key==='Escape'){ pal.classList.remove('show'); } });
+function markSel(){ [...pal.children].forEach((r,i)=>r.classList.toggle('sel',i===palSel)); }
+document.addEventListener('click',e=>{ if(!e.target.closest('.cmd'))pal.classList.remove('show'); });
+
+/* ---- drop / paste ---- */
+const drop=$('#drop');
+drop.onclick=()=>{ const inp=$('#file'); inp.multiple=true; inp.onchange=e=>intake(e.target.files); inp.click(); };
+drop.onkeydown=e=>{ if(e.key==='Enter'||e.key===' ')drop.click(); };
+const DROP_TYPES=['Files','text/uri-list','text/html','text/plain'];
+;['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{
+  const t=e.dataTransfer?[...e.dataTransfer.types]:[]; if(DROP_TYPES.some(x=>t.includes(x))){ e.preventDefault(); drop.classList.add('hot'); }}));
+document.addEventListener('dragleave',e=>{ if(!e.relatedTarget) drop.classList.remove('hot'); });
+document.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('hot');
+  const dt=e.dataTransfer; if(!dt)return;
+  if(dt.files&&dt.files.length){ intake(dt.files); return; }
+  const cands=[]; const push=s=>{ if(/^(https?:|blob:)/i.test(s))cands.push(s); };
+  (dt.getData('text/uri-list')||'').split(/\s+/).forEach(push);
+  (dt.getData('text/plain')||'').split(/\s+/).forEach(push);
+  const htm=dt.getData('text/html'); if(htm){ const re=/<img[^>]+src=["']([^"']+)["']/ig; let m; while((m=re.exec(htm)))push(m[1]); }
+  if(cands.length) fetchDropped(cands); else toast('Drop a file, or copy the image and press ⌘V');
+});
+const isMedia=t=>/^(image|video|audio)\//.test(t)||t==='application/pdf';
+function unwrap(raw){ try{ const u=new URL(raw); const inner=u.searchParams.get('imgurl')||u.searchParams.get('url')||u.searchParams.get('mediaurl');
+  return inner?decodeURIComponent(inner):raw; }catch{ return raw; } }
+async function fetchDropped(cands){
+  openStage(); $('#panel').innerHTML=''; const onP=progress('Pulling the image in'); onP(.25);
+  const tried=new Set(); let sawBlob=false;
+  for(const raw of cands){ const url=unwrap(raw); if(tried.has(url))continue; tried.add(url);
+    if(url.startsWith('blob:')){ sawBlob=true; continue; }
+    try{ const res=await fetch(url,{mode:'cors'}); if(!res.ok)continue; const blob=await res.blob();
+      if(!isMedia(blob.type))continue;
+      let name=decodeURIComponent((url.split('#')[0].split('?')[0].split('/').pop())||'image');
+      const ex={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif','video/mp4':'mp4','application/pdf':'pdf'}[blob.type];
+      if(!/\.[a-z0-9]+$/i.test(name)) name+='.'+(ex||'png');
+      resetStage(); intake([new File([blob],name,{type:blob.type})]); return;
+    }catch{ /* try next candidate */ }
+  }
+  pasteFallback(sawBlob);
+}
+function pasteFallback(isBlob){
+  resetStage(); openStage(); const p=$('#panel'); p.innerHTML='';
+  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Use copy + paste instead'})]));
+  p.append(el('div',{className:'ds',textContent: isBlob
+    ? 'WhatsApp keeps images as private in-page data, so no other app can read them by dragging. Copy + paste carries the actual image, which always works:'
+    : 'That site blocks other apps from reading its images by drag. Copy + paste carries the actual pixels, which always works:'}));
+  const steps=el('div',{className:'opts',style:'font:13px var(--sans)'});
+  steps.append(el('div',{style:'margin:6px 0'},['1. Right-click the image → ',el('b',{textContent:'Copy Image'}),'.']));
+  steps.append(el('div',{style:'margin:6px 0'},['2. Come back here and hit the ',el('b',{textContent:'Paste an image'}),' button (or press ⌘V).']));
+  const go=el('button',{className:'btn',textContent:'📋 Paste an image now'}); go.onclick=pasteFromClipboard;
+  const ok=el('button',{className:'btn ghost',textContent:'Close'}); ok.onclick=resetStage;
+  p.append(el('div',{className:'runrow'},[go,ok]));
+}
+async function pasteFromClipboard(){
+  try{ const items=await navigator.clipboard.read();
+    for(const it of items){ const type=it.types.find(t=>isMedia(t)); if(type){ const blob=await it.getType(type);
+      resetStage(); intake([new File([blob],'pasted.'+(type.split('/')[1]||'png'),{type})]); return; } }
+    toast('No image on the clipboard yet. Copy Image first.');
+  }catch{ toast('Browser blocked clipboard read. Press ⌘V instead.'); }
+}
+$('#pasteBtn').onclick=pasteFromClipboard;
+window.addEventListener('paste',e=>{ let f=[...(e.clipboardData?.files||[])];
+  if(!f.length&&e.clipboardData){ for(const it of e.clipboardData.items){ if(it.kind==='file'){ const g=it.getAsFile(); if(g)f.push(g); } } }
+  if(f.length)intake(f); });
+$('#navPrivacy').onclick=e=>{ e.preventDefault(); toast('Everything runs locally. Files never leave your machine.'); };
+const _root=document.documentElement;
+$('#themeToggle').onclick=e=>{ e.preventDefault(); const t=_root.dataset.theme==='dark'?'light':'dark'; _root.dataset.theme=t; try{localStorage.setItem('jd-theme',t);}catch{} };
+
+/* ---- tiny inline icons ---- */
+function icon(n){ return ({
+  doc:'M6 2h8l4 4v16H6zM14 2v4h4', img:'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6', film:'M4 4h16v16H4zM4 9h16M4 15h16M9 4v16M15 4v16',
+  music:'M9 18V6l10-2v12M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM19 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', grid:'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z',
+  code:'M8 6l-6 6 6 6M16 6l6 6-6 6', box:'M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10', star:'M12 3l2.5 6 6.5.5-5 4 1.5 6.5L12 17l-5.5 3.5L8 14l-5-4 6.5-.5z',
+  down:'M12 3v12M7 10l5 5 5-5M5 21h14',
+  clip:'M21 10l-9 9a5 5 0 0 1-7-7l9-9a3 3 0 0 1 4 4l-9 9a1 1 0 0 1-2-2l8-8'}[n])||'M4 4h16v16H4z'; }
+function svg(path){ const ns='http://www.w3.org/2000/svg'; const s=document.createElementNS(ns,'svg');
+  s.setAttribute('width','18'); s.setAttribute('height','18'); s.setAttribute('viewBox','0 0 24 24');
+  s.setAttribute('fill','none'); s.setAttribute('stroke','currentColor'); s.setAttribute('stroke-width','1.6');
+  s.setAttribute('stroke-linecap','round'); s.setAttribute('stroke-linejoin','round');
+  const p=document.createElementNS(ns,'path'); p.setAttribute('d',path); s.append(p); return s; }
+
+buildDrawers();
+console.log('%c🗄️ Junk Drawer ready · '+T.length+' tools','color:#9a3f29;font-weight:bold');
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{
+  "name": "junk-drawer",
+  "version": "1.0.0",
+  "description": "Every annoying file tool in one place.",
+  "author": "Abhay Shah",
+  "license": "MIT",
+  "repository": "github:abhayshah06/junk-drawer",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal",
+    "release:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal --publish always",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "vc.axl.junkdrawer",
+    "productName": "Junk Drawer",
+    "files": ["index.html", "electron/**/*", "package.json"],
+    "extraResources": [
+      { "from": "resources/bin", "to": "bin", "filter": ["**/*"] }
+    ],
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.utilities",
+      "x64ArchFiles": "**/bin/*"
+    },
+    "win": { "target": ["nsis"] },
+    "publish": [{ "provider": "github", "owner": "abhayshah06", "repo": "junk-drawer" }],
+    "directories": { "output": "dist-app" }
+  }
+}
