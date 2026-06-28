@@ -11,3 +11,5 @@ resources/bin/
 .DS_Store
 HANDOFF.md
 JunkDrawer.zip
+.claude/settings.local.json
+.claude/worktrees/
