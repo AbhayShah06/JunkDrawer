@@ -259,10 +259,10 @@
 <div class="toast" id="toast"></div>
 
 <script type="module">
-import { PDFDocument, degrees, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
-import * as pdfjsLib from "https://esm.sh/pdfjs-dist@4.0.379";
-import { zipSync, unzipSync, strFromU8 } from "https://esm.sh/fflate@0.8.2";
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs";
+import { PDFDocument, degrees, rgb, StandardFonts } from "./vendor/pdf-lib.mjs";
+import * as pdfjsLib from "./vendor/pdfjs/pdf.min.mjs";
+import { zipSync, unzipSync, strFromU8 } from "./vendor/fflate.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdfjs/pdf.worker.min.mjs";
 
 /* ---------------- helpers ---------------- */
 const $ = s => document.querySelector(s);
@@ -285,20 +285,20 @@ function kind(f){ const e=ext(f.name);
 
 /* ---------------- lazy heavy deps ---------------- */
 let _bg=null;
-async function bgRemove(blob,onP){ if(!_bg) _bg=(await import("https://esm.sh/@imgly/background-removal@1.5.5")).removeBackground;
-  return _bg(blob,{progress:(k,c,t)=>onP&&onP(c/t)}); }
+async function bgRemove(blob,onP){ if(!_bg) _bg=(await import("./vendor/imgly/background-removal.mjs")).removeBackground;
+  return _bg(blob,{publicPath:new URL('vendor/imgly/data/',location.origin+'/').href,progress:(k,c,t)=>onP&&onP(c/t)}); }
 let _qrgen=null, _qrdec=null;
-async function qrGen(){ if(!_qrgen) _qrgen=(await import("https://esm.sh/qrcode@1.5.3")).default; return _qrgen; }
-async function qrDec(){ if(!_qrdec) _qrdec=(await import("https://esm.sh/jsqr@1.4.0")).default; return _qrdec; }
+async function qrGen(){ if(!_qrgen) _qrgen=(await import("./vendor/qrcode.mjs")).default; return _qrgen; }
+async function qrDec(){ if(!_qrdec) _qrdec=(await import("./vendor/jsqr.mjs")).default; return _qrdec; }
 let _ff=null, _ffutil=null;
-async function ffutil(){ if(!_ffutil) _ffutil=await import("https://esm.sh/@ffmpeg/util@0.12.1"); return _ffutil; }
+async function ffutil(){ if(!_ffutil) _ffutil=await import("./vendor/ffmpeg/util.mjs"); return _ffutil; }
 async function getFF(onP){
   if(_ff) return _ff;
-  const { FFmpeg } = await import("https://esm.sh/@ffmpeg/ffmpeg@0.12.10");
+  const { FFmpeg } = await import("./vendor/ffmpeg/ffmpeg.mjs");
   const { toBlobURL } = await ffutil();
   const ff = new FFmpeg(); ff.on('progress',({progress})=>onP&&onP(Math.min(progress,1)));
   const mt = self.crossOriginIsolated;
-  const b = `https://unpkg.com/${mt?'@ffmpeg/core-mt':'@ffmpeg/core'}@0.12.6/dist/umd`;
+  const b = mt ? './vendor/ffmpeg/core-mt' : './vendor/ffmpeg/core';
   const cfg = { coreURL: await toBlobURL(`${b}/ffmpeg-core.js`,'text/javascript'),
                 wasmURL: await toBlobURL(`${b}/ffmpeg-core.wasm`,'application/wasm') };
   if(mt) cfg.workerURL = await toBlobURL(`${b}/ffmpeg-core.worker.js`,'text/javascript');
@@ -323,7 +323,7 @@ function videoDuration(file){ return new Promise(res=>{ const v=document.createE
 
 /* ---------------- image primitives ---------------- */
 async function toImage(file){ let src=file; const e=ext(file.name);
-  if(e==='heic'||e==='heif'){ const h=(await import("https://esm.sh/heic2any@0.0.4")).default;
+  if(e==='heic'||e==='heif'){ const h=(await import("./vendor/heic2any.mjs")).default;
     src=await h({blob:file,toType:'image/png'}); }
   const url=URL.createObjectURL(src); const img=new Image();
   await new Promise((ok,no)=>{ img.onload=ok; img.onerror=()=>no(new Error('Could not read that image')); img.src=url; });
@@ -595,7 +595,7 @@ add({cat:'dev',input:'text',nm:'Tidy Up JSON',ds:'Clean up or shrink a JSON file
 add({cat:'dev',input:'text',nm:'Switch Between JSON and YAML',ds:'Turn JSON into YAML or back again',kw:'json yaml convert',
   more:'Converts a settings file between the two common formats, JSON and YAML. Pick which way to convert and paste your text.',
   opts:oSel('direction',[['j2y','JSON → YAML'],['y2j','YAML → JSON']],'d'),
-  run:async (text,o)=>{ const YAML=await import("https://esm.sh/js-yaml@4.1.0");
+  run:async (text,o)=>{ const YAML=await import("./vendor/js-yaml.mjs");
     if(o.d==='j2y') showText(YAML.dump(JSON.parse(text)),'out.yaml'); else showText(JSON.stringify(YAML.load(text),null,2),'out.json'); }});
 add({cat:'dev',input:'text',nm:'Scramble Text to Base64',ds:'Turn text into Base64 or back',kw:'base64 encode decode',
   more:'Turns plain text into Base64, a scrambled form some apps and emails use. It can also turn Base64 back into normal text.',

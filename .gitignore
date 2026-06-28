@@ -3,6 +3,10 @@ node_modules/
 dist-app/
 build/
 
+# vendored third-party engines — regenerated from npm deps by `npm run vendor`
+# (kept out of git to avoid bloat + redistributing third-party models; bundled into the DMG at build time)
+vendor/
+
 # bundled CLI binaries — too large for GitHub (ffmpeg is ~119 MB, over the 100 MB limit).
 # Kept locally on the build machine; recipients get them inside the released .dmg.
 resources/bin/

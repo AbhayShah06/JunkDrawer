@@ -8,13 +8,28 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
-    "dist:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal",
-    "release:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal --publish always",
+    "vendor": "node scripts/vendor.mjs",
+    "dist:mac": "npm run vendor && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal",
+    "release:mac": "npm run vendor && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal --publish always",
     "dist:win": "electron-builder --win nsis"
   },
   "devDependencies": {
+    "@ffmpeg/core": "^0.12.6",
+    "@ffmpeg/core-mt": "^0.12.6",
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1",
+    "@imgly/background-removal": "^1.5.5",
+    "@imgly/background-removal-data": "^1.4.5",
     "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.28.1",
+    "fflate": "^0.8.2",
+    "heic2any": "^0.0.4",
+    "js-yaml": "^4.1.0",
+    "jsqr": "^1.4.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.0.379",
+    "qrcode": "^1.5.3"
   },
   "build": {
     "appId": "vc.axl.junkdrawer",
@@ -22,6 +37,7 @@
     "files": [
       "index.html",
       "electron/**/*",
+      "vendor/**/*",
       "package.json"
     ],
     "extraResources": [

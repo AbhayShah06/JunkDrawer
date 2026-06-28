@@ -146,6 +146,13 @@ function startServer(appRoot, binDir) {
       res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
       res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
       res.setHeader('Cache-Control', 'no-store');
+      // No remote code: script-src has no http(s) origin, so only our own bundled,
+      // inline, wasm and blob scripts run. Everything is vendored locally.
+      res.setHeader('Content-Security-Policy',
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: data:; " +
+        "worker-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data: blob: https:; font-src 'self' data:; " +
+        "connect-src 'self' https: data: blob:; media-src 'self' blob: data:");
       const url = decodeURIComponent(req.url.split('?')[0]);
       if (url.startsWith('/api/') && !localOnly(req)) { res.statusCode = 403; return res.end('forbidden'); }
       if (url === '/api/check')
