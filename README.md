@@ -41,4 +41,4 @@ Type a URL or any text to get a QR image you can download, copy, or drag straigh
 
 The video tools, background remover, and QR tools fetch a small engine the first time you run each one, then keep it on hand. Stay online for that first use.
 
-Built by Abhay Shah.
+Built by Abhay Shah. If you find it useful, connect on [LinkedIn](https://www.linkedin.com/in/abhay-shah1/) or follow on [X](https://x.com/AbhayShahCA).
