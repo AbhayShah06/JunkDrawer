@@ -1,6 +1,6 @@
 {
   "name": "junk-drawer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Every annoying file tool in one place.",
   "author": "Abhay Shah",
   "license": "MIT",
@@ -19,17 +19,42 @@
   "build": {
     "appId": "vc.axl.junkdrawer",
     "productName": "Junk Drawer",
-    "files": ["index.html", "electron/**/*", "package.json"],
+    "files": [
+      "index.html",
+      "electron/**/*",
+      "package.json"
+    ],
     "extraResources": [
-      { "from": "resources/bin", "to": "bin", "filter": ["**/*"] }
+      {
+        "from": "resources/bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.utilities",
       "x64ArchFiles": "**/bin/*"
     },
-    "win": { "target": ["nsis"] },
-    "publish": [{ "provider": "github", "owner": "AbhayShah06", "repo": "JunkDrawer", "releaseType": "release" }],
-    "directories": { "output": "dist-app" }
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "AbhayShah06",
+        "repo": "JunkDrawer",
+        "releaseType": "release"
+      }
+    ],
+    "directories": {
+      "output": "dist-app"
+    }
   }
 }
