@@ -106,6 +106,10 @@ function handleDownload(req, res, binDir) {
 }
 function cleanup(d) { try { fs.rmSync(d, { recursive: true, force: true }); } catch {} }
 
+// Live encode progress (0..1) keyed by a per-request job id, scraped from ffmpeg's stderr
+// and polled by the renderer via /api/ffmpeg-progress so the bar moves during long encodes.
+const ffProgress = new Map();
+
 // Run the bundled NATIVE ffmpeg on a user file (≈10× faster than the in-browser
 // wasm core). The renderer streams the raw file as the body and passes the ffmpeg
 // argv + the in/out filenames as a JSON `meta` query param. We rebuild nothing from
@@ -126,6 +130,7 @@ function handleFFmpeg(req, res, binDir) {
   try { meta = JSON.parse(new URLSearchParams(req.url.split('?')[1] || '').get('meta') || ''); }
   catch { return reject({ error: 'bad-meta' }, 400); }
   const { inName, outName, args } = meta || {};
+  const id = (new URLSearchParams(req.url.split('?')[1] || '').get('id') || '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 64);
   const okName = n => typeof n === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(n) && !n.includes('..');
   if (!okName(inName) || !okName(outName)) return reject({ error: 'bad-names' }, 400);
   if (!Array.isArray(args) || args.length < 2 || args.length > 64) return reject({ error: 'bad-args' }, 400);
@@ -149,17 +154,27 @@ function handleFFmpeg(req, res, binDir) {
   ws.on('finish', () => {
     if (aborted) return;
     const child = spawn(ffmpeg, args, { cwd: tmp });
-    let err = '';
-    child.stderr.on('data', d => { err += d; if (err.length > 20000) err = err.slice(-20000); });
-    child.on('error', e => { cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
+    let err = '', durSec = 0;
+    const hms = s => { const m = /(\d+):(\d\d):(\d\d(?:\.\d+)?)/.exec(s); return m ? (+m[1] * 3600 + +m[2] * 60 + +m[3]) : 0; };
+    child.stderr.on('data', d => {
+      const s = String(d); err += s; if (err.length > 20000) err = err.slice(-20000);
+      // ffmpeg prints "Duration: HH:MM:SS.ss" once, then "time=HH:MM:SS.ss" as it encodes.
+      if (!durSec) { const dm = /Duration:\s*(\d+:\d\d:\d\d(?:\.\d+)?)/.exec(s); if (dm) durSec = hms(dm[1]); }
+      const tm = /time=\s*(\d+:\d\d:\d\d(?:\.\d+)?)/.exec(s);
+      if (id && durSec && tm) ffProgress.set(id, Math.min(0.999, hms(tm[1]) / durSec));
+    });
+    child.on('error', e => { if (id) ffProgress.delete(id); cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
     child.on('close', code => {
-      if (code !== 0 || !fs.existsSync(outPath)) { const d = err.slice(-2500); cleanup(tmp); return sendJSON(res, { error: 'tool-failed', detail: d || ('ffmpeg exit ' + code) }, 500); }
-      let data; try { data = fs.readFileSync(outPath); } catch { cleanup(tmp); return sendJSON(res, { error: 'read-failed' }, 500); }
+      if (code !== 0 || !fs.existsSync(outPath)) { if (id) ffProgress.delete(id); const d = err.slice(-2500); cleanup(tmp); return sendJSON(res, { error: 'tool-failed', detail: d || ('ffmpeg exit ' + code) }, 500); }
+      let stat; try { stat = fs.statSync(outPath); } catch { if (id) ffProgress.delete(id); cleanup(tmp); return sendJSON(res, { error: 'read-failed' }, 500); }
+      // Stream the result straight off disk instead of buffering the whole file in memory.
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Length', data.length);
-      res.end(data);
-      cleanup(tmp);
+      res.setHeader('Content-Length', stat.size);
+      const rs = fs.createReadStream(outPath);
+      rs.on('error', () => { try { res.destroy(); } catch {} if (id) ffProgress.delete(id); cleanup(tmp); });
+      rs.on('close', () => { if (id) ffProgress.delete(id); cleanup(tmp); });
+      rs.pipe(res);
     });
   });
 }
@@ -280,6 +295,8 @@ function startServer(appRoot, binDir, updater) {
         return sendJSON(res, { error: 'unavailable' }, 400);
       }
       if (url === '/api/download' && req.method === 'POST') return handleDownload(req, res, binDir);
+      if (url === '/api/ffmpeg-progress')
+        return sendJSON(res, { percent: ffProgress.get(new URLSearchParams(req.url.split('?')[1] || '').get('id') || '') || 0 });
       if (url === '/api/ffmpeg' && req.method === 'POST') return handleFFmpeg(req, res, binDir);
       // Static files, confined to appRoot. Reject backslashes/NUL (Windows traversal),
       // then require the resolved path to sit on a separator boundary inside the root

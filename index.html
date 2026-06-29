@@ -343,9 +343,15 @@ function kind(f){ const e=ext(f.name);
   if(DOC.includes(e))return'doc'; return'other'; }
 
 /* ---------------- lazy heavy deps ---------------- */
-let _bg=null;
+let _bg=null, _bgGpu=null;  // _bgGpu: null=untried, true=GPU works, false=fell back to CPU
 async function bgRemove(blob,onP){ if(!_bg) _bg=(await import("./vendor/imgly/background-removal.mjs")).removeBackground;
-  return _bg(blob,{publicPath:new URL('vendor/imgly/data/',location.origin+'/').href,progress:(k,c,t)=>onP&&onP(c/t)}); }
+  const base={publicPath:new URL('vendor/imgly/data/',location.origin+'/').href,progress:(k,c,t)=>onP&&onP(c/t)};
+  // WebGPU (when present) runs the segmentation model far faster than the wasm CPU path.
+  // The jsep/WebGPU runtime is vendored locally, so this stays fully offline. Fall back to
+  // CPU if GPU init fails for any reason.
+  if(_bgGpu!==false && navigator.gpu){ try{ const r=await _bg(blob,{...base,device:'gpu'}); _bgGpu=true; return r; }
+    catch{ _bgGpu=false; } }
+  return _bg(blob,{...base,device:'cpu'}); }
 let _qrgen=null, _qrdec=null;
 async function qrGen(){ if(!_qrgen) _qrgen=(await import("./vendor/qrcode.mjs")).default; return _qrgen; }
 async function qrDec(){ if(!_qrdec) _qrdec=(await import("./vendor/jsqr.mjs")).default; return _qrdec; }
@@ -385,12 +391,18 @@ async function runFF(file,outName,argsFn,label){
   return new Blob([data.buffer],{type:mimeOf(outName)});
 }
 async function runFFNative(file,inName,outName,args,label){
-  const onP=progress(label); onP(.08);
+  const onP=progress(label); onP(.04);
   const meta=encodeURIComponent(JSON.stringify({inName,outName,args}));
-  const res=await fetch('/api/ffmpeg?meta='+meta,{method:'POST',body:file});
-  if(!res.ok){ let m=''; try{ const j=await res.json(); m=j.detail||j.error||''; }catch{} throw new Error(m?('ffmpeg: '+m):('ffmpeg failed ('+res.status+')')); }
-  onP(.92); const buf=await res.arrayBuffer(); onP(1);
-  return new Blob([buf],{type:mimeOf(outName)});
+  const id=(((self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'-'+Math.random()))+'').replace(/[^a-z0-9-]/gi,'').slice(0,64);
+  // Poll the server for ffmpeg's real encode progress so the bar advances during long jobs.
+  const poll=setInterval(async()=>{ try{ const r=await fetch('/api/ffmpeg-progress?id='+id); const j=await r.json();
+    if(j&&typeof j.percent==='number') onP(.04+0.9*Math.min(1,Math.max(0,j.percent))); }catch{} },600);
+  try{
+    const res=await fetch('/api/ffmpeg?meta='+meta+'&id='+id,{method:'POST',body:file});
+    if(!res.ok){ let m=''; try{ const j=await res.json(); m=j.detail||j.error||''; }catch{} throw new Error(m?('ffmpeg: '+m):('ffmpeg failed ('+res.status+')')); }
+    const buf=await res.arrayBuffer(); onP(1);
+    return new Blob([buf],{type:mimeOf(outName)});
+  } finally { clearInterval(poll); }
 }
 const mimeOf = n => ({gif:'image/gif',mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',png:'image/png',
   jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',mp3:'audio/mpeg',wav:'audio/wav',m4a:'audio/mp4',
@@ -453,7 +465,12 @@ function showResult(blob,filename,{note}={}){
   const right=el('div',{style:'flex:1;min-width:210px'});
   const actions=el('div',{className:'actions'},[el('a',{className:'btn',href:url,download:filename,textContent:'Download'})]);
   if(isImg){ const cp=el('button',{className:'btn ghost',textContent:'Copy'});
-    cp.onclick=async()=>{ try{ await navigator.clipboard.write([new ClipboardItem({[blob.type]:blob})]); toast('Copied'); }
+    cp.onclick=async()=>{ try{
+        // The Async Clipboard API only accepts image/png — re-encode JPG/WEBP/etc. to PNG first.
+        let png=blob;
+        if(blob.type!=='image/png'){ const bmp=await createImageBitmap(blob); const c=el('canvas'); c.width=bmp.width; c.height=bmp.height;
+          c.getContext('2d').drawImage(bmp,0,0); bmp.close&&bmp.close(); png=await blobOf(c,'image/png'); }
+        await navigator.clipboard.write([new ClipboardItem({'image/png':png})]); toast('Copied'); }
       catch{ toast('Copy not supported here. Use Download'); } }; actions.append(cp); }
   const ag=el('button',{className:'btn ghost',textContent:'Home'}); ag.onclick=resetStage; actions.append(ag);
   right.append(actions);
@@ -496,8 +513,8 @@ const oSel=(label,pairs,key)=>()=>{ const s=el('select'); pairs.forEach(([v,l])=
 
 /* ---- IMAGE ---- */
 add({cat:'image',kinds:['image'],rec:1,nm:'Remove Background',ds:'Cut out the subject and get a clear PNG',kw:'remove background transparent cutout zap',
-  more:'Cuts the subject out of a photo and gives you a see-through PNG. Great for product shots, profile pics, and stickers. The first time you use it, it downloads a small helper once.',
-  run:async f=>{ const onP=progress('Removing background (first run downloads the model)'); const b=await bgRemove(f,onP);
+  more:'Cuts the subject out of a photo and gives you a see-through PNG. Great for product shots, profile pics, and stickers. The first run loads a small model from the app, then it’s instant.',
+  run:async f=>{ const onP=progress('Removing background (first run loads the model — a few seconds)'); const b=await bgRemove(f,onP);
     showResult(b,base(f.name)+'-nobg.png'); }});
 add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'Switch between PNG, JPG, and WEBP',kw:'convert format png jpg jpeg webp heic',
   more:'Change an image to PNG, JPG, or WEBP. Use JPG for photos, PNG when you need a clear background, and WEBP for websites.',
@@ -613,10 +630,15 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make the file sma
   more:'Makes a video small enough to fit an email or upload limit. You pick the size you want in MB.',
   opts:oNum('target','10','MB','mb',{min:1,step:1}),
   run:async (f,o)=>{ const onP=progress('Reading length'); const dur=await videoDuration(f)||30;
-    const target=(o.mb||10)*1048576*8; const vkbps=Math.max(150,Math.floor(target/dur/1000-128));
+    const mb=o.mb||10;
+    // Split the MB budget across the whole duration. 1 MB ≈ 8388.6 kbit; keep ~8% headroom for
+    // container overhead, use lighter audio when the budget is tight, and give the rest to video.
+    const totalKbps=mb*8388.608/dur*0.92;
+    const akbps=totalKbps<300?64:128;
+    const vkbps=Math.max(64,Math.floor(totalKbps-akbps));
     showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-b:v',vkbps+'k','-maxrate',vkbps+'k',
-      '-bufsize',(vkbps*2)+'k','-preset','ultrafast','-vf',"scale=-2:'min(720,ih)'",'-c:a','aac','-b:a','128k',out],'Compressing video'),
-      base(f.name)+'-small.mp4',{note:`~${o.mb} MB target (${vkbps}kbps video).`}); }});
+      '-bufsize',(vkbps*2)+'k','-preset','ultrafast','-vf',"scale=-2:'min(720,ih)'",'-c:a','aac','-b:a',akbps+'k',out],'Compressing video'),
+      base(f.name)+'-small.mp4',{note:`~${mb} MB target (${vkbps}k video, ${akbps}k audio)${vkbps===64?' — a long clip may still exceed the target':''}.`}); }});
 add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the sound out as an MP3',kw:'extract audio mp3 sound from video',
   more:'Takes just the sound from a video and saves it as an MP3 file.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-acodec','libmp3lame','-q:a','2',out],'Extracting audio'),base(f.name)+'.mp3'); }});
@@ -1206,30 +1228,55 @@ async function pdfSignFill(file){
   p.append(bar, sigHost, scroll);
   requestAnimationFrame(measure);
 
+  // Draw all placed items (text/date + signatures) onto `out`; `pageFor(pi)` returns the
+  // target page in `out` for page index pi. Shared by the in-place and rasterized export paths.
+  async function placeItems(out, pageFor){
+    const helv=await out.embedFont(StandardFonts.Helvetica);
+    for(const it of items){
+      const cTop=it.node.offsetTop+it.content.offsetTop, cLeft=it.node.offsetLeft+it.content.offsetLeft;
+      let pi=0; for(let k=0;k<pages.length;k++){ if(cTop>=pages[k].top-2) pi=k; }
+      const pg=pages[pi], page=pageFor(pi); if(!page) continue;
+      const sx=pg.wPt/pg.w, localX=(cLeft-pg.left)*sx, localTop=(cTop-pg.top)*sx;
+      if(it.type==='text'){
+        const sizePt=it.size*sx; const lines=(it.content.innerText||'').replace(/ /g,' ').replace(/\r/g,'').split('\n');
+        lines.forEach((ln,li)=>{ ln=ln.replace(/[^\x20-\x7E\xA0-\xFF]/g,''); if(!ln) return;
+          const baseline=pg.hPt-(localTop+li*sizePt*1.18+sizePt*0.80);
+          page.drawText(ln,{x:localX,y:baseline,size:sizePt,font:helv,color:rgb(.06,.06,.06)}); });
+      } else if(it.dataUrl){
+        const wPt=it.content.offsetWidth*sx, hPt=it.content.offsetHeight*sx; const png=await out.embedPng(it.dataUrl);
+        page.drawImage(png,{x:localX,y:pg.hPt-(localTop+hPt),width:wPt,height:hPt});
+      }
+    }
+  }
   bExport.onclick=async()=>{
     if(!items.length){ toast('Add a signature or text first'); return; }
     bExport.disabled=true; const onP2=progress('Building signed PDF'); onP2(.25);
     try{
       measure();
+      // Primary: overlay onto the original PDF (keeps existing pages vector + text selectable).
       const out=await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
-      const helv=await out.embedFont(StandardFonts.Helvetica); const opages=out.getPages();
-      for(const it of items){
-        const cTop=it.node.offsetTop+it.content.offsetTop, cLeft=it.node.offsetLeft+it.content.offsetLeft;
-        let pi=0; for(let k=0;k<pages.length;k++){ if(cTop>=pages[k].top-2) pi=k; }
-        const pg=pages[pi], page=opages[pi]; if(!page) continue;
-        const sx=pg.wPt/pg.w, localX=(cLeft-pg.left)*sx, localTop=(cTop-pg.top)*sx;
-        if(it.type==='text'){
-          const sizePt=it.size*sx; const lines=(it.content.innerText||'').replace(/ /g,' ').replace(/\r/g,'').split('\n');
-          lines.forEach((ln,li)=>{ ln=ln.replace(/[^\x20-\x7E\xA0-\xFF]/g,''); if(!ln) return;
-            const baseline=pg.hPt-(localTop+li*sizePt*1.18+sizePt*0.80);
-            page.drawText(ln,{x:localX,y:baseline,size:sizePt,font:helv,color:rgb(.06,.06,.06)}); });
-        } else {
-          const wPt=it.content.offsetWidth*sx, hPt=it.content.offsetHeight*sx; const png=await out.embedPng(it.dataUrl);
-          page.drawImage(png,{x:localX,y:pg.hPt-(localTop+hPt),width:wPt,height:hPt});
-        }
-      }
+      const opages=out.getPages();
+      await placeItems(out, pi=>opages[pi]);
       showResult(new Blob([await out.save()],{type:'application/pdf'}), base(file.name)+'-signed.pdf', {note:'Your signature & text are flattened onto the PDF.'});
-    }catch(e){ fail(e); } finally{ bExport.disabled=false; }
+    }catch(e){
+      // Some PDFs can't be edited in place (pdf-lib can't resolve their object graph — e.g. a
+      // dangling reference or an unusual stream filter). Rebuild a fresh PDF from the page images
+      // we already rendered with pdf.js, then overlay onto that. Always succeeds, but rasterized.
+      try{
+        onP2(.4);
+        const out=await PDFDocument.create(); const made=[];
+        for(let pi=0; pi<pages.length; pi++){ onP2(.4+.4*(pi/pages.length));
+          const src=await pdoc.getPage(pi+1);
+          const rscale=Math.min(3, Math.max(1, 1654/pages[pi].wPt)); // aim ~200 dpi, capped at 3x
+          const vp=src.getViewport({scale:rscale}); const rc=el('canvas'); rc.width=vp.width; rc.height=vp.height;
+          await src.render({canvasContext:rc.getContext('2d'),viewport:vp}).promise;
+          const jpg=await blobOf(rc,'image/jpeg',.92); const im=await out.embedJpg(await jpg.arrayBuffer());
+          const page=out.addPage([pages[pi].wPt,pages[pi].hPt]); page.drawImage(im,{x:0,y:0,width:pages[pi].wPt,height:pages[pi].hPt}); made.push(page);
+        }
+        await placeItems(out, pi=>made[pi]);
+        showResult(new Blob([await out.save()],{type:'application/pdf'}), base(file.name)+'-signed.pdf', {note:'Flattened to a fresh PDF — the original couldn’t be edited in place.'});
+      }catch(e2){ fail(e2); }
+    } finally{ bExport.disabled=false; }
   };
 }
 
