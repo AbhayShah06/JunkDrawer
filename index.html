@@ -455,7 +455,7 @@ function showResult(blob,filename,{note}={}){
   if(isImg){ const cp=el('button',{className:'btn ghost',textContent:'Copy'});
     cp.onclick=async()=>{ try{ await navigator.clipboard.write([new ClipboardItem({[blob.type]:blob})]); toast('Copied'); }
       catch{ toast('Copy not supported here. Use Download'); } }; actions.append(cp); }
-  const ag=el('button',{className:'btn ghost',textContent:'Drawers'}); ag.onclick=resetStage; actions.append(ag);
+  const ag=el('button',{className:'btn ghost',textContent:'Home'}); ag.onclick=resetStage; actions.append(ag);
   right.append(actions);
   if(note) right.append(el('div',{className:'note',textContent:note}));
   row.append(right); box.append(row); out.append(box); out.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -634,7 +634,7 @@ add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'m
 add({cat:'video',kinds:['video'],nm:'Save a Photo from a Video',ds:'Save one moment as a picture',kw:'thumbnail frame screenshot still poster',
   more:'Saves a single still picture from a moment you pick. Good for a thumbnail or poster image.',
   opts:()=>{ const t=el('input',{type:'text',value:'00:01',placeholder:'mm:ss'}); return {node:el('label',{},['at ',t]),get:()=>({t:t.value})}; },
-  run:async (f,o)=>{ showResult(await runFF(f,'out.png',(i,out)=>['-ss',o.t,'-i',i,'-vframes','1',out],'Grabbing frame'),base(f.name)+'-frame.png'); }});
+  run:async (f,o)=>{ showResult(await runFF(f,'out.png',(i,out)=>['-ss',o.t,'-i',i,'-vframes','1','-update','1',out],'Grabbing frame'),base(f.name)+'-frame.png'); }});
 
 /* ---- AUDIO ---- */
 add({cat:'audio',kinds:['audio'],rec:1,nm:'Convert Audio',ds:'Switch between MP3, WAV, M4A, OGG, FLAC, AAC',kw:'convert audio mp3 wav m4a ogg flac',
@@ -1124,7 +1124,7 @@ async function openViewer(file){
   p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Open & Preview'}),el('span',{className:'badge',textContent:'Open'})]));
   p.append(el('div',{className:'filechip'},[svg(icon('clip')), `${file.name} · ${fmt(file.size)}`]));
   const ch=el('button',{className:'btn ghost',textContent:'Open another file'}); ch.onclick=()=>pickFiles(false,fs=>openViewer(fs[0]));
-  const dw=el('button',{className:'btn ghost',textContent:'Drawers'}); dw.onclick=resetStage;
+  const dw=el('button',{className:'btn ghost',textContent:'Home'}); dw.onclick=resetStage;
   p.append(el('div',{className:'runrow'},[ch,dw]));
   const host=el('div',{className:'viewer'}); p.append(host);
   const e=ext(file.name);
@@ -1195,7 +1195,7 @@ async function pdfSignFill(file){
   const bText=el('button',{className:'btn ghost',textContent:'Text'});
   const bDate=el('button',{className:'btn ghost',textContent:'Date'});
   const bExport=el('button',{className:'btn',textContent:'Export signed PDF'});
-  const bClose=el('button',{className:'btn ghost',textContent:'Drawers'}); bClose.onclick=resetStage;
+  const bClose=el('button',{className:'btn ghost',textContent:'Home'}); bClose.onclick=resetStage;
   bar.append(bSig,bText,bDate,bExport,bClose,el('span',{className:'pdfedit-hint',textContent:`${pages.length} page${pages.length>1?'s':''} · drag items by the blue bar`}));
   const sigHost=el('div');
   bText.onclick=()=>{ measure(); addItem({type:'text',text:'Type here',size:18}); };
