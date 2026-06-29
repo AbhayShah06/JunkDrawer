@@ -10,7 +10,7 @@
     --desk:#64777e; --face:#d9d5cc; --faceD:#cfcabf; --well:#fffdf7;
     --hi:#f7f4ed; --sh:#9c968b; --sh2:#6e6a60; --ink:#201e18; --ink2:#5a564c; --line:#b7b1a5;
     --pdf:#b23a2e; --img:#5f7d3a; --vid:#3d6e9c; --aud:#9c7416; --data:#5f6b78;
-    --dev:#5a52a0; --arc:#b5662a; --weird:#8a4a78; --web:#2f8a86; --ok:#3f7a3f;
+    --dev:#5a52a0; --arc:#b5662a; --weird:#8a4a78; --web:#2f8a86; --ok:#3f7a3f; --doc:#1f7a99;
     --mono:"Monaco","Courier New",monospace;
     --sans:"Tahoma","Geneva","Segoe UI",Verdana,sans-serif;
     --rb:var(--hi) var(--sh2) var(--sh2) var(--hi);  /* raised bevel */
@@ -20,7 +20,7 @@
     --desk:#23262b; --face:#3a3d43; --faceD:#34373c; --well:#272a2e;
     --hi:#50555c; --sh:#202327; --sh2:#16181b; --ink:#e9e6dd; --ink2:#a6a194; --line:#4a4e54;
     --pdf:#cf6149; --img:#82a458; --vid:#5e92b3; --aud:#bd942f; --data:#828c9a;
-    --dev:#8a83d0; --arc:#c8732f; --weird:#b06a98; --web:#46a0a7; --ok:#5b9a4c;
+    --dev:#8a83d0; --arc:#c8732f; --weird:#b06a98; --web:#46a0a7; --ok:#5b9a4c; --doc:#4fb3cf;
   }
   *{box-sizing:border-box}
   html,body{margin:0; min-height:100%}
@@ -211,6 +211,24 @@
   .pdfedit-sigpad canvas{background:#fff; border:1px solid var(--line); width:100%; max-width:460px; height:160px; touch-action:none; cursor:crosshair; display:block}
   .pdfedit-tabs{display:flex; gap:6px; margin-bottom:8px}
   .pdfedit-tabs .on{outline:2px solid #2b6fd6}
+  /* Open & Preview viewer (read-only) */
+  .viewer{margin-top:10px}
+  .view-img{display:block; max-width:100%; max-height:64vh; margin:0 auto; border:2px solid; border-color:var(--sb); background:#fff}
+  .txt-view{background:var(--well); border:2px solid; border-color:var(--sb); padding:14px; max-height:64vh; overflow:auto;
+    font:12.5px/1.6 var(--mono); color:var(--ink); white-space:pre-wrap; word-break:break-word; margin:0}
+  .md-view{background:var(--well); border:2px solid; border-color:var(--sb); padding:18px 22px; max-height:64vh; overflow:auto;
+    color:var(--ink); font:14px/1.65 var(--sans)}
+  .md-view h1,.md-view h2,.md-view h3,.md-view h4{line-height:1.3; margin:18px 0 8px}
+  .md-view h1{font-size:23px; border-bottom:1px solid var(--line); padding-bottom:6px}
+  .md-view h2{font-size:18px; border-bottom:1px solid var(--line); padding-bottom:4px}
+  .md-view h3{font-size:15.5px} .md-view h4{font-size:14px}
+  .md-view p{margin:10px 0} .md-view a{color:var(--vid)}
+  .md-view code{font:12.5px var(--mono); background:var(--faceD); padding:1px 5px; border-radius:3px}
+  .md-view pre{background:var(--faceD); border:2px solid; border-color:var(--sb); padding:12px 14px; overflow:auto; margin:12px 0}
+  .md-view pre code{background:none; padding:0}
+  .md-view blockquote{margin:12px 0; padding:4px 14px; border-left:4px solid var(--line); color:var(--ink2)}
+  .md-view ul,.md-view ol{margin:10px 0; padding-left:26px} .md-view li{margin:4px 0}
+  .md-view img{max-width:100%} .md-view hr{border:none; border-top:1px solid var(--line); margin:18px 0}
   @media(max-width:620px){ .hero h1{font-size:18px} nav{display:none} .result .row{flex-direction:column} }
 </style>
 </head>
@@ -240,7 +258,7 @@
     <div id="drop" tabindex="0">
       <div class="stamp">🗃️</div>
       <div class="big">Drop a file here</div>
-      <div class="sub">photo, video, audio, PDF, or zip. Or click to pick one.</div>
+      <div class="sub">photo, video, audio, PDF, Markdown, text, or zip. Or click to pick one.</div>
     </div>
     <input type="file" id="file" multiple hidden />
 
@@ -319,9 +337,11 @@ const VID=['mp4','mov','mkv','webm','avi','flv','wmv','m4v','3gp','mpeg','mpg','
 const AUD=['mp3','wav','aac','m4a','flac','ogg','opus','wma','aiff','aif'];
 const DAT=['csv','tsv','json','xml','yaml','yml','toml','xlsx','xls','ods'];
 const ARC=['zip','7z','rar','tar','gz','tgz','bz2','xz'];
+const DOC=['md','markdown','mdown','mkd','mdx','txt','text','log'];
 function kind(f){ const e=ext(f.name);
   if(IMG.includes(e))return'image'; if(VID.includes(e))return'video'; if(AUD.includes(e))return'audio';
-  if(e==='pdf')return'pdf'; if(DAT.includes(e))return'data'; if(ARC.includes(e))return'archive'; return'other'; }
+  if(e==='pdf')return'pdf'; if(DAT.includes(e))return'data'; if(ARC.includes(e))return'archive';
+  if(DOC.includes(e))return'doc'; return'other'; }
 
 /* ---------------- lazy heavy deps ---------------- */
 let _bg=null;
@@ -438,6 +458,7 @@ function showMulti(files,zipName,note){ const z=zipSync(Object.fromEntries(files
 const CATS = {
   image:{label:'Image', color:'var(--img)', icon:icon('img'),  blurb:'fix, convert, shrink, and clean up photos'},
   pdf:  {label:'PDF',   color:'var(--pdf)', icon:icon('doc'),   blurb:'sign, merge, split, shrink, and more'},
+  doc:  {label:'Open',  color:'var(--doc)', icon:icon('eye'),   blurb:'open and read PDFs, Markdown, and text'},
   video:{label:'Video', color:'var(--vid)', icon:icon('film'), blurb:'shrink, trim, convert, grab frames'},
   audio:{label:'Audio', color:'var(--aud)', icon:icon('music'),blurb:'convert, trim, even out, shrink'},
   web:  {label:'Download',color:'var(--web)',icon:icon('down'), blurb:'save video or sound from a link'},
@@ -619,6 +640,11 @@ add({cat:'pdf',kinds:['pdf'],multi:1,nm:'Combine PDFs',ds:'Join several PDFs int
       (await m.copyPages(d,d.getPageIndices())).forEach(p=>m.addPage(p)); }
     showResult(new Blob([await m.save()],{type:'application/pdf'}),'merged.pdf'); }});
 
+/* ---- OPEN / READ (read-only preview; nothing leaves the machine) ---- */
+add({cat:'doc',kinds:['pdf','doc'],rec:1,custom:f=>openViewer(f),nm:'Open & Preview',ds:'Read a PDF, Markdown, or text file right here',
+  kw:'open view preview read pdf markdown md text txt log reader quick look display show render document',
+  more:'Opens a PDF, Markdown (.md), or plain-text file right in the app so you can read it without another program. PDFs show every page; Markdown is rendered with headings, lists, and links. Nothing leaves your computer.'});
+
 /* ---- DATA ---- */
 add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'CSV to JSON',ds:'Turn a spreadsheet into JSON',kw:'csv json convert data table',
   more:'Takes a spreadsheet-style CSV and turns it into JSON. The first row becomes the field names.',
@@ -761,7 +787,7 @@ function bindTip(node,text){ if(!text)return;
 
 /* drawers */
 /* starred + recent quick-access tools (no forced setup — recents fill in as you go) */
-const STARRED=['Remove Background','Shrink File Size','Shrink a Video','Sign & Fill PDF','Make a QR Code','iPhone Photo to JPG'];
+const STARRED=['Remove Background','Shrink File Size','Shrink a Video','Sign & Fill PDF','Open & Preview','Make a QR Code'];
 function recentList(){ try{ return JSON.parse(localStorage.getItem('jd-recent')||'[]'); }catch{ return []; } }
 function pushRecent(nm){ let r=recentList().filter(x=>x!==nm); r.unshift(nm); try{ localStorage.setItem('jd-recent',JSON.stringify(r.slice(0,5))); }catch{} }
 function renderQuick(){
@@ -945,6 +971,79 @@ function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
   card.append(rr); r.append(card); r.scrollIntoView({behavior:'smooth'});
 }
 const reco=(label,fn)=>{ const b=el('button',{className:'reco',textContent:label}); b.onclick=fn; return b; };
+
+/* ===== Open & Preview (read-only viewer for PDF / Markdown / text) ===== */
+const MDEXT=['md','markdown','mdown','mkd','mdx'];
+// Render a safe subset of Markdown. All text is HTML-escaped first and every URL is
+// scheme-checked, so untrusted file contents can never inject markup or javascript:.
+function mdToHtml(src){
+  const escTxt=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const escAttr=u=>String(u).replace(/"/g,'%22');
+  const safeUrl=u=>{ u=(u||'').trim();
+    if(/^(https?:|mailto:)/i.test(u))return u;          // safe absolute links
+    if(/^data:image\//i.test(u))return u;               // inline images only
+    if(/^[a-z][\w+.-]*:/i.test(u))return '#';           // block javascript:, file:, etc.
+    return u; };                                        // relative paths + #anchors pass through
+  const inline=raw=>{ let t=escTxt(raw);
+    t=t.replace(/!\[([^\]]*)\]\(\s*([^)\s]+)[^)]*\)/g,(m,a,u)=>`<img alt="${a}" src="${escAttr(safeUrl(u))}">`);
+    t=t.replace(/\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g,(m,a,u)=>`<a href="${escAttr(safeUrl(u))}" target="_blank" rel="noopener">${a}</a>`);
+    t=t.replace(/`([^`]+)`/g,(m,c)=>`<code>${c}</code>`);
+    t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+    t=t.replace(/__([^_]+)__/g,'<strong>$1</strong>');
+    t=t.replace(/\*([^*\n]+)\*/g,'<em>$1</em>');
+    t=t.replace(/~~([^~]+)~~/g,'<del>$1</del>');
+    return t; };
+  const lines=String(src).replace(/\r\n?/g,'\n').split('\n'); const out=[]; let i=0;
+  const isSpecial=l=>/^(#{1,6})\s|^```|^>\s?|^\s*[-*+]\s+|^\s*\d+[.)]\s+/.test(l);
+  while(i<lines.length){ const line=lines[i]; let m;
+    if(/^```/.test(line)){ const buf=[]; i++; while(i<lines.length&&!/^```/.test(lines[i])){ buf.push(lines[i]); i++; } i++;
+      out.push(`<pre><code>${escTxt(buf.join('\n'))}</code></pre>`); continue; }
+    if((m=line.match(/^(#{1,6})\s+(.*)$/))){ const n=Math.min(m[1].length,4); out.push(`<h${n}>${inline(m[2])}</h${n}>`); i++; continue; }
+    if(/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)){ out.push('<hr>'); i++; continue; }
+    if(/^>\s?/.test(line)){ const buf=[]; while(i<lines.length&&/^>\s?/.test(lines[i])){ buf.push(lines[i].replace(/^>\s?/,'')); i++; }
+      out.push(`<blockquote>${inline(buf.join(' '))}</blockquote>`); continue; }
+    if(/^\s*[-*+]\s+/.test(line)){ const it=[]; while(i<lines.length&&/^\s*[-*+]\s+/.test(lines[i])){ it.push(lines[i].replace(/^\s*[-*+]\s+/,'')); i++; }
+      out.push('<ul>'+it.map(x=>`<li>${inline(x)}</li>`).join('')+'</ul>'); continue; }
+    if(/^\s*\d+[.)]\s+/.test(line)){ const it=[]; while(i<lines.length&&/^\s*\d+[.)]\s+/.test(lines[i])){ it.push(lines[i].replace(/^\s*\d+[.)]\s+/,'')); i++; }
+      out.push('<ol>'+it.map(x=>`<li>${inline(x)}</li>`).join('')+'</ol>'); continue; }
+    if(/^\s*$/.test(line)){ i++; continue; }
+    const buf=[]; while(i<lines.length&&!/^\s*$/.test(lines[i])&&!isSpecial(lines[i])){ buf.push(lines[i]); i++; }
+    out.push(`<p>${inline(buf.join('\n')).replace(/\n/g,'<br>')}</p>`); }
+  return out.join('\n');
+}
+async function readTextCapped(file){ const CAP=4*1048576;
+  const txt=await (file.size>CAP?file.slice(0,CAP):file).text(); return {txt,truncated:file.size>CAP}; }
+async function viewPDF(file,host){ const onP=progress('Opening PDF'); onP(.1);
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  const scroll=el('div',{className:'pdfedit-scroll'}); const stack=el('div',{className:'pdfedit-stack'});
+  for(let i=1;i<=doc.numPages;i++){ onP(.1+.9*i/doc.numPages);
+    const pg=await doc.getPage(i); const vp1=pg.getViewport({scale:1}); const scale=820/vp1.width; const vp=pg.getViewport({scale});
+    const cv=el('canvas',{className:'pdfedit-page'}); cv.width=vp.width; cv.height=vp.height;
+    await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise; stack.append(cv); }
+  scroll.append(stack); host.append(scroll); clearStatus();
+  host.append(el('div',{className:'note'},`${doc.numPages} page${doc.numPages>1?'s':''} · read-only preview.`)); }
+async function viewMarkdown(file,host){ const {txt,truncated}=await readTextCapped(file); clearStatus();
+  const md=el('div',{className:'md-view'}); md.innerHTML=mdToHtml(txt); host.append(md);
+  if(truncated) host.append(el('div',{className:'note'},'Large file — showing the first 4 MB.')); }
+async function viewText(file,host){ const {txt,truncated}=await readTextCapped(file); clearStatus();
+  host.append(el('pre',{className:'txt-view',textContent:txt}));
+  if(truncated) host.append(el('div',{className:'note'},'Large file — showing the first 4 MB.')); }
+async function openViewer(file){
+  openStage(); const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.doc.color); $('#output').innerHTML=''; clearStatus();
+  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Open & Preview'}),el('span',{className:'badge',textContent:'Open'})]));
+  p.append(el('div',{className:'filechip'},[svg(icon('clip')), `${file.name} · ${fmt(file.size)}`]));
+  const ch=el('button',{className:'btn ghost',textContent:'Open another file'}); ch.onclick=()=>pickFiles(false,fs=>openViewer(fs[0]));
+  const dw=el('button',{className:'btn ghost',textContent:'↺ Drawers'}); dw.onclick=resetStage;
+  p.append(el('div',{className:'runrow'},[ch,dw]));
+  const host=el('div',{className:'viewer'}); p.append(host);
+  const e=ext(file.name);
+  try{
+    if(e==='pdf') await viewPDF(file,host);
+    else if(MDEXT.includes(e)) await viewMarkdown(file,host);
+    else if(IMG.includes(e)){ const {img}=await toImage(file); img.className='view-img'; host.append(img); clearStatus(); }
+    else await viewText(file,host);
+  }catch(err){ fail(err); }
+}
 /* ===== PDF Sign & Fill (interactive editor) ===== */
 async function pdfSignFill(file){
   openStage();
@@ -1195,6 +1294,7 @@ function icon(n){ return ({
   music:'M9 18V6l10-2v12M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM19 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', grid:'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z',
   code:'M8 6l-6 6 6 6M16 6l6 6-6 6', box:'M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10', star:'M12 3l2.5 6 6.5.5-5 4 1.5 6.5L12 17l-5.5 3.5L8 14l-5-4 6.5-.5z',
   down:'M12 3v12M7 10l5 5 5-5M5 21h14',
+  eye:'M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
   clip:'M21 10l-9 9a5 5 0 0 1-7-7l9-9a3 3 0 0 1 4 4l-9 9a1 1 0 0 1-2-2l8-8'}[n])||'M4 4h16v16H4z'; }
 function svg(path){ const ns='http://www.w3.org/2000/svg'; const s=document.createElementNS(ns,'svg');
   s.setAttribute('width','18'); s.setAttribute('height','18'); s.setAttribute('viewBox','0 0 24 24');
