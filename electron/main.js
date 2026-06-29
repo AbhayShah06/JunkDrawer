@@ -1,8 +1,33 @@
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const { startServer } = require('./server');
+const { autoUpdater } = require('electron-updater');
 
 let win, srv;
+
+// ---- in-app auto-update. Windows only: electron-updater downloads the new build from
+// the GitHub release and applies it on restart. macOS needs a signed app for Squirrel.Mac,
+// so there it stays disabled and the renderer falls back to opening the release page.
+// The renderer drives this through the local server (no preload/IPC needed). ----
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+let upState = { status: 'idle', version: '', percent: 0, error: '' };
+autoUpdater.on('update-available', i => { upState = { status: 'available', version: i.version, percent: 0, error: '' }; });
+autoUpdater.on('update-not-available', () => { if (upState.status === 'idle') upState.status = 'none'; });
+autoUpdater.on('download-progress', p => { upState.status = 'downloading'; upState.percent = p.percent || 0; });
+autoUpdater.on('update-downloaded', i => { upState = { status: 'ready', version: i.version, percent: 100, error: '' }; });
+autoUpdater.on('error', e => { upState.status = 'error'; upState.error = String((e && e.message) || e); });
+const updater = {
+  enabled: false,                          // set true at launch on packaged Windows
+  state: () => upState,
+  check: async () => { try { await autoUpdater.checkForUpdates(); } catch (e) { upState.status = 'error'; upState.error = String((e && e.message) || e); } },
+  download: async () => {
+    upState = { status: 'downloading', version: upState.version, percent: 0, error: '' };
+    try { await autoUpdater.checkForUpdates(); await autoUpdater.downloadUpdate(); }
+    catch (e) { upState.status = 'error'; upState.error = String((e && e.message) || e); }
+  },
+  apply: () => { setImmediate(() => { try { autoUpdater.quitAndInstall(); } catch {} }); },
+};
 
 const appRoot = () => app.isPackaged ? app.getAppPath() : path.join(__dirname, '..');
 // Packaged: electron-builder's per-platform extraResources copies resources/bin/<os> -> Resources/bin.
@@ -13,8 +38,10 @@ const binDir  = () => app.isPackaged ? path.join(process.resourcesPath, 'bin') :
 async function create() {
   // Don't nag about updates while developing (npm start) — only the packaged app checks.
   process.env.JD_DEV = app.isPackaged ? '' : '1';
-  const { port, server } = await startServer(appRoot(), binDir());
+  updater.enabled = app.isPackaged && process.platform === 'win32';
+  const { port, server } = await startServer(appRoot(), binDir(), updater);
   srv = server;
+  if (updater.enabled) updater.check();
   win = new BrowserWindow({
     width: 1180, height: 840, minWidth: 720, minHeight: 560,
     title: 'Junk Drawer', backgroundColor: '#23262b', show: false,

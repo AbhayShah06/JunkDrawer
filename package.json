@@ -1,6 +1,6 @@
 {
   "name": "junk-drawer",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Every annoying file tool in one place.",
   "author": "Abhay Shah",
   "license": "MIT",
@@ -74,6 +74,12 @@
       ]
     },
     "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "uninstallDisplayName": "Junk Drawer ${version}",
       "installerIcon": "icon.ico",
       "uninstallerIcon": "icon.ico"
     },
@@ -88,5 +94,8 @@
     "directories": {
       "output": "dist-app"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

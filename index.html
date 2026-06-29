@@ -878,11 +878,23 @@ fetch('/api/update-check').then(r=>r.ok?r.json():null).then(j=>{
   if(!j || !j.hasUpdate) return;
   if(localStorage.getItem('jd-skip-update')===j.latest) return;   // user dismissed this exact version
   const bar=$('#updateBar'); if(!bar) return;
-  bar.querySelector('.ub-txt').textContent=`Junk Drawer ${j.latest} is available — you have ${j.current}.`;
-  const get=bar.querySelector('.ub-get');
-  get.textContent=`Download ${j.latest}`;
-  const upUrl=j.installerUrl||j.dmgUrl||j.htmlUrl||''; get.href=/^https?:\/\//i.test(upUrl)?upUrl:'#';
+  const txt=bar.querySelector('.ub-txt'), get=bar.querySelector('.ub-get');
+  txt.textContent=`Junk Drawer ${j.latest} is available. You have ${j.current}.`;
   bar.querySelector('.ub-x').onclick=(e)=>{ e.preventDefault(); localStorage.setItem('jd-skip-update',j.latest); bar.hidden=true; };
+  if(j.canAutoUpdate){
+    // Windows: download and install inside the app, no browser, no manual download.
+    get.textContent=`Update to ${j.latest}`; get.href='#'; get.removeAttribute('target');
+    let timer=null;
+    const poll=async()=>{ let s; try{ s=await (await fetch('/api/update-state')).json(); }catch{ return; }
+      if(s.status==='downloading'){ get.textContent=`Downloading ${Math.round(s.percent||0)}%`; }
+      else if(s.status==='ready'){ clearInterval(timer); txt.textContent=`Junk Drawer ${j.latest} is ready to install.`;
+        get.textContent='Restart & install'; get.onclick=(e)=>{ e.preventDefault(); get.textContent='Installing…'; fetch('/api/update-apply',{method:'POST'}).catch(()=>{}); }; }
+      else if(s.status==='error'){ clearInterval(timer); timer=null; get.textContent='Update failed, retry'; } };
+    get.onclick=(e)=>{ e.preventDefault(); get.textContent='Starting…'; fetch('/api/update-download',{method:'POST'}).catch(()=>{}); if(!timer) timer=setInterval(poll,800); };
+  } else {
+    // macOS / dev: open the release download in the browser (auto-update needs a signed app on Mac).
+    get.textContent=`Download ${j.latest}`; const upUrl=j.installerUrl||j.dmgUrl||j.htmlUrl||''; get.href=/^https?:\/\//i.test(upUrl)?upUrl:'#';
+  }
   bar.hidden=false;
 }).catch(()=>{});
 function codeLine(cmd){ return el('div',{style:'font:12px var(--mono);background:var(--well);border:2px solid;border-color:var(--sb);padding:8px 10px;margin:6px 0'},cmd); }

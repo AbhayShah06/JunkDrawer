@@ -118,10 +118,11 @@ function cmpVer(a, b) { // > 0 when a is newer than b
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) { const d = (pa[i] || 0) - (pb[i] || 0); if (d) return d; }
   return 0;
 }
-function handleUpdateCheck(res) {
+function handleUpdateCheck(res, updater) {
   const current = PKG.version || '0.0.0';
+  const canAutoUpdate = !!(updater && updater.enabled);
   let done = false;
-  const finish = o => { if (done) return; done = true; sendJSON(res, Object.assign({ current, hasUpdate: false }, o)); };
+  const finish = o => { if (done) return; done = true; sendJSON(res, Object.assign({ current, hasUpdate: false, canAutoUpdate }, o)); };
   if (process.env.JD_DEV) return finish({});  // dev build never nags about updates
   const r = ghRepo();
   if (!r) return finish({});
@@ -177,7 +178,7 @@ function localOnly(req, expectedHost) {
   return true;
 }
 
-function startServer(appRoot, binDir) {
+function startServer(appRoot, binDir, updater) {
   return new Promise(resolve => {
     let expectedHost = null;  // set once the ephemeral port is known (below)
     const rootResolved = path.resolve(appRoot);
@@ -197,7 +198,17 @@ function startServer(appRoot, binDir) {
       if (url === '/api/check')
         return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir) });
       if (url === '/api/update-check')
-        return handleUpdateCheck(res);
+        return handleUpdateCheck(res, updater);
+      if (url === '/api/update-state')
+        return sendJSON(res, Object.assign({ enabled: !!(updater && updater.enabled) }, (updater && updater.state && updater.state()) || {}));
+      if (url === '/api/update-download' && req.method === 'POST') {
+        if (updater && updater.enabled) { updater.download(); return sendJSON(res, { ok: true }); }
+        return sendJSON(res, { error: 'unavailable' }, 400);
+      }
+      if (url === '/api/update-apply' && req.method === 'POST') {
+        if (updater && updater.enabled) { updater.apply(); return sendJSON(res, { ok: true }); }
+        return sendJSON(res, { error: 'unavailable' }, 400);
+      }
       if (url === '/api/download' && req.method === 'POST') return handleDownload(req, res, binDir);
       // Static files, confined to appRoot. Reject backslashes/NUL (Windows traversal),
       // then require the resolved path to sit on a separator boundary inside the root
