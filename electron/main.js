@@ -8,6 +8,8 @@ const appRoot = () => app.isPackaged ? app.getAppPath() : path.join(__dirname, '
 const binDir  = () => app.isPackaged ? path.join(process.resourcesPath, 'bin') : path.join(__dirname, '..', 'resources', 'bin');
 
 async function create() {
+  // Don't nag about updates while developing (npm start) — only the packaged app checks.
+  process.env.JD_DEV = app.isPackaged ? '' : '1';
   const { port, server } = await startServer(appRoot(), binDir());
   srv = server;
   win = new BrowserWindow({

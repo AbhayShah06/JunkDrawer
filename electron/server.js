@@ -108,6 +108,7 @@ function handleUpdateCheck(res) {
   const current = PKG.version || '0.0.0';
   let done = false;
   const finish = o => { if (done) return; done = true; sendJSON(res, Object.assign({ current, hasUpdate: false }, o)); };
+  if (process.env.JD_DEV) return finish({});  // dev build never nags about updates
   const r = ghRepo();
   if (!r) return finish({});
   const req = https.get(`https://api.github.com/repos/${r.owner}/${r.repo}/releases/latest`,
