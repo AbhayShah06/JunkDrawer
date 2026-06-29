@@ -268,13 +268,13 @@
       <span>Copied an image somewhere? Click here, or paste it.</span>
     </div>
 
-    <div class="quick qrow" id="recentRow" hidden><span class="qlabel">Recent</span><div class="qtools" id="recentTools"></div></div>
-
     <div class="cmd">
       <span class="pmt"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="7"/><path d="M21 21l-5.2-5.2"/></svg></span>
       <input id="q" autocomplete="off" placeholder="Search for a tool, like shrink a video or sign a PDF" />
       <div class="pal" id="pal"></div>
     </div>
+
+    <div class="quick qrow" id="recentRow" hidden><span class="qlabel">Recent</span><div class="qtools" id="recentTools"></div></div>
 
     <div class="quick qrow"><span class="qlabel">Popular</span><div class="qtools" id="starTools"></div></div>
   </section>
@@ -915,6 +915,7 @@ async function postDownload(url,mode){
   const r=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,mode})});
   if(!r.ok){ let msg; try{ const j=await r.json();
       if(j.error==='ytdlp-missing') msg='yt-dlp isn’t installed. Run: brew install yt-dlp ffmpeg';
+      else if(j.error==='ffmpeg-missing') msg='Couldn’t find the MP3 converter (ffmpeg). Restart the app and try again.';
       else if(j.error==='spotdl-missing') msg='spotdl isn’t installed. Run: pip3 install spotdl';
       else if(j.error==='tool-failed') msg='The downloader errored. Last lines:\n'+(j.detail||'').split('\n').filter(Boolean).slice(-4).join('\n');
       else msg=j.error||('HTTP '+r.status);

@@ -62,10 +62,12 @@ function handleDownload(req, res, binDir) {
       // separators/unicode from the (remote-controlled) media title so it can't traverse;
       // the trailing `--` stops option parsing so a URL can never be read as a flag.
       const base = ['--no-config','--restrict-filenames','--no-playlist','-o','%(title)s.%(ext)s'];
-      if (mode === 'audio')
-        args = ffmpegOk ? [...base,'-x','--audio-format','mp3','--',url]
-                        : [...base,'-f','bestaudio','--',url];
-      else
+      if (mode === 'audio') {
+        // MP3 needs ffmpeg to transcode the source stream. Without it, yt-dlp would just
+        // save the raw webm/m4a audio — not an MP3. Fail clearly rather than mislabel.
+        if (!ffmpegOk) return sendJSON(res, { error: 'ffmpeg-missing' }, 501);
+        args = [...base,'-x','--audio-format','mp3','--',url];
+      } else
         args = ffmpegOk ? [...base,'-f','bestvideo*+bestaudio/best','--merge-output-format','mp4','--',url]
                         : [...base,'-f','best[ext=mp4]/best','--',url];
     }

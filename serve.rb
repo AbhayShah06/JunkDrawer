@@ -30,7 +30,7 @@ class IsoFileHandler < WEBrick::HTTPServlet::FileHandler
     # No remote code: script-src has no http(s) origin, so only our own bundled,
     # inline, wasm and blob scripts run. Everything is vendored locally.
     res['Content-Security-Policy'] =
-      "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: data:; " \
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data:; " \
       "worker-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; " \
       "img-src 'self' data: blob: https:; font-src 'self' data:; " \
       "connect-src 'self' https: data: blob:; media-src 'self' blob: data:"
@@ -69,6 +69,12 @@ server.mount_proc('/api/download') do |req, res|
       res.status = 501; res['Content-Type'] = 'application/json'
       res.body = { error: "#{tool == 'spotdl' ? 'spotdl' : 'ytdlp'}-missing" }.to_json; next
     end
+    # MP3 needs ffmpeg to transcode; without it yt-dlp would save the raw webm/m4a
+    # stream, not an MP3. Fail clearly rather than mislabel.
+    if mode == 'audio' && !have?('ffmpeg')
+      res.status = 501; res['Content-Type'] = 'application/json'
+      res.body = { error: 'ffmpeg-missing' }.to_json; next
+    end
 
     Dir.mktmpdir('jd-') do |tmp|
       ffmpeg_ok = have?('ffmpeg')
@@ -79,8 +85,7 @@ server.mount_proc('/api/download') do |req, res|
       cmd = case mode
             when 'spotify' then ['spotdl', 'download', '--', url]
             when 'audio'
-              ffmpeg_ok ? yt + ['-x', '--audio-format', 'mp3', '--', url]
-                        : yt + ['-f', 'bestaudio', '--', url]
+              yt + ['-x', '--audio-format', 'mp3', '--', url]
             else
               ffmpeg_ok ? yt + ['-f', 'bestvideo*+bestaudio/best', '--merge-output-format', 'mp4', '--', url]
                         : yt + ['-f', 'best[ext=mp4]/best', '--', url]

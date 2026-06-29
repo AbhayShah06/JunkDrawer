@@ -118,10 +118,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         elif mode == "audio":
             if not have("yt-dlp"):
                 return self._json({"error": "ytdlp-missing"}, 501)
-            if ffmpeg_ok:
-                cmd = ytdlp_base + ["-x", "--audio-format", "mp3", "--", url]
-            else:  # no ffmpeg: grab the raw audio stream as-is (m4a/webm), can't make mp3
-                cmd = ytdlp_base + ["-f", "bestaudio", "--", url]
+            # MP3 needs ffmpeg to transcode; without it yt-dlp would save the raw
+            # webm/m4a stream, not an MP3. Fail clearly rather than mislabel.
+            if not ffmpeg_ok:
+                return self._json({"error": "ffmpeg-missing"}, 501)
+            cmd = ytdlp_base + ["-x", "--audio-format", "mp3", "--", url]
         else:
             if not have("yt-dlp"):
                 return self._json({"error": "ytdlp-missing"}, 501)
