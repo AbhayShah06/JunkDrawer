@@ -106,6 +106,21 @@
   .drawer-body{display:none; padding:4px 11px 12px; background:var(--face); border-top:1px solid var(--line)}
   .drawer.open .drawer-body{display:block}
   .tools{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:7px; margin-top:8px}
+  /* quick-access rows (popular / recent) */
+  .quick{margin-top:16px}
+  .qrow{margin:12px 0 0}
+  .qrow[hidden]{display:none}
+  .qlabel{display:block; font:bold 10.5px var(--sans); letter-spacing:.07em; text-transform:uppercase; color:var(--ink2); margin:0 0 7px 1px}
+  .qtools{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px}
+  /* "browse all tools" toggle + collapsed cabinet */
+  .cabinet .alltoggle{display:inline-flex; align-items:center; gap:8px; background:var(--face);
+    border:2px solid; border-color:var(--hi) var(--sh2) var(--sh2) var(--hi); padding:8px 16px;
+    font:bold 12px var(--sans); color:var(--ink); cursor:pointer}
+  .cabinet .alltoggle:active{border-color:var(--sh2) var(--hi) var(--hi) var(--sh2)}
+  .cabinet .alltoggle .chev{transition:transform .12s}
+  .cabinet.open .alltoggle .chev{transform:rotate(90deg)}
+  #drawerwrap[hidden]{display:none}
+  #drawerwrap{margin-top:12px}
   .tool{display:flex; gap:9px; align-items:flex-start; background:var(--well); border:2px solid; border-color:var(--rb);
     padding:9px 10px; cursor:pointer}
   .tool:hover{background:#fffef9}
@@ -233,6 +248,11 @@
       <span>Copied an image from somewhere? Click here, or press ⌘V.</span>
     </div>
 
+    <div class="quick">
+      <div class="qrow" id="recentRow" hidden><span class="qlabel">Recent</span><div class="qtools" id="recentTools"></div></div>
+      <div class="qrow"><span class="qlabel">Popular</span><div class="qtools" id="starTools"></div></div>
+    </div>
+
     <div class="cmd">
       <span class="pmt">🔍</span>
       <input id="q" autocomplete="off" placeholder="Search for what you want to do, like shrink a video or sign a PDF" />
@@ -245,8 +265,8 @@
   <section id="stage"><div class="panel" id="panel"></div><div id="status"></div><div id="output"></div></section>
 
   <section class="cabinet" id="cabinet">
-    <h2>the drawers · {N} tools</h2>
-    <div id="drawers"></div>
+    <button class="alltoggle" id="allToggle"><span class="chev">▸</span> <span id="allLabel">Browse all tools</span></button>
+    <div id="drawerwrap" hidden><div id="drawers"></div></div>
   </section>
 </main>
 
@@ -396,15 +416,15 @@ function showMulti(files,zipName,note){ const z=zipSync(Object.fromEntries(files
 
 /* ================= TOOL REGISTRY ================= */
 const CATS = {
-  web:  {label:'Download',color:'var(--web)',icon:icon('down'), blurb:'save video or sound from a link'},
-  pdf:  {label:'PDF',   color:'var(--pdf)', icon:icon('doc'),   blurb:'sign, merge, split, shrink, and more'},
   image:{label:'Image', color:'var(--img)', icon:icon('img'),  blurb:'fix, convert, shrink, and clean up photos'},
+  pdf:  {label:'PDF',   color:'var(--pdf)', icon:icon('doc'),   blurb:'sign, merge, split, shrink, and more'},
   video:{label:'Video', color:'var(--vid)', icon:icon('film'), blurb:'shrink, trim, convert, grab frames'},
   audio:{label:'Audio', color:'var(--aud)', icon:icon('music'),blurb:'convert, trim, even out, shrink'},
+  web:  {label:'Download',color:'var(--web)',icon:icon('down'), blurb:'save video or sound from a link'},
   data: {label:'Data',  color:'var(--data)',icon:icon('grid'), blurb:'switch between spreadsheet and JSON'},
-  dev:  {label:'Dev',   color:'var(--dev)', icon:icon('code'), blurb:'codes, data files, and QR codes'},
   arc:  {label:'Archive',color:'var(--arc)',icon:icon('box'),  blurb:'zip and unzip files'},
   weird:{label:'Weird', color:'var(--weird)',icon:icon('star'),blurb:'the odd jobs'},
+  dev:  {label:'Dev',   color:'var(--dev)', icon:icon('code'), blurb:'codes, data files, and QR codes'},
 };
 const T = []; // tools
 const add = t => { T.push(t); return t; };
@@ -696,6 +716,17 @@ function bindTip(node,text){ if(!text)return;
   node.addEventListener('mouseleave',()=>{ tipEl.style.display='none'; }); }
 
 /* drawers */
+/* starred + recent quick-access tools (no forced setup — recents fill in as you go) */
+const STARRED=['Remove Background','Shrink File Size','Shrink a Video','Sign & Fill PDF','Make a QR Code','iPhone Photo to JPG'];
+function recentList(){ try{ return JSON.parse(localStorage.getItem('jd-recent')||'[]'); }catch{ return []; } }
+function pushRecent(nm){ let r=recentList().filter(x=>x!==nm); r.unshift(nm); try{ localStorage.setItem('jd-recent',JSON.stringify(r.slice(0,5))); }catch{} }
+function renderQuick(){
+  const fill=(host,names)=>{ if(!host)return 0; host.innerHTML=''; let n=0;
+    names.forEach(nm=>{ const t=T.find(x=>x.nm===nm); if(t){ host.append(toolCard(t,CATS[t.cat].color)); n++; } }); return n; };
+  fill($('#starTools'),STARRED);
+  const rr=$('#recentRow'), n=fill($('#recentTools'),recentList()); if(rr) rr.hidden=!n;
+}
+
 function buildDrawers(){
   const host=$('#drawers');
   for(const id in CATS){ const c=CATS[id]; const tools=T.filter(t=>t.cat===id);
@@ -712,7 +743,7 @@ function buildDrawers(){
     body.append(grid); tab.onclick=()=>d.classList.toggle('open');
     d.append(tab,body); d.dataset.cat=id; host.append(d);
   }
-  $('.cabinet h2').textContent=`the drawers · ${T.length} tools`;
+  $('#allLabel').textContent=`Browse all ${T.length} tools`;
 }
 function toolCard(t,color){ const c=el('div',{className:'tool'}); c.style.setProperty('--c',color);
   c.append(el('span',{className:'dot'}), el('div',{},[el('div',{className:'nm',textContent:t.nm}),el('div',{className:'ds',textContent:t.ds})]));
@@ -721,6 +752,7 @@ function openDrawer(id){ document.querySelectorAll('.drawer').forEach(d=>d.class
 
 /* open a tool */
 function openTool(t){
+  pushRecent(t.nm); renderQuick();
   if(t.input==='url'){ return renderUrl(t); }
   if(t.input==='text' && !t.fileToText){ return renderText(t); }
   if(t.multi){ return pickFiles(true, fs=>renderRun(t,fs)); }
@@ -1128,6 +1160,8 @@ function svg(path){ const ns='http://www.w3.org/2000/svg'; const s=document.crea
   const p=document.createElementNS(ns,'path'); p.setAttribute('d',path); s.append(p); return s; }
 
 buildDrawers();
+renderQuick();
+$('#allToggle').onclick=()=>{ const open=$('#cabinet').classList.toggle('open'); $('#drawerwrap').hidden=!open; };
 console.log('%c🗄️ Junk Drawer ready · '+T.length+' tools','color:#9a3f29;font-weight:bold');
 </script>
 </body>
