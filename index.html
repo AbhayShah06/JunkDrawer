@@ -259,7 +259,7 @@
   <section class="hero">
     <div id="drop" tabindex="0">
       <span class="big">Open a file</span>
-      <span class="sub">drop one anywhere, or click to choose. Photo, video, audio, PDF, Markdown, text, or zip.</span>
+      <span class="sub">Click to pick one from your computer, or paste an image you copied. Photo, video, audio, PDF, Markdown, text, or zip.</span>
     </div>
     <input type="file" id="file" multiple hidden />
 
@@ -621,26 +621,26 @@ add({cat:'pdf',kinds:['pdf'],rec:1,nm:'PDF to Pictures',ds:'Save each page as a 
     out.length===1?showResult(new Blob([out[0].data],{type:'image/png'}),out[0].name):showMulti(out,base(f.name)+'-pages.zip'); }});
 add({cat:'pdf',kinds:['pdf'],nm:'Split into Single Pages',ds:'Make one PDF per page',kw:'split pages separate pdf',
   more:'Breaks a PDF into a separate file for each page and puts them all in a zip.',
-  run:async f=>{ const onP=progress('Splitting'); const src=await PDFDocument.load(await f.arrayBuffer()); const n=src.getPageCount(); const out=[];
+  run:async f=>{ const onP=progress('Splitting'); const src=await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true }); const n=src.getPageCount(); const out=[];
     for(let i=0;i<n;i++){ onP((i+1)/n); const d=await PDFDocument.create(); const [pg]=await d.copyPages(src,[i]); d.addPage(pg);
       out.push({name:`${base(f.name)}-p${String(i+1).padStart(2,'0')}.pdf`,data:await d.save()}); }
     showMulti(out,base(f.name)+'-split.zip'); }});
 add({cat:'pdf',kinds:['pdf'],nm:'Turn Pages',ds:'Turn every page the right way up',kw:'rotate pages turn orientation',
   more:'Turns every page 90 or 180 degrees. Fixes a scan that came out sideways or upside down.',
   opts:oSel('turn',[['90','90° clockwise'],['270','90° counter-clockwise'],['180','180°']],'deg'),
-  run:async (f,o)=>{ const onP=progress('Rotating'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
+  run:async (f,o)=>{ const onP=progress('Rotating'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
     d.getPages().forEach(p=>p.setRotation(degrees((p.getRotation().angle+ +o.deg)%360)));
     showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-rotated.pdf'); }});
 add({cat:'pdf',kinds:['pdf'],nm:'Add Page Numbers',ds:'Number every page',kw:'page numbers number stamp footer',
   more:'Stamps the page number at the bottom of each page, like 3 / 12.',
-  run:async f=>{ const onP=progress('Numbering'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
+  run:async f=>{ const onP=progress('Numbering'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
     const font=await d.embedFont(StandardFonts.Helvetica); const ps=d.getPages();
     ps.forEach((p,i)=>{ const {width}=p.getSize(); p.drawText(`${i+1} / ${ps.length}`,{x:width/2-14,y:18,size:10,font,color:rgb(.2,.2,.2)}); });
     showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-numbered.pdf'); }});
 add({cat:'pdf',kinds:['pdf'],nm:'Add a Watermark',ds:'Stamp text across every page',kw:'watermark stamp text overlay draft confidential',
   more:'Prints faint slanted text across every page, like CONFIDENTIAL or DRAFT. Type your own words.',
   opts:()=>{ const t=el('input',{type:'text',value:'CONFIDENTIAL'}); return {node:el('label',{},['text ',t]),get:()=>({t:t.value||'DRAFT'})}; },
-  run:async (f,o)=>{ const onP=progress('Stamping'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
+  run:async (f,o)=>{ const onP=progress('Stamping'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
     const font=await d.embedFont(StandardFonts.HelveticaBold);
     d.getPages().forEach(p=>{ const {width,height}=p.getSize();
       p.drawText(o.t,{x:width/2-120,y:height/2,size:50,font,color:rgb(.6,.1,.1),opacity:.18,rotate:degrees(35)}); });
@@ -648,7 +648,7 @@ add({cat:'pdf',kinds:['pdf'],nm:'Add a Watermark',ds:'Stamp text across every pa
 add({cat:'pdf',kinds:['pdf'],nm:'Delete Pages',ds:'Take out pages you don\'t want',kw:'delete remove pages drop',
   more:'Removes the pages you name. Type page numbers with commas and ranges, like 1,3,5-7.',
   opts:()=>{ const t=el('input',{type:'text',value:'1',placeholder:'e.g. 1,3,5-7'}); return {node:el('label',{},['remove ',t]),get:()=>({spec:t.value})}; },
-  run:async (f,o)=>{ const onP=progress('Removing'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer());
+  run:async (f,o)=>{ const onP=progress('Removing'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
     const drop=new Set(); o.spec.split(',').forEach(s=>{ s=s.trim(); if(s.includes('-')){ const [a,b]=s.split('-').map(Number);
       for(let i=a;i<=b;i++)drop.add(i-1);} else if(s)drop.add(+s-1); });
     [...drop].sort((a,b)=>b-a).forEach(i=>{ if(i>=0&&i<d.getPageCount())d.removePage(i); });
@@ -656,7 +656,7 @@ add({cat:'pdf',kinds:['pdf'],nm:'Delete Pages',ds:'Take out pages you don\'t wan
 add({cat:'pdf',kinds:['pdf'],multi:1,nm:'Combine PDFs',ds:'Join several PDFs into one',kw:'merge combine join pdf',
   more:'Joins your PDFs into a single file, in the order you pick them. Drop in more than one PDF to use this.',
   run:async fs=>{ const onP=progress('Merging'); const m=await PDFDocument.create();
-    for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); const d=await PDFDocument.load(await fs[i].arrayBuffer());
+    for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); const d=await PDFDocument.load(await fs[i].arrayBuffer(), { ignoreEncryption: true });
       (await m.copyPages(d,d.getPageIndices())).forEach(p=>m.addPage(p)); }
     showResult(new Blob([await m.save()],{type:'application/pdf'}),'merged.pdf'); }});
 
@@ -969,13 +969,18 @@ function showReceipt(file){
   card.append(el('div',{className:'hd'},[el('b',{textContent:'▸ file detected'}),
     el('button',{className:'clearbtn',textContent:'✕ clear'},[])]));
   card.querySelector('.clearbtn').onclick=clearAll;
+  r.append(card);
   meta(file,k).then(m=>{ const md=el('div',{className:'meta'}); md.innerHTML=m; card.insertBefore(md,card.children[1]||null);
     const recos=T.filter(t=>t.rec && (t.kinds&&(t.kinds.includes(k)||t.kinds.includes('any'))));
     if(recos.length){ card.append(el('div',{className:'want',textContent:'What you can do'}));
       const rr=el('div',{className:'qtools'}); recos.slice(0,8).forEach(t=>rr.append(toolCard(t,CATS[t.cat].color))); card.append(rr); }
     openDrawer(k);
+    // Scroll only AFTER the async meta + recommendations + drawer have expanded the receipt,
+    // and on the next frame so layout has settled — otherwise (e.g. right after a tool result
+    // collapsed #stage) the smooth-scroll targets stale geometry and the new receipt lands
+    // off-screen, making a fresh drop look like it did nothing.
+    requestAnimationFrame(()=>r.scrollIntoView({behavior:'smooth',block:'start'}));
   });
-  r.append(card); r.scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function meta(file,k){ let extra='';
   try{ if(k==='image'){ const {img,url}=await toImage(file); extra=`<div><span class="k">size  </span> ${img.naturalWidth}×${img.naturalHeight}px</div>`; URL.revokeObjectURL(url); }
@@ -1151,7 +1156,7 @@ async function pdfSignFill(file){
     bExport.disabled=true; const onP2=progress('Building signed PDF'); onP2(.25);
     try{
       measure();
-      const out=await PDFDocument.load(await file.arrayBuffer());
+      const out=await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
       const helv=await out.embedFont(StandardFonts.Helvetica); const opages=out.getPages();
       for(const it of items){
         const cTop=it.node.offsetTop+it.content.offsetTop, cLeft=it.node.offsetLeft+it.content.offsetLeft;
