@@ -1,6 +1,6 @@
 {
   "name": "junk-drawer",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Every annoying file tool in one place.",
   "author": "Abhay Shah",
   "license": "MIT",
@@ -48,7 +48,13 @@
       "category": "public.app-category.utilities",
       "x64ArchFiles": "**/bin/*",
       "extraResources": [
-        { "from": "resources/bin/mac", "to": "bin", "filter": ["**/*"] }
+        {
+          "from": "resources/bin/mac",
+          "to": "bin",
+          "filter": [
+            "**/*"
+          ]
+        }
       ]
     },
     "win": {
@@ -56,7 +62,13 @@
         "nsis"
       ],
       "extraResources": [
-        { "from": "resources/bin/win", "to": "bin", "filter": ["**/*"] }
+        {
+          "from": "resources/bin/win",
+          "to": "bin",
+          "filter": [
+            "**/*"
+          ]
+        }
       ]
     },
     "publish": [
