@@ -29,8 +29,16 @@ ALLOWED_ORIGINS = {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"}
 BIN = os.path.join(DIRECTORY, "resources", "bin")  # bundled yt-dlp / ffmpeg, if present
 
 def find(cmd):
-    p = os.path.join(BIN, cmd)
-    return p if os.path.exists(p) else shutil.which(cmd)
+    # bins live in a per-OS subfolder (resources/bin/mac | win); fall back to the legacy
+    # flat layout, then PATH. On Windows the bundled binaries carry a .exe suffix.
+    sub = "win" if os.name == "nt" else "mac"
+    names = [cmd + ".exe", cmd] if os.name == "nt" else [cmd]
+    for d in (os.path.join(BIN, sub), BIN):
+        for n in names:
+            p = os.path.join(d, n)
+            if os.path.exists(p):
+                return p
+    return shutil.which(cmd)
 
 def have(cmd):
     return find(cmd) is not None
@@ -66,13 +74,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def _same_origin(self):
-        # DNS-rebinding defense: we must have been reached via a loopback hostname.
+        # DNS-rebinding defense: the Host must be a loopback name (missing Host is hostile too).
         host = (self.headers.get("Host") or "").split(":")[0]
-        if host and host not in ("127.0.0.1", "localhost"):
+        if host not in ("127.0.0.1", "localhost"):
             return False
-        # CSRF defense: a cross-site page's request carries its own Origin; only ours pass.
-        origin = self.headers.get("Origin")
-        return origin is None or origin in ALLOWED_ORIGINS
+        # CSRF defense: this is a state-changing POST, so our renderer always sends an Origin
+        # (a JSON fetch is not CORS-simple). Require it to be present AND one of ours — fail
+        # closed on a missing Origin rather than trusting it.
+        return self.headers.get("Origin") in ALLOWED_ORIGINS
 
     # ---- routes ----
     def do_GET(self):
@@ -97,32 +106,37 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._json({"error": "Please paste a full https:// link."}, 400)
 
         ffmpeg_ok = have("ffmpeg")
+        # Hardening for every yt-dlp call: --no-config ignores any yt-dlp.conf;
+        # --restrict-filenames strips path separators/unicode from the remote-controlled
+        # media title (no traversal); a trailing "--" stops option parsing so the URL can
+        # never be read as a flag.
+        ytdlp_base = ["yt-dlp", "--no-config", "--restrict-filenames", "--no-playlist", "-o", "%(title)s.%(ext)s"]
         if mode == "spotify":
             if not have("spotdl"):
                 return self._json({"error": "spotdl-missing"}, 501)
-            cmd = ["spotdl", "download", url]
+            cmd = ["spotdl", "download", "--", url]
         elif mode == "audio":
             if not have("yt-dlp"):
                 return self._json({"error": "ytdlp-missing"}, 501)
             if ffmpeg_ok:
-                cmd = ["yt-dlp", "-x", "--audio-format", "mp3", "--no-playlist", "-o", "%(title)s.%(ext)s", url]
+                cmd = ytdlp_base + ["-x", "--audio-format", "mp3", "--", url]
             else:  # no ffmpeg: grab the raw audio stream as-is (m4a/webm), can't make mp3
-                cmd = ["yt-dlp", "-f", "bestaudio", "--no-playlist", "-o", "%(title)s.%(ext)s", url]
+                cmd = ytdlp_base + ["-f", "bestaudio", "--", url]
         else:
             if not have("yt-dlp"):
                 return self._json({"error": "ytdlp-missing"}, 501)
             if ffmpeg_ok:  # merge best video+audio into one HD mp4
-                cmd = ["yt-dlp", "-f", "bestvideo*+bestaudio/best", "--merge-output-format", "mp4",
-                       "--no-playlist", "-o", "%(title)s.%(ext)s", url]
+                cmd = ytdlp_base + ["-f", "bestvideo*+bestaudio/best", "--merge-output-format", "mp4", "--", url]
             else:  # no ffmpeg: take a single already-muxed file (one clean mp4, lower res)
-                cmd = ["yt-dlp", "-f", "best[ext=mp4]/best", "--no-playlist", "-o", "%(title)s.%(ext)s", url]
+                cmd = ytdlp_base + ["-f", "best[ext=mp4]/best", "--", url]
 
         tmp = tempfile.mkdtemp(prefix="jd-")
         try:
             try:
                 env = dict(os.environ)
-                if os.path.isdir(BIN):  # let yt-dlp find the bundled ffmpeg so MP3 conversion works
-                    env["PATH"] = BIN + os.pathsep + env.get("PATH", "")
+                # let yt-dlp find the bundled ffmpeg (now under the per-OS subfolder) so MP3 works
+                bin_os = os.path.join(BIN, "win" if os.name == "nt" else "mac")
+                env["PATH"] = bin_os + os.pathsep + BIN + os.pathsep + env.get("PATH", "")
                 proc = subprocess.run(cmd, cwd=tmp, capture_output=True, text=True, timeout=900, env=env)
             except subprocess.TimeoutExpired:
                 return self._json({"error": "tool-failed", "detail": "Timed out after 15 minutes."}, 500)

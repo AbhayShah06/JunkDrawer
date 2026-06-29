@@ -309,6 +309,8 @@ const el = (t, p={}, kids=[]) => { const e=document.createElement(t);
   for(const c of [].concat(kids)) if(c!=null) e.append(c); return e; };
 const fmt = b => b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(2)+' MB';
 const ext = n => (n.split('.').pop()||'').toLowerCase();
+// Escape untrusted text (filenames, typed input, error detail) before it touches innerHTML.
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const base = n => n.replace(/\.[^.]+$/,'');
 const toast = m => { const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1700); };
 
@@ -399,7 +401,7 @@ function jsonToCSV(text){ const a=JSON.parse(text); if(!Array.isArray(a))throw n
 function progress(label){ $('#status').innerHTML=`<div><span class="spin"></span>${label} …</div><div class="prog"><i id="bar"></i></div>`;
   return p=>{ const b=$('#bar'); if(b)b.style.width=Math.round((p||0)*100)+'%'; }; }
 const clearStatus=()=>{ $('#status').innerHTML=''; };
-function fail(e){ clearStatus(); $('#output').innerHTML=''; $('#status').innerHTML=`<div class="err">⚠ ${e.message||e}</div>`; }
+function fail(e){ clearStatus(); $('#output').innerHTML=''; $('#status').innerHTML=`<div class="err">⚠ ${esc(e&&e.message||e)}</div>`; }
 function showResult(blob,filename,{note}={}){
   clearStatus(); const out=$('#output'); out.innerHTML='';
   const url=URL.createObjectURL(blob), isImg=/^image\//.test(blob.type);
@@ -853,7 +855,7 @@ fetch('/api/update-check').then(r=>r.ok?r.json():null).then(j=>{
   bar.querySelector('.ub-txt').textContent=`Junk Drawer ${j.latest} is available — you have ${j.current}.`;
   const get=bar.querySelector('.ub-get');
   get.textContent=`Download ${j.latest}`;
-  get.href=j.dmgUrl||j.htmlUrl||'#';
+  const upUrl=j.installerUrl||j.dmgUrl||j.htmlUrl||''; get.href=/^https?:\/\//i.test(upUrl)?upUrl:'#';
   bar.querySelector('.ub-x').onclick=(e)=>{ e.preventDefault(); localStorage.setItem('jd-skip-update',j.latest); bar.hidden=true; };
   bar.hidden=false;
 }).catch(()=>{});
@@ -921,7 +923,7 @@ function showReceipt(file){
 async function meta(file,k){ let extra='';
   try{ if(k==='image'){ const {img,url}=await toImage(file); extra=`<div><span class="k">size  </span> ${img.naturalWidth}×${img.naturalHeight}px</div>`; URL.revokeObjectURL(url); }
     if(k==='video'){ const d=await videoDuration(file); if(d)extra=`<div><span class="k">length</span> ${d.toFixed(1)}s</div>`; } }catch{}
-  return `<div><span class="k">name  </span> ${file.name}</div><div><span class="k">type  </span> ${k} · .${ext(file.name)}</div><div><span class="k">weight</span> ${fmt(file.size)}</div>${extra}`;
+  return `<div><span class="k">name  </span> ${esc(file.name)}</div><div><span class="k">type  </span> ${esc(k)} · .${esc(ext(file.name))}</div><div><span class="k">weight</span> ${fmt(file.size)}</div>${extra}`;
 }
 
 /* file intake */
@@ -934,7 +936,7 @@ function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
   card.append(el('div',{className:'hd'},[el('b',{textContent:`▸ ${fs.length} files detected`}),
     el('button',{className:'clearbtn',textContent:'✕ clear'})]));
   card.querySelector('.clearbtn').onclick=clearAll;
-  card.append(el('div',{className:'meta',innerHTML:fs.map(f=>`<div>${f.name} <span class="k">(${fmt(f.size)})</span></div>`).join('')}));
+  card.append(el('div',{className:'meta',innerHTML:fs.map(f=>`<div>${esc(f.name)} <span class="k">(${fmt(f.size)})</span></div>`).join('')}));
   card.append(el('div',{className:'want',textContent:'batch actions:'}));
   const rr=el('div',{className:'recos'});
   rr.append(reco('Zip Files',()=>{ const t=T.find(x=>x.nm==='Zip Files'); renderRun(t,fs); $('#panel .btn').click(); }));
@@ -1100,7 +1102,7 @@ function search(input){ const raw=input.trim(); const str=raw.toLowerCase(); if(
   if(/youtu\.?be|youtube\.com/i.test(raw)) items=[T.find(x=>x.nm==='YouTube to Video'),T.find(x=>x.nm==='YouTube to MP3'),...items];
   items=[...new Set(items.filter(Boolean))].slice(0,7);
   palItems=items; palSel=0;
-  pal.innerHTML=''; if(!items.length){ pal.innerHTML=`<div class="row"><span class="ds">no tool matches “${str}”. try a file type or action</span></div>`; pal.classList.add('show'); return; }
+  pal.innerHTML=''; if(!items.length){ pal.innerHTML=`<div class="row"><span class="ds">no tool matches “${esc(str)}”. try a file type or action</span></div>`; pal.classList.add('show'); return; }
   items.forEach((t,i)=>{ const row=el('div',{className:'row'+(i===0?' sel':'')});
     row.append(el('div',{},[el('div',{className:'nm',textContent:t.nm}),el('div',{className:'ds',textContent:t.ds})]));
     const tag=el('span',{className:'tag',textContent:CATS[t.cat].label}); tag.style.background=CATS[t.cat].color; row.append(tag);

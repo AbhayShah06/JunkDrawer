@@ -12,14 +12,18 @@ port = (ENV['PORT'] || '8777').to_i
 ALLOWED = ["http://127.0.0.1:#{port}", "http://localhost:#{port}"]
 
 BIN = File.join(root, 'resources', 'bin')  # bundled yt-dlp / ffmpeg, if present
+WIN = (RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/) ? true : false
+BIN_OS = File.join(BIN, WIN ? 'win' : 'mac')  # bins live in a per-OS subfolder
 def have?(cmd)
-  File.exist?(File.join(BIN, cmd)) ||
-    ENV['PATH'].to_s.split(File::PATH_SEPARATOR).any? { |p| File.executable?(File.join(p, cmd)) }
+  names = WIN ? ["#{cmd}.exe", cmd] : [cmd]
+  [BIN_OS, BIN].each { |d| names.each { |n| return true if File.exist?(File.join(d, n)) } }
+  ENV['PATH'].to_s.split(File::PATH_SEPARATOR).any? { |p| names.any? { |n| File.executable?(File.join(p, n)) } }
 end
 
 class IsoFileHandler < WEBrick::HTTPServlet::FileHandler
   def service(req, res)
-    super
+    # Set the cross-origin-isolation + CSP headers BEFORE super so they're present on
+    # every response path (304s, redirects), not just plain 200s.
     res['Cross-Origin-Opener-Policy'] = 'same-origin'
     res['Cross-Origin-Embedder-Policy'] = 'credentialless'
     res['Cache-Control'] = 'no-store'
@@ -30,6 +34,7 @@ class IsoFileHandler < WEBrick::HTTPServlet::FileHandler
       "worker-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; " \
       "img-src 'self' data: blob: https:; font-src 'self' data:; " \
       "connect-src 'self' https: data: blob:; media-src 'self' blob: data:"
+    super
   end
 end
 
@@ -45,11 +50,12 @@ end
 
 server.mount_proc('/api/download') do |req, res|
   begin
-    # DNS-rebinding defense: the Host we were reached through must be loopback.
+    # DNS-rebinding defense: the Host must be a loopback name (a missing Host is hostile).
     host = (req['host'] || '').split(':').first
-    # CSRF defense: a cross-site page's request carries its own Origin; only ours pass.
+    # CSRF defense: this state-changing POST always carries an Origin from our renderer
+    # (a JSON fetch isn't CORS-simple). Require it present AND ours — fail closed on absence.
     origin = req['origin']
-    if (host && !['127.0.0.1', 'localhost'].include?(host)) || (origin && !ALLOWED.include?(origin))
+    unless ['127.0.0.1', 'localhost'].include?(host) && ALLOWED.include?(origin)
       res.status = 403; res['Content-Type'] = 'application/json'
       res.body = { error: 'blocked cross-site request' }.to_json; next
     end
@@ -66,16 +72,20 @@ server.mount_proc('/api/download') do |req, res|
 
     Dir.mktmpdir('jd-') do |tmp|
       ffmpeg_ok = have?('ffmpeg')
+      # Hardening: --no-config ignores any yt-dlp.conf; --restrict-filenames strips path
+      # separators/unicode from the remote-controlled media title (no traversal); the
+      # trailing '--' stops option parsing so the URL can never be read as a flag.
+      yt = ['yt-dlp', '--no-config', '--restrict-filenames', '--no-playlist', '-o', '%(title)s.%(ext)s']
       cmd = case mode
-            when 'spotify' then ['spotdl', 'download', url]
+            when 'spotify' then ['spotdl', 'download', '--', url]
             when 'audio'
-              ffmpeg_ok ? ['yt-dlp', '-x', '--audio-format', 'mp3', '--no-playlist', '-o', '%(title)s.%(ext)s', url]
-                        : ['yt-dlp', '-f', 'bestaudio', '--no-playlist', '-o', '%(title)s.%(ext)s', url]
+              ffmpeg_ok ? yt + ['-x', '--audio-format', 'mp3', '--', url]
+                        : yt + ['-f', 'bestaudio', '--', url]
             else
-              ffmpeg_ok ? ['yt-dlp', '-f', 'bestvideo*+bestaudio/best', '--merge-output-format', 'mp4', '--no-playlist', '-o', '%(title)s.%(ext)s', url]
-                        : ['yt-dlp', '-f', 'best[ext=mp4]/best', '--no-playlist', '-o', '%(title)s.%(ext)s', url]
+              ffmpeg_ok ? yt + ['-f', 'bestvideo*+bestaudio/best', '--merge-output-format', 'mp4', '--', url]
+                        : yt + ['-f', 'best[ext=mp4]/best', '--', url]
             end
-      jd_env = { 'PATH' => "#{BIN}#{File::PATH_SEPARATOR}#{ENV['PATH']}" }  # so yt-dlp finds bundled ffmpeg
+      jd_env = { 'PATH' => "#{BIN_OS}#{File::PATH_SEPARATOR}#{BIN}#{File::PATH_SEPARATOR}#{ENV['PATH']}" }  # so yt-dlp finds bundled ffmpeg
       _out, err, st = Open3.capture3(jd_env, *cmd, chdir: tmp)
       unless st.success?
         res.status = 500; res['Content-Type'] = 'application/json'

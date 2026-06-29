@@ -15,14 +15,20 @@ const MIME = { '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javasc
   '.ico':'image/x-icon', '.webmanifest':'application/manifest+json' };
 
 function findBin(name, binDir) {
-  // bundled: prefer the per-architecture folder (resources/bin/arm64|x64), then the flat dir
+  // bundled: prefer the per-architecture folder (resources/bin/arm64|x64), then the flat dir.
+  // On Windows the bundled binaries carry a .exe suffix (yt-dlp.exe, ffmpeg.exe); on macOS
+  // they're suffix-less (or the legacy `_macos` suffix).
+  const win = process.platform === 'win32';
+  const cands = win ? [name+'.exe', name] : [name, name+'_macos'];
   const dirs = [path.join(binDir||'', process.arch), binDir||''];
   for (const d of dirs) {
-    for (const c of [path.join(d, name), path.join(d, name+'_macos')]) {
-      try { if (fs.existsSync(c)) return c; } catch {}
+    for (const c of cands) {
+      const f = path.join(d, c);
+      try { if (fs.existsSync(f)) return f; } catch {}
     }
   }
-  const w = spawnSync(process.platform === 'win32' ? 'where' : 'which', [name], { encoding: 'utf8' });
+  // PATH fallback: `where` on Windows resolves yt-dlp.exe from the bare name already.
+  const w = spawnSync(win ? 'where' : 'which', [name], { encoding: 'utf8' });
   if (w.status === 0) { const p = (w.stdout||'').split('\n')[0].trim(); if (p) return p; }
   return null;
 }
@@ -37,10 +43,11 @@ function sendJSON(res, obj, code=200) {
 }
 
 function handleDownload(req, res, binDir) {
-  let body = '';
-  req.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
+  let chunks = [], size = 0, aborted = false;
+  req.on('data', c => { size += c.length; if (size > 1e6) { aborted = true; req.destroy(); return; } chunks.push(c); });
   req.on('end', () => {
-    let j; try { j = JSON.parse(body || '{}'); } catch { return sendJSON(res, { error: 'bad body' }, 400); }
+    if (aborted) return;
+    let j; try { j = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return sendJSON(res, { error: 'bad body' }, 400); }
     const url = (j.url || '').trim(), mode = j.mode || 'video';
     if (!/^https?:\/\//i.test(url)) return sendJSON(res, { error: 'Please paste a full https:// link.' }, 400);
 
@@ -51,12 +58,16 @@ function handleDownload(req, res, binDir) {
       args = ['download', url];
     } else {
       bin = findBin('yt-dlp', binDir); if (!bin) return sendJSON(res, { error: 'ytdlp-missing' }, 501);
+      // Hardening: --no-config ignores any yt-dlp.conf; --restrict-filenames strips path
+      // separators/unicode from the (remote-controlled) media title so it can't traverse;
+      // the trailing `--` stops option parsing so a URL can never be read as a flag.
+      const base = ['--no-config','--restrict-filenames','--no-playlist','-o','%(title)s.%(ext)s'];
       if (mode === 'audio')
-        args = ffmpegOk ? ['-x','--audio-format','mp3','--no-playlist','-o','%(title)s.%(ext)s',url]
-                        : ['-f','bestaudio','--no-playlist','-o','%(title)s.%(ext)s',url];
+        args = ffmpegOk ? [...base,'-x','--audio-format','mp3','--',url]
+                        : [...base,'-f','bestaudio','--',url];
       else
-        args = ffmpegOk ? ['-f','bestvideo*+bestaudio/best','--merge-output-format','mp4','--no-playlist','-o','%(title)s.%(ext)s',url]
-                        : ['-f','best[ext=mp4]/best','--no-playlist','-o','%(title)s.%(ext)s',url];
+        args = ffmpegOk ? [...base,'-f','bestvideo*+bestaudio/best','--merge-output-format','mp4','--',url]
+                        : [...base,'-f','best[ext=mp4]/best','--',url];
     }
 
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-'));
@@ -82,7 +93,8 @@ function handleDownload(req, res, binDir) {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Content-Length', data.length);
-      res.setHeader('Content-Disposition', `attachment; filename="${name.replace(/"/g,'')}"`);
+      const safeName = (name || 'download').replace(/[^\w.\- ]+/g, '_').slice(0, 200) || 'download';
+      res.setHeader('Content-Disposition', `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(name)}`);
       res.setHeader('X-Filename', encodeURIComponent(name));
       res.setHeader('Access-Control-Expose-Headers', 'X-Filename');
       res.end(data);
@@ -113,14 +125,26 @@ function handleUpdateCheck(res) {
   if (!r) return finish({});
   const req = https.get(`https://api.github.com/repos/${r.owner}/${r.repo}/releases/latest`,
     { headers: { 'User-Agent': 'JunkDrawer', 'Accept': 'application/vnd.github+json' } }, gr => {
-      let data = ''; gr.on('data', d => data += d);
+      // Cap the response body so a tampered/MITM'd endpoint can't exhaust memory.
+      let data = ''; gr.on('data', d => { data += d; if (data.length > 512 * 1024) { gr.destroy(); finish({}); } });
       gr.on('end', () => {
         if (gr.statusCode !== 200) return finish({});
         let j; try { j = JSON.parse(data); } catch { return finish({}); }
         const latest = (j.tag_name || '').replace(/^v/, '');
+        // Only trust asset URLs that live on github.com/githubusercontent.com — these flow
+        // to the renderer and get opened externally, so don't relay an arbitrary URL.
+        const safeUrl = u => /^https:\/\/([a-z0-9-]+\.)*github(usercontent)?\.com\//i.test(u || '') ? u : '';
         const dmg = (j.assets || []).find(a => /\.dmg$/i.test(a.name || ''));
+        const exe = (j.assets || []).find(a => /\.exe$/i.test(a.name || ''));
+        const dmgUrl = safeUrl(dmg && dmg.browser_download_url);
+        const exeUrl = safeUrl(exe && exe.browser_download_url);
+        // pick the asset that matches the OS this app is running on
+        const installerUrl = process.platform === 'win32' ? exeUrl : dmgUrl;
         finish({ latest, hasUpdate: !!latest && cmpVer(latest, current) > 0,
-          htmlUrl: j.html_url || '', dmgUrl: dmg ? dmg.browser_download_url : '', dmgName: dmg ? dmg.name : '' });
+          htmlUrl: safeUrl(j.html_url),
+          dmgUrl, dmgName: dmg ? dmg.name : '',
+          exeUrl, exeName: exe ? exe.name : '',
+          installerUrl });
       });
     });
   req.setTimeout(6000, () => { req.destroy(); finish({}); });
@@ -130,19 +154,31 @@ function handleUpdateCheck(res) {
 // Only the app's own loopback page may reach the /api/* backend. Blocks a malicious
 // website from driving the local server (CSRF) and DNS-rebinding attacks that point a
 // hostile hostname at 127.0.0.1.
-function localOnly(req) {
-  const host = (req.headers.host || '').split(':')[0];
-  if (host && host !== '127.0.0.1' && host !== 'localhost') return false;
+function localOnly(req, expectedHost) {
+  // Host must be EXACTLY our bound loopback authority (127.0.0.1:<port>). A rebound
+  // attacker hostname can never produce this value, and the random port can't be
+  // forged into the Host header cross-site — this alone defeats DNS-rebinding.
+  if (expectedHost && req.headers.host !== expectedHost) return false;
+  // Sec-Fetch-Site is set by Chromium (our renderer) and cannot be forged by a
+  // cross-site page; reject anything that isn't same-origin or a direct address-bar hit.
+  const site = req.headers['sec-fetch-site'];
+  if (site && site !== 'same-origin' && site !== 'none') return false;
   const origin = req.headers.origin;
   if (origin) {
     let h; try { h = new URL(origin).hostname; } catch { return false; }
     if (h !== '127.0.0.1' && h !== 'localhost') return false;
+  } else if (req.method !== 'GET' && req.method !== 'HEAD') {
+    // Our renderer always sends Origin on state-changing /api fetches (JSON POST is not
+    // a CORS-simple request). A missing Origin on a write is therefore hostile — fail closed.
+    return false;
   }
   return true;
 }
 
 function startServer(appRoot, binDir) {
   return new Promise(resolve => {
+    let expectedHost = null;  // set once the ephemeral port is known (below)
+    const rootResolved = path.resolve(appRoot);
     const server = http.createServer((req, res) => {
       res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
       res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
@@ -155,21 +191,30 @@ function startServer(appRoot, binDir) {
         "img-src 'self' data: blob: https:; font-src 'self' data:; " +
         "connect-src 'self' https: data: blob:; media-src 'self' blob: data:");
       const url = decodeURIComponent(req.url.split('?')[0]);
-      if (url.startsWith('/api/') && !localOnly(req)) { res.statusCode = 403; return res.end('forbidden'); }
+      if (url.startsWith('/api/') && !localOnly(req, expectedHost)) { res.statusCode = 403; return res.end('forbidden'); }
       if (url === '/api/check')
         return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir) });
       if (url === '/api/update-check')
         return handleUpdateCheck(res);
       if (url === '/api/download' && req.method === 'POST') return handleDownload(req, res, binDir);
-      let p = path.normalize(path.join(appRoot, url === '/' ? '/index.html' : url));
-      if (!p.startsWith(appRoot)) { res.statusCode = 403; return res.end('forbidden'); }
+      // Static files, confined to appRoot. Reject backslashes/NUL (Windows traversal),
+      // then require the resolved path to sit on a separator boundary inside the root
+      // (so a sibling like app.asar.unpacked can't satisfy a loose prefix match).
+      const reqPath = url === '/' ? '/index.html' : url;
+      if (reqPath.includes('\\') || reqPath.includes('\0')) { res.statusCode = 400; return res.end('bad request'); }
+      const p = path.resolve(rootResolved, '.' + reqPath);
+      if (p !== rootResolved && !p.startsWith(rootResolved + path.sep)) { res.statusCode = 403; return res.end('forbidden'); }
       fs.readFile(p, (e, data) => {
         if (e) { res.statusCode = 404; return res.end('not found'); }
         res.setHeader('Content-Type', MIME[path.extname(p)] || 'application/octet-stream');
         res.end(data);
       });
     });
-    server.listen(0, '127.0.0.1', () => resolve({ port: server.address().port, server }));
+    server.listen(0, '127.0.0.1', () => {
+      const port = server.address().port;
+      expectedHost = '127.0.0.1:' + port;
+      resolve({ port, server });
+    });
   });
 }
 
