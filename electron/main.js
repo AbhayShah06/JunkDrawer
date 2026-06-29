@@ -1,5 +1,6 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { startServer } = require('./server');
 const { autoUpdater } = require('electron-updater');
 
@@ -29,6 +30,44 @@ const updater = {
   apply: () => { setImmediate(() => { try { autoUpdater.quitAndInstall(); } catch {} }); },
 };
 
+// macOS uninstall — the analogue of the Windows NSIS uninstaller (Windows already has its
+// own in Add/Remove Programs). Confirms, then moves the .app to the Trash, clears the app's
+// saved data, and quits. User files are never touched.
+async function doUninstall() {
+  const pick = dialog.showMessageBoxSync(win || undefined, {
+    type: 'warning', buttons: ['Uninstall', 'Cancel'], defaultId: 1, cancelId: 1,
+    message: 'Uninstall Junk Drawer?',
+    detail: 'This moves Junk Drawer to the Trash and clears its saved settings. Your files are not touched.',
+  });
+  if (pick !== 0) return;
+  try { fs.rmSync(app.getPath('userData'), { recursive: true, force: true }); } catch {}
+  try {
+    let p = app.getPath('exe');                 // .../Junk Drawer.app/Contents/MacOS/Junk Drawer
+    const i = p.indexOf('.app/');
+    if (i !== -1) p = p.slice(0, i + 4);        // trim to the .app bundle
+    await shell.trashItem(p);                   // macOS allows trashing a running bundle
+  } catch {}
+  app.quit();
+}
+
+// Only macOS gets a custom menu (for the Uninstall item). Windows keeps its default menu.
+// The standard edit/view/window roles are kept so copy-paste/shortcuts still work.
+function buildAppMenu() {
+  if (process.platform !== 'darwin') return;
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: app.name, submenu: [
+      { role: 'about' },
+      { type: 'separator' },
+      // only in the installed app — in dev this would trash Electron.app
+      ...(app.isPackaged ? [{ label: 'Uninstall Junk Drawer…', click: () => doUninstall() }, { type: 'separator' }] : []),
+      { role: 'services' }, { type: 'separator' },
+      { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' },
+      { role: 'quit' },
+    ]},
+    { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
+  ]));
+}
+
 const appRoot = () => app.isPackaged ? app.getAppPath() : path.join(__dirname, '..');
 // Packaged: electron-builder's per-platform extraResources copies resources/bin/<os> -> Resources/bin.
 // Dev (npm start): point at the same per-platform source folder so bundled-binary lookup works locally too.
@@ -36,6 +75,17 @@ const devBinSub = process.platform === 'win32' ? 'win' : 'mac';
 const binDir  = () => app.isPackaged ? path.join(process.resourcesPath, 'bin') : path.join(__dirname, '..', 'resources', 'bin', devBinSub);
 
 async function create() {
+  // On macOS, offer to move out of the disk image / Downloads into /Applications on first
+  // run (the Mac analogue of a clean install — keeps the app off the DMG). Relaunches if moved.
+  if (process.platform === 'darwin' && app.isPackaged && !app.isInApplicationsFolder()) {
+    const pick = dialog.showMessageBoxSync({
+      type: 'question', buttons: ['Move to Applications', 'Not Now'], defaultId: 0, cancelId: 1,
+      message: 'Move Junk Drawer to your Applications folder?',
+      detail: 'Recommended — keeps the app handy so you can eject and delete the disk image.',
+    });
+    if (pick === 0) { try { if (app.moveToApplicationsFolder()) return; } catch {} }
+  }
+  buildAppMenu();
   // Don't nag about updates while developing (npm start) — only the packaged app checks.
   process.env.JD_DEV = app.isPackaged ? '' : '1';
   updater.enabled = app.isPackaged && process.platform === 'win32';
