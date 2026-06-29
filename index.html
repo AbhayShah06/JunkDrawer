@@ -527,6 +527,61 @@ add({cat:'image',kinds:['image'],rec:1,nm:'Remove Hidden Info',ds:'Drop GPS, cam
   run:async f=>{ const onP=progress('Scrubbing metadata'); onP(.4);
     const isPng=ext(f.name)==='png'; const b=await imgConvert(f,{type:isPng?'image/png':'image/jpeg',quality:.95});
     showResult(b,base(f.name)+'-clean.'+(isPng?'png':'jpg'),{note:'re-encoded with no embedded metadata.'}); }});
+// Self-contained EXIF reader (no deps — keeps the app fully offline). Finds the TIFF/EXIF
+// block (JPEG APP1 or HEIC Exif item) by scanning for the "Exif\0\0" marker or a TIFF magic,
+// then walks IFD0 + the Exif and GPS sub-IFDs and pulls the human-useful tags.
+function readExif(buf){
+  const u8=new Uint8Array(buf), dv=new DataView(buf);
+  let tiff=-1; const lim=Math.min(u8.length-8, 6000000);
+  for(let i=0;i<lim;i++){ if(u8[i]===0x45&&u8[i+1]===0x78&&u8[i+2]===0x69&&u8[i+3]===0x66&&u8[i+4]===0&&u8[i+5]===0){ tiff=i+6; break; } }
+  if(tiff<0){ for(let i=0;i<lim;i++){ if((u8[i]===0x49&&u8[i+1]===0x49&&u8[i+2]===0x2a&&u8[i+3]===0)||(u8[i]===0x4d&&u8[i+1]===0x4d&&u8[i+2]===0&&u8[i+3]===0x2a)){ tiff=i; break; } } }
+  if(tiff<0||tiff+8>u8.length) return null;
+  const le=u8[tiff]===0x49, rd16=a=>dv.getUint16(a,le), rd32=a=>dv.getUint32(a,le);
+  if(rd16(tiff+2)!==0x2a) return null;
+  const TS={1:1,2:1,3:2,4:4,5:8,7:1,9:4,10:8,11:4,12:8};
+  function vals(type,count,fieldAbs){ const sz=TS[type]||1, total=sz*count, at0=total<=4?fieldAbs:tiff+rd32(fieldAbs);
+    if(at0<0||at0+total>u8.length) return null;
+    if(type===2){ let s=''; for(let i=0;i<count;i++){ const c=u8[at0+i]; if(c)s+=String.fromCharCode(c); } return s.replace(/\0+$/,'').trim(); }
+    const a=[]; for(let i=0;i<count;i++){ const at=at0+i*sz;
+      if(type===3)a.push(rd16(at)); else if(type===4||type===9)a.push(rd32(at));
+      else if(type===5)a.push(rd32(at+4)?rd32(at)/rd32(at+4):0);
+      else if(type===10){ const n=dv.getInt32(at,le),d=dv.getInt32(at+4,le); a.push(d?n/d:0); }
+      else if(type===11)a.push(dv.getFloat32(at,le)); else if(type===12)a.push(dv.getFloat64(at,le)); else a.push(u8[at]); }
+    return a; }
+  function ifd(relOff,want){ if(relOff<=0) return {}; const base=tiff+relOff; if(base+2>u8.length) return {};
+    const n=rd16(base), res={}; for(let i=0;i<n;i++){ const e=base+2+i*12; if(e+12>u8.length) break;
+      const tag=rd16(e); if(!want.has(tag)) continue; res[tag]=vals(rd16(e+2),rd32(e+4),e+8); } return res; }
+  const one=v=>Array.isArray(v)?v[0]:v, out={};
+  const i0=ifd(rd32(tiff+4), new Set([0x010F,0x0110,0x0112,0x0132,0x8769,0x8825]));
+  if(i0[0x010F])out.Make=i0[0x010F]; if(i0[0x0110])out.Model=i0[0x0110];
+  if(i0[0x0112]!=null)out.Orientation=one(i0[0x0112]); if(i0[0x0132])out.DateTime=i0[0x0132];
+  if(i0[0x8769]!=null){ const ex=ifd(one(i0[0x8769]), new Set([0x9003,0x829A,0x829D,0x8827,0x920A,0xA434]));
+    if(ex[0x9003])out.DateTaken=ex[0x9003]; if(ex[0x829A]!=null)out.Exposure=one(ex[0x829A]);
+    if(ex[0x829D]!=null)out.FNumber=one(ex[0x829D]); if(ex[0x8827]!=null)out.ISO=one(ex[0x8827]);
+    if(ex[0x920A]!=null)out.FocalLength=one(ex[0x920A]); if(ex[0xA434])out.Lens=ex[0xA434]; }
+  if(i0[0x8825]!=null){ const gp=ifd(one(i0[0x8825]), new Set([1,2,3,4]));
+    const dms=a=>Array.isArray(a)&&a.length>=3?a[0]+a[1]/60+a[2]/3600:null, la=dms(gp[2]), lo=dms(gp[4]);
+    if(la!=null&&lo!=null) out.GPS=((/^s/i.test(gp[1]||'')?-1:1)*la).toFixed(6)+', '+((/^w/i.test(gp[3]||'')?-1:1)*lo).toFixed(6); }
+  return Object.keys(out).length?out:null;
+}
+add({cat:'image',kinds:['image','pdf'],rec:1,nm:'See Hidden Info',ds:'Read the GPS, camera, and date tags',kw:'metadata exif gps location camera date read see info hidden pdf author show',
+  more:'Shows the hidden tags inside a photo (where and when it was taken, the camera) or a PDF (title, author, dates). The read-only twin of Remove Hidden Info. Nothing leaves your computer.',
+  run:async f=>{ const onP=progress('Reading metadata'); onP(.4); const lines=[]; const row=(k,v)=>{ if(v!=null&&v!=='')lines.push(String(k).padEnd(12)+' '+v); };
+    if(ext(f.name)==='pdf'){ try{ const d=await PDFDocument.load(await f.arrayBuffer(),{ignoreEncryption:true});
+      const dstr=dt=>{ try{ return dt?dt.toISOString().slice(0,19).replace('T',' '):null; }catch{ return null; } };
+      row('title',d.getTitle&&d.getTitle()); row('author',d.getAuthor&&d.getAuthor()); row('subject',d.getSubject&&d.getSubject());
+      row('creator',d.getCreator&&d.getCreator()); row('producer',d.getProducer&&d.getProducer());
+      row('created',dstr(d.getCreationDate&&d.getCreationDate())); row('modified',dstr(d.getModificationDate&&d.getModificationDate()));
+      row('pages',d.getPageCount()); }catch{ lines.push('(could not read this PDF’s info)'); }
+    } else { onP(.7); const ex=readExif(await f.arrayBuffer());
+      try{ const {img,url}=await toImage(f); if(img&&img.naturalWidth)row('dimensions',img.naturalWidth+' × '+img.naturalHeight+'px'); URL.revokeObjectURL(url); }catch{}
+      if(ex){ row('camera',[ex.Make,ex.Model].filter(Boolean).join(' ')); row('lens',ex.Lens); row('taken',ex.DateTaken||ex.DateTime);
+        if(ex.GPS)row('GPS',ex.GPS+'  (location!)');
+        if(ex.FNumber)row('aperture','f/'+(+ex.FNumber).toFixed(1));
+        if(ex.Exposure)row('shutter',ex.Exposure>=1?ex.Exposure+'s':'1/'+Math.round(1/ex.Exposure)+'s');
+        if(ex.ISO)row('ISO',ex.ISO); if(ex.FocalLength)row('focal len',Math.round(ex.FocalLength)+'mm'); if(ex.Orientation)row('orientation',ex.Orientation); } }
+    const body=lines.length?lines.join('\n'):'No embedded metadata found.\nThis file carries no EXIF / GPS / camera tags — it may already be clean.';
+    showText('HIDDEN INFO — '+f.name+'\n──────────────────────────────\n'+body+'\n', base(f.name)+'-info.txt'); }});
 add({cat:'image',kinds:['image'],nm:'Add a Background',ds:'Put a solid color behind clear areas',kw:'white background flatten backdrop solid',
   more:'Puts a solid color behind a see-through image, like a white card behind a logo or a colored backdrop behind a cut-out.',
   opts:oSel('color',[['#ffffff','White'],['#000000','Black'],['#e9dec7','Paper'],['#0b57d0','Blue']],'bg'),
