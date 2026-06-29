@@ -9,8 +9,8 @@
   :root{
     --desk:#64777e; --face:#d9d5cc; --faceD:#cfcabf; --well:#fffdf7;
     --hi:#f7f4ed; --sh:#9c968b; --sh2:#6e6a60; --ink:#201e18; --ink2:#5a564c; --line:#b7b1a5;
-    --pdf:#9a3f29; --img:#566b3f; --vid:#3f6173; --aud:#977720; --data:#6b6c66;
-    --dev:#34312b; --arc:#a85d28; --weird:#7c5a30; --web:#2d6a72; --ok:#3f7a3f;
+    --pdf:#b23a2e; --img:#5f7d3a; --vid:#3d6e9c; --aud:#9c7416; --data:#5f6b78;
+    --dev:#5a52a0; --arc:#b5662a; --weird:#8a4a78; --web:#2f8a86; --ok:#3f7a3f;
     --mono:"Monaco","Courier New",monospace;
     --sans:"Tahoma","Geneva","Segoe UI",Verdana,sans-serif;
     --rb:var(--hi) var(--sh2) var(--sh2) var(--hi);  /* raised bevel */
@@ -19,8 +19,8 @@
   :root[data-theme="dark"]{
     --desk:#23262b; --face:#3a3d43; --faceD:#34373c; --well:#272a2e;
     --hi:#50555c; --sh:#202327; --sh2:#16181b; --ink:#e9e6dd; --ink2:#a6a194; --line:#4a4e54;
-    --pdf:#c1573c; --img:#6f8a4e; --vid:#5183a0; --aud:#b08a2e; --data:#7f8189;
-    --dev:#6c6f78; --arc:#c06a30; --weird:#8f6a3c; --web:#3f8f96; --ok:#5b9a4c;
+    --pdf:#cf6149; --img:#82a458; --vid:#5e92b3; --aud:#bd942f; --data:#828c9a;
+    --dev:#8a83d0; --arc:#c8732f; --weird:#b06a98; --web:#46a0a7; --ok:#5b9a4c;
   }
   *{box-sizing:border-box}
   html,body{margin:0; min-height:100%}
@@ -122,10 +122,10 @@
   #drawerwrap[hidden]{display:none}
   #drawerwrap{margin-top:12px}
   .tool{display:flex; gap:9px; align-items:flex-start; background:var(--well); border:2px solid; border-color:var(--rb);
-    padding:9px 10px; cursor:pointer}
+    border-left:5px solid var(--c,#888); padding:9px 10px; cursor:pointer}
   .tool:hover{background:var(--hi); border-color:var(--c)}
-  .tool:active{border-color:var(--sb)}
-  .tool .dot{width:8px; height:8px; background:var(--c,#888); margin-top:4px; flex:0 0 auto; transform:rotate(45deg)}
+  .tool:active{border-color:var(--sb); border-left-color:var(--c)}
+  .tool .dot{display:none}
   .tool .nm{font-weight:bold; font-size:12.5px}
   .tool .ds{color:var(--ink2); font-size:11px; line-height:1.3}
   /* ---- stage / panel ---- */
