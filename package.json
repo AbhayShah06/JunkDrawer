@@ -18,7 +18,7 @@
     "@ffmpeg/core-mt": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
-    "@imgly/background-removal": "^1.5.5",
+    "@imgly/background-removal": "^1.4.5",
     "@imgly/background-removal-data": "^1.4.5",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
