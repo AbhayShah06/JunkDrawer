@@ -11,8 +11,10 @@ root = File.expand_path(File.dirname(__FILE__))
 port = (ENV['PORT'] || '8777').to_i
 ALLOWED = ["http://127.0.0.1:#{port}", "http://localhost:#{port}"]
 
+BIN = File.join(root, 'resources', 'bin')  # bundled yt-dlp / ffmpeg, if present
 def have?(cmd)
-  ENV['PATH'].to_s.split(File::PATH_SEPARATOR).any? { |p| File.executable?(File.join(p, cmd)) }
+  File.exist?(File.join(BIN, cmd)) ||
+    ENV['PATH'].to_s.split(File::PATH_SEPARATOR).any? { |p| File.executable?(File.join(p, cmd)) }
 end
 
 class IsoFileHandler < WEBrick::HTTPServlet::FileHandler
@@ -73,7 +75,8 @@ server.mount_proc('/api/download') do |req, res|
               ffmpeg_ok ? ['yt-dlp', '-f', 'bestvideo*+bestaudio/best', '--merge-output-format', 'mp4', '--no-playlist', '-o', '%(title)s.%(ext)s', url]
                         : ['yt-dlp', '-f', 'best[ext=mp4]/best', '--no-playlist', '-o', '%(title)s.%(ext)s', url]
             end
-      _out, err, st = Open3.capture3(*cmd, chdir: tmp)
+      jd_env = { 'PATH' => "#{BIN}#{File::PATH_SEPARATOR}#{ENV['PATH']}" }  # so yt-dlp finds bundled ffmpeg
+      _out, err, st = Open3.capture3(jd_env, *cmd, chdir: tmp)
       unless st.success?
         res.status = 500; res['Content-Type'] = 'application/json'
         res.body = { error: 'tool-failed', detail: (err || '')[-2500..-1] || err }.to_json; next

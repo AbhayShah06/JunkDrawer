@@ -43,8 +43,8 @@
   /* ---- panels ---- */
   .hero,.cabinet,.receipt,.panel{background:var(--face); border:2px solid; border-color:var(--rb)}
   .hero{padding:16px 16px 14px; margin-bottom:14px}
-  .hero h1{font:bold 21px var(--sans); margin:0 0 6px}
-  .hero p{color:var(--ink2); margin:0 0 14px; max-width:70ch; font-size:12.5px}
+  .hero h1{font:bold 21px var(--sans); margin:0 0 6px; text-align:center}
+  .hero p{color:var(--ink2); margin:0 auto 14px; max-width:70ch; font-size:12.5px; text-align:center}
   /* drop well */
   #drop{background:var(--well); border:2px solid; border-color:var(--sb); padding:18px; text-align:center; cursor:pointer}
   #drop:hover{background:#fff}
@@ -184,6 +184,7 @@
   footer a{color:var(--ink); font-weight:bold; text-decoration:none} footer a:hover{text-decoration:underline}
   footer .cr{font:10.5px var(--mono); max-width:440px; text-align:right; line-height:1.5}
   /* update notifier bar */
+  #updateBar[hidden]{display:none}
   #updateBar{display:flex; align-items:center; justify-content:center; gap:12px;
     background:var(--faceD); border-bottom:2px solid var(--sh2); box-shadow:0 1px 0 var(--hi) inset;
     padding:6px 14px; font:12px var(--sans); color:var(--ink)}
@@ -273,7 +274,24 @@
 <footer><div class="wrap">
   <div>Built by <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">Abhay Shah</a>
     · <a href="https://x.com/AbhayShahCA" target="_blank" rel="noopener">@AbhayShahCA</a></div>
-  <div class="cr">Everything runs on your Mac. Your files never leave your computer.</div>
+  <div class="cr">Everything runs on your Mac. Your files never leave your computer.
+    <details class="credits" style="margin-top:6px">
+      <summary style="cursor:pointer; font-weight:bold; color:var(--ink)">Open-source credits</summary>
+      Built with <a href="https://ffmpeg.org/" target="_blank" rel="noopener">FFmpeg</a>,
+      <a href="https://github.com/yt-dlp/yt-dlp" target="_blank" rel="noopener">yt-dlp</a>,
+      <a href="https://github.com/Hopding/pdf-lib" target="_blank" rel="noopener">pdf-lib</a>,
+      <a href="https://github.com/mozilla/pdf.js" target="_blank" rel="noopener">PDF.js</a>,
+      <a href="https://github.com/imgly/background-removal-js" target="_blank" rel="noopener">@imgly/background-removal</a>,
+      <a href="https://github.com/microsoft/onnxruntime" target="_blank" rel="noopener">ONNX Runtime</a>,
+      <a href="https://github.com/soldair/node-qrcode" target="_blank" rel="noopener">qrcode</a>,
+      <a href="https://github.com/cozmo/jsQR" target="_blank" rel="noopener">jsQR</a>,
+      <a href="https://github.com/alexcorvi/heic2any" target="_blank" rel="noopener">heic2any</a>,
+      <a href="https://github.com/101arrowz/fflate" target="_blank" rel="noopener">fflate</a>,
+      <a href="https://github.com/nodeca/js-yaml" target="_blank" rel="noopener">js-yaml</a>, and
+      <a href="https://github.com/electron/electron" target="_blank" rel="noopener">Electron</a>.
+      Full list and licenses in CREDITS.md.
+    </details>
+  </div>
 </div></footer>
 
 <div class="toast" id="toast"></div>
@@ -649,6 +667,30 @@ add({cat:'dev',kinds:['image'],rec:1,nm:'Read a QR Code',ds:'Pull the link out o
     const jsQR=await qrDec(); const res=jsQR(d.data,c.width,c.height);
     if(!res||!res.data) throw new Error('No QR code found. Try a sharper image or crop closer to the code.');
     showText(res.data,'qr.txt'); }});
+add({cat:'dev',input:'text',nm:'Number Base Converter',ds:'Decimal, hex, binary, octal',kw:'base convert hex hexadecimal binary octal decimal radix base10 base16 base2',
+  more:'Convert a number from one base to another, like decimal to hexadecimal or binary to decimal. Pick what you are starting from and what you want.',
+  opts:()=>{ const mk=()=>{ const s=el('select'); [['10','Decimal (base 10)'],['16','Hex (base 16)'],['2','Binary (base 2)'],['8','Octal (base 8)']].forEach(([v,l])=>s.append(el('option',{value:v,textContent:l}))); return s; };
+    const f=mk(), t=mk(); t.value='16';
+    return {node:el('div',{},[el('label',{},['from ',f]),el('label',{},['to ',t])]),get:()=>({from:+f.value,to:+t.value})}; },
+  run:(text,o)=>{ const v=text.trim().replace(/^0x/i,'').replace(/\s+/g,''); const n=parseInt(v,o.from);
+    if(v===''||isNaN(n))throw new Error('That is not a valid base-'+o.from+' number.');
+    showText(n.toString(o.to).toUpperCase(),'number.txt'); }});
+add({cat:'dev',input:'text',nm:'Text ↔ Binary',ds:'Turn text into binary and back',kw:'binary text convert bits ascii 8-bit ones zeros',
+  more:'Turn text into 8-bit binary, or decode binary back into text. When decoding, put a space between each 8-bit group.',
+  opts:oSel('direction',[['enc','Text → Binary'],['dec','Binary → Text']],'d'),
+  run:(text,o)=>{ let out;
+    if(o.d==='enc') out=[...text].map(c=>c.codePointAt(0).toString(2).padStart(8,'0')).join(' ');
+    else out=text.trim().split(/\s+/).filter(Boolean).map(b=>String.fromCodePoint(parseInt(b,2))).join('');
+    showText(out,'binary.txt'); }});
+const MORSE={A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..','0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.','.':'.-.-.-',',':'--..--','?':'..--..','/':'-..-.','@':'.--.-.','-':'-....-','=':'-...-'};
+const UNMORSE=Object.fromEntries(Object.entries(MORSE).map(([k,v])=>[v,k]));
+add({cat:'dev',input:'text',nm:'Morse Code',ds:'English ↔ Morse code',kw:'morse code translate dots dashes english sos',
+  more:'Turn text into Morse code, or decode Morse back into text. Letters are separated by spaces and words by a slash (/).',
+  opts:oSel('direction',[['enc','Text → Morse'],['dec','Morse → Text']],'d'),
+  run:(text,o)=>{ let out;
+    if(o.d==='enc') out=text.toUpperCase().trim().split(/\s+/).map(w=>[...w].map(c=>MORSE[c]||'').filter(Boolean).join(' ')).join(' / ');
+    else out=text.trim().split(/\s*\/\s*/).map(w=>w.split(/\s+/).map(s=>UNMORSE[s]||'').join('')).join(' ');
+    showText(out,'morse.txt'); }});
 
 /* ---- ARCHIVE ---- */
 add({cat:'arc',kinds:['archive'],rec:1,nm:'Unzip a File',ds:'Pull the files out of a .zip',kw:'unzip extract archive open zip',

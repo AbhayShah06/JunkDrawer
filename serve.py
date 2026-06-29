@@ -26,8 +26,14 @@ DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 ALLOWED_ORIGINS = {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"}
 
 
+BIN = os.path.join(DIRECTORY, "resources", "bin")  # bundled yt-dlp / ffmpeg, if present
+
+def find(cmd):
+    p = os.path.join(BIN, cmd)
+    return p if os.path.exists(p) else shutil.which(cmd)
+
 def have(cmd):
-    return shutil.which(cmd) is not None
+    return find(cmd) is not None
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -114,7 +120,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         tmp = tempfile.mkdtemp(prefix="jd-")
         try:
             try:
-                proc = subprocess.run(cmd, cwd=tmp, capture_output=True, text=True, timeout=900)
+                env = dict(os.environ)
+                if os.path.isdir(BIN):  # let yt-dlp find the bundled ffmpeg so MP3 conversion works
+                    env["PATH"] = BIN + os.pathsep + env.get("PATH", "")
+                proc = subprocess.run(cmd, cwd=tmp, capture_output=True, text=True, timeout=900, env=env)
             except subprocess.TimeoutExpired:
                 return self._json({"error": "tool-failed", "detail": "Timed out after 15 minutes."}, 500)
             if proc.returncode != 0:
