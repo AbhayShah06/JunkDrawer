@@ -7,20 +7,22 @@
 <script>try{var t=localStorage.getItem('jd-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
   :root{
-    --desk:#64777e; --face:#d9d5cc; --faceD:#cfcabf; --well:#fffdf7;
-    --hi:#f7f4ed; --sh:#9c968b; --sh2:#6e6a60; --ink:#201e18; --ink2:#5a564c; --line:#b7b1a5;
-    --pdf:#b23a2e; --img:#5f7d3a; --vid:#3d6e9c; --aud:#9c7416; --data:#5f6b78;
-    --dev:#5a52a0; --arc:#b5662a; --weird:#8a4a78; --web:#2f8a86; --ok:#3f7a3f; --doc:#1f7a99;
-    --mono:"Monaco","Courier New",monospace;
-    --sans:"Tahoma","Geneva","Segoe UI",Verdana,sans-serif;
+    --desk:#008080; --face:#c0c0c0; --faceD:#bcbcbc; --well:#ffffff;
+    --hi:#ffffff; --sh:#808080; --sh2:#3f3f3f; --ink:#0a0a0a; --ink2:#444444; --line:#808080;
+    --pdf:#a8200f; --img:#2f7d3a; --vid:#000087; --aud:#946000; --data:#46505c;
+    --dev:#5a3a9a; --arc:#a8531f; --weird:#7a2a68; --web:#117a78; --ok:#2f7a2f; --doc:#0a5a8a;
+    --title1:#000082; --title2:#1083d0; --titletx:#ffffff;
+    --mono:"Lucida Console","Consolas","Courier New",monospace;
+    --sans:"MS Sans Serif","Tahoma","Segoe UI",Verdana,sans-serif;
     --rb:var(--hi) var(--sh2) var(--sh2) var(--hi);  /* raised bevel */
     --sb:var(--sh2) var(--hi) var(--hi) var(--sh2);  /* sunken bevel */
   }
   :root[data-theme="dark"]{
-    --desk:#23262b; --face:#3a3d43; --faceD:#34373c; --well:#272a2e;
-    --hi:#50555c; --sh:#202327; --sh2:#16181b; --ink:#e9e6dd; --ink2:#a6a194; --line:#4a4e54;
-    --pdf:#cf6149; --img:#82a458; --vid:#5e92b3; --aud:#bd942f; --data:#828c9a;
+    --desk:#0b3a3a; --face:#3a3d43; --faceD:#34373c; --well:#272a2e;
+    --hi:#5a606a; --sh:#202327; --sh2:#101214; --ink:#e9e6dd; --ink2:#a6a194; --line:#4a4e54;
+    --pdf:#cf6149; --img:#82a458; --vid:#6f8fd0; --aud:#bd942f; --data:#828c9a;
     --dev:#8a83d0; --arc:#c8732f; --weird:#b06a98; --web:#46a0a7; --ok:#5b9a4c; --doc:#4fb3cf;
+    --title1:#0a2a6a; --title2:#1e5fa0; --titletx:#ffffff;
   }
   *{box-sizing:border-box}
   html,body{margin:0; min-height:100%}
@@ -122,17 +124,20 @@
   #drawerwrap[hidden]{display:none}
   #drawerwrap{margin-top:12px}
   .tool{display:flex; gap:9px; align-items:flex-start; background:var(--well); border:2px solid; border-color:var(--rb);
-    border-left:5px solid var(--c,#888); padding:9px 10px; cursor:pointer}
-  .tool:hover{background:var(--hi); border-color:var(--c)}
-  .tool:active{border-color:var(--sb); border-left-color:var(--c)}
-  .tool .dot{display:none}
+    padding:9px 10px; cursor:pointer}
+  .tool:hover{background:var(--faceD)}
+  .tool:active{border-color:var(--sb)}
+  /* category color = a small beveled chip (a Win95-style icon swatch), not a side strip */
+  .tool .dot{display:block; flex:none; width:16px; height:16px; margin-top:1px; background:var(--c,#888);
+    border:2px solid; border-color:var(--rb)}
   .tool .nm{font-weight:bold; font-size:12.5px}
   .tool .ds{color:var(--ink2); font-size:11px; line-height:1.3}
   /* ---- stage / panel ---- */
   #stage{margin-bottom:14px; display:none}
   .panel{padding:16px 18px}
-  .panel .ph{display:flex; align-items:center; gap:10px; margin-bottom:4px}
-  .panel .ph .nm{font:bold 17px var(--sans)}
+  .panel .ph{display:flex; align-items:center; gap:10px; margin:-16px -18px 12px; padding:5px 9px;
+    background:linear-gradient(90deg,var(--title1),var(--title2)); color:var(--titletx)}
+  .panel .ph .nm{font:bold 14px var(--sans); color:var(--titletx)}
   .panel .ph .badge{font:bold 9px var(--mono); text-transform:uppercase; letter-spacing:.5px; color:#fff;
     background:var(--c,#666); padding:3px 7px; border-radius:2px}
   .panel .ds{color:var(--ink2); margin-bottom:12px; font-size:12.5px}
@@ -253,7 +258,7 @@
 <main>
   <section class="hero">
     <h1>Every annoying file job, in one place.</h1>
-    <p>Fix files without hunting for a website. Drop one in and the right tools open. Everything happens on your Mac, and your files never leave it.</p>
+    <p>Fix files without hunting for a website. Drop one in and the right tools open. Everything happens on your computer, and your files never leave it.</p>
 
     <div id="drop" tabindex="0">
       <div class="stamp">🗃️</div>
@@ -267,16 +272,15 @@
       <span>Copied an image from somewhere? Click here, or press ⌘V.</span>
     </div>
 
-    <div class="quick">
-      <div class="qrow" id="recentRow" hidden><span class="qlabel">Recent</span><div class="qtools" id="recentTools"></div></div>
-      <div class="qrow"><span class="qlabel">Popular</span><div class="qtools" id="starTools"></div></div>
-    </div>
+    <div class="quick qrow" id="recentRow" hidden><span class="qlabel">Recent</span><div class="qtools" id="recentTools"></div></div>
 
     <div class="cmd">
       <span class="pmt">🔍</span>
       <input id="q" autocomplete="off" placeholder="Search for what you want to do, like shrink a video or sign a PDF" />
       <div class="pal" id="pal"></div>
     </div>
+
+    <div class="quick qrow"><span class="qlabel">Popular</span><div class="qtools" id="starTools"></div></div>
     <div class="hints">Search, paste a YouTube link, or open a drawer below.</div>
   </section>
 
@@ -292,7 +296,7 @@
 <footer><div class="wrap">
   <div>Built by <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">Abhay Shah</a>
     · <a href="https://x.com/AbhayShahCA" target="_blank" rel="noopener">@AbhayShahCA</a></div>
-  <div class="cr">Everything runs on your Mac. Your files never leave your computer.
+  <div class="cr">Everything runs on your computer. Your files never leave it.
     <details class="credits" style="margin-top:6px">
       <summary style="cursor:pointer; font-weight:bold; color:var(--ink)">Open-source credits</summary>
       Built with <a href="https://ffmpeg.org/" target="_blank" rel="noopener">FFmpeg</a>,
@@ -933,7 +937,7 @@ function resetStage(){ $('#stage').style.display='none'; $('#panel').innerHTML='
 /* receipt after a file is dropped */
 function showReceipt(file){
   state.file=file; state.files=null; resetStage();
-  const k=kind(file); const r=$('#receipt'); r.style.display='block'; r.innerHTML=''; const q=$('.quick'); if(q)q.style.display='none';
+  const k=kind(file); const r=$('#receipt'); r.style.display='block'; r.innerHTML=''; document.querySelectorAll('.quick').forEach(qq=>qq.style.display='none');
   const card=el('div',{className:'receipt'});
   card.append(el('div',{className:'hd'},[el('b',{textContent:'▸ file detected'}),
     el('button',{className:'clearbtn',textContent:'✕ clear'},[])]));
@@ -957,7 +961,7 @@ function intake(list){ const fs=[...list]; if(!fs.length)return;
   if(fs.length===1){ showReceipt(fs[0]); } else { multiReceipt(fs); } }
 function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
   const allPdf=fs.every(f=>ext(f.name)==='pdf'), allImg=fs.every(f=>kind(f)==='image');
-  const r=$('#receipt'); r.style.display='block'; r.innerHTML=''; const q=$('.quick'); if(q)q.style.display='none';
+  const r=$('#receipt'); r.style.display='block'; r.innerHTML=''; document.querySelectorAll('.quick').forEach(qq=>qq.style.display='none');
   const card=el('div',{className:'receipt'});
   card.append(el('div',{className:'hd'},[el('b',{textContent:`▸ ${fs.length} files detected`}),
     el('button',{className:'clearbtn',textContent:'✕ clear'})]));
@@ -1190,7 +1194,7 @@ async function imagesToPdf(fs){ openStage(); const onP=progress('Building PDF');
   try{ for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); const png=await imgConvert(fs[i],{type:'image/png'});
     const im=await pdf.embedPng(await png.arrayBuffer()); pdf.addPage([im.width,im.height]).drawImage(im,{x:0,y:0,width:im.width,height:im.height}); }
     showResult(new Blob([await pdf.save()],{type:'application/pdf'}),'images.pdf'); }catch(e){fail(e);} }
-function clearAll(){ state.file=state.files=null; $('#receipt').style.display='none'; $('#receipt').innerHTML=''; const q=$('.quick'); if(q)q.style.display=''; resetStage(); }
+function clearAll(){ state.file=state.files=null; $('#receipt').style.display='none'; $('#receipt').innerHTML=''; document.querySelectorAll('.quick').forEach(qq=>qq.style.display=''); resetStage(); }
 
 /* ---- tool search ---- */
 const q=$('#q'), pal=$('#pal'); let palItems=[],palSel=0;
