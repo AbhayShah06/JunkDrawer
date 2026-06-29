@@ -123,7 +123,7 @@
   #drawerwrap{margin-top:12px}
   .tool{display:flex; gap:9px; align-items:flex-start; background:var(--well); border:2px solid; border-color:var(--rb);
     padding:9px 10px; cursor:pointer}
-  .tool:hover{background:#fffef9}
+  .tool:hover{background:var(--hi); border-color:var(--c)}
   .tool:active{border-color:var(--sb)}
   .tool .dot{width:8px; height:8px; background:var(--c,#888); margin-top:4px; flex:0 0 auto; transform:rotate(45deg)}
   .tool .nm{font-weight:bold; font-size:12.5px}
@@ -863,16 +863,15 @@ function resetStage(){ $('#stage').style.display='none'; $('#panel').innerHTML='
 /* receipt after a file is dropped */
 function showReceipt(file){
   state.file=file; state.files=null; resetStage();
-  const k=kind(file); const r=$('#receipt'); r.style.display='block'; r.innerHTML='';
+  const k=kind(file); const r=$('#receipt'); r.style.display='block'; r.innerHTML=''; const q=$('.quick'); if(q)q.style.display='none';
   const card=el('div',{className:'receipt'});
   card.append(el('div',{className:'hd'},[el('b',{textContent:'▸ file detected'}),
     el('button',{className:'clearbtn',textContent:'✕ clear'},[])]));
   card.querySelector('.clearbtn').onclick=clearAll;
   meta(file,k).then(m=>{ const md=el('div',{className:'meta'}); md.innerHTML=m; card.insertBefore(md,card.children[1]||null);
     const recos=T.filter(t=>t.rec && (t.kinds&&(t.kinds.includes(k)||t.kinds.includes('any'))));
-    if(recos.length){ card.append(el('div',{className:'want',textContent:'likely what you want:'}));
-      const rr=el('div',{className:'recos'}); recos.slice(0,6).forEach(t=>{ const b=el('button',{className:'reco',textContent:t.nm});
-        bindTip(b, t.more||t.ds); b.onclick=()=>openTool(t); rr.append(b); }); card.append(rr); }
+    if(recos.length){ card.append(el('div',{className:'want',textContent:'What you can do'}));
+      const rr=el('div',{className:'qtools'}); recos.slice(0,8).forEach(t=>rr.append(toolCard(t,CATS[t.cat].color))); card.append(rr); }
     openDrawer(k);
   });
   r.append(card); r.scrollIntoView({behavior:'smooth',block:'start'});
@@ -888,7 +887,7 @@ function intake(list){ const fs=[...list]; if(!fs.length)return;
   if(fs.length===1){ showReceipt(fs[0]); } else { multiReceipt(fs); } }
 function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
   const allPdf=fs.every(f=>ext(f.name)==='pdf'), allImg=fs.every(f=>kind(f)==='image');
-  const r=$('#receipt'); r.style.display='block'; r.innerHTML='';
+  const r=$('#receipt'); r.style.display='block'; r.innerHTML=''; const q=$('.quick'); if(q)q.style.display='none';
   const card=el('div',{className:'receipt'});
   card.append(el('div',{className:'hd'},[el('b',{textContent:`▸ ${fs.length} files detected`}),
     el('button',{className:'clearbtn',textContent:'✕ clear'})]));
@@ -1048,7 +1047,7 @@ async function imagesToPdf(fs){ openStage(); const onP=progress('Building PDF');
   try{ for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); const png=await imgConvert(fs[i],{type:'image/png'});
     const im=await pdf.embedPng(await png.arrayBuffer()); pdf.addPage([im.width,im.height]).drawImage(im,{x:0,y:0,width:im.width,height:im.height}); }
     showResult(new Blob([await pdf.save()],{type:'application/pdf'}),'images.pdf'); }catch(e){fail(e);} }
-function clearAll(){ state.file=state.files=null; $('#receipt').style.display='none'; $('#receipt').innerHTML=''; resetStage(); }
+function clearAll(){ state.file=state.files=null; $('#receipt').style.display='none'; $('#receipt').innerHTML=''; const q=$('.quick'); if(q)q.style.display=''; resetStage(); }
 
 /* ---- tool search ---- */
 const q=$('#q'), pal=$('#pal'); let palItems=[],palSel=0;
