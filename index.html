@@ -363,15 +363,34 @@ async function getFF(onP){
   if(mt) cfg.workerURL = await toBlobURL(`${b}/ffmpeg-core.worker.js`,'text/javascript');
   await ff.load(cfg); _ff=ff; return ff;
 }
+let _nativeFF=null; // null=unknown, then true/false once /api/check answers
+async function nativeFFAvailable(){
+  if(_nativeFF!==null) return _nativeFF;
+  try{ const r=await fetch('/api/check'); _nativeFF=!!(await r.json()).ffmpeg; }catch{ _nativeFF=false; }
+  return _nativeFF;
+}
 async function runFF(file,outName,argsFn,label){
   if(file.size>500*1048576) throw new Error(`This video is ${Math.round(file.size/1048576)} MB — too big to process in-app without running out of memory (the limit is about 500 MB). Try trimming it to a shorter clip first, or export a smaller version from your phone/editor.`);
-  const onP=progress(label); const ff=await getFF(onP); const { fetchFile }=await ffutil();
   const inName='in.'+ext(file.name);
+  const args=argsFn(inName,outName);
+  // Desktop app: run the bundled NATIVE ffmpeg (≈10× faster than wasm) through the
+  // local server. Plain browser / dev server (no /api backend) falls back to the
+  // in-browser wasm core below.
+  if(await nativeFFAvailable()) return runFFNative(file,inName,outName,args,label);
+  const onP=progress(label); const ff=await getFF(onP); const { fetchFile }=await ffutil();
   await ff.writeFile(inName, await fetchFile(file));
-  await ff.exec(argsFn(inName,outName));
+  await ff.exec(args);
   const data=await ff.readFile(outName);
   ff.deleteFile(inName).catch(()=>{}); ff.deleteFile(outName).catch(()=>{});
   return new Blob([data.buffer],{type:mimeOf(outName)});
+}
+async function runFFNative(file,inName,outName,args,label){
+  const onP=progress(label); onP(.08);
+  const meta=encodeURIComponent(JSON.stringify({inName,outName,args}));
+  const res=await fetch('/api/ffmpeg?meta='+meta,{method:'POST',body:file});
+  if(!res.ok){ let m=''; try{ const j=await res.json(); m=j.detail||j.error||''; }catch{} throw new Error(m?('ffmpeg: '+m):('ffmpeg failed ('+res.status+')')); }
+  onP(.92); const buf=await res.arrayBuffer(); onP(1);
+  return new Blob([buf],{type:mimeOf(outName)});
 }
 const mimeOf = n => ({gif:'image/gif',mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',png:'image/png',
   jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',mp3:'audio/mpeg',wav:'audio/wav',m4a:'audio/mp4',
@@ -541,7 +560,7 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make the file sma
   run:async (f,o)=>{ const onP=progress('Reading length'); const dur=await videoDuration(f)||30;
     const target=(o.mb||10)*1048576*8; const vkbps=Math.max(150,Math.floor(target/dur/1000-128));
     showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-b:v',vkbps+'k','-maxrate',vkbps+'k',
-      '-bufsize',(vkbps*2)+'k','-preset','ultrafast','-vf','scale=-2:min(720\\,ih)','-c:a','aac','-b:a','128k',out],'Compressing video'),
+      '-bufsize',(vkbps*2)+'k','-preset','ultrafast','-vf',"scale=-2:'min(720,ih)'",'-c:a','aac','-b:a','128k',out],'Compressing video'),
       base(f.name)+'-small.mp4',{note:`~${o.mb} MB target (${vkbps}kbps video).`}); }});
 add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the sound out as an MP3',kw:'extract audio mp3 sound from video',
   more:'Takes just the sound from a video and saves it as an MP3 file.',

@@ -106,6 +106,64 @@ function handleDownload(req, res, binDir) {
 }
 function cleanup(d) { try { fs.rmSync(d, { recursive: true, force: true }); } catch {} }
 
+// Run the bundled NATIVE ffmpeg on a user file (≈10× faster than the in-browser
+// wasm core). The renderer streams the raw file as the body and passes the ffmpeg
+// argv + the in/out filenames as a JSON `meta` query param. We rebuild nothing from
+// a shell — `spawn` takes the argv array directly, so there's no shell-injection
+// surface. Defense in depth: this is behind `localOnly` (only our own renderer can
+// reach it), filenames must be plain basenames, and no argv token may be an absolute
+// path / UNC / drive-letter / contain `..` — so ffmpeg can't read or write outside
+// the throwaway temp dir we run it in.
+function handleFFmpeg(req, res, binDir) {
+  // Drain the (possibly still-streaming) request body before replying to a rejected
+  // request — otherwise ending the response mid-upload resets the socket.
+  const reject = (obj, code) => { try { req.resume(); } catch {} return sendJSON(res, obj, code); };
+  req.on('error', () => {});
+  let ffmpeg = findBin('ffmpeg', binDir);
+  if (!ffmpeg) return reject({ error: 'ffmpeg-missing' }, 501);
+  ffmpeg = path.resolve(ffmpeg);  // we spawn with cwd:tmp, so a relative bin path would ENOENT
+  let meta;
+  try { meta = JSON.parse(new URLSearchParams(req.url.split('?')[1] || '').get('meta') || ''); }
+  catch { return reject({ error: 'bad-meta' }, 400); }
+  const { inName, outName, args } = meta || {};
+  const okName = n => typeof n === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(n) && !n.includes('..');
+  if (!okName(inName) || !okName(outName)) return reject({ error: 'bad-names' }, 400);
+  if (!Array.isArray(args) || args.length < 2 || args.length > 64) return reject({ error: 'bad-args' }, 400);
+  for (const a of args) {
+    // backslashes are legal *inside* a filtergraph (e.g. scale=...min(720\,ih)), so we
+    // don't ban them outright — we ban path-escape shapes: NUL, `..`, and any token that
+    // STARTS like an absolute path, UNC share, or drive letter.
+    if (typeof a !== 'string' || a.length > 2000 || a.includes('\0') || a.includes('..') || /^([A-Za-z]:|\\\\|\/)/.test(a))
+      return reject({ error: 'bad-args', detail: 'unsafe argument' }, 400);
+  }
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-ff-'));
+  const inPath = path.join(tmp, inName), outPath = path.join(tmp, outName);
+  const ws = fs.createWriteStream(inPath);
+  let size = 0, aborted = false;
+  const die = (obj, code) => { if (aborted) return; aborted = true; try { req.destroy(); } catch {} try { ws.destroy(); } catch {} cleanup(tmp); sendJSON(res, obj, code); };
+  req.on('data', c => { size += c.length; if (size > 500 * 1048576) die({ error: 'too-big' }, 413); });
+  req.on('error', () => die({ error: 'upload-failed' }, 400));
+  ws.on('error', () => die({ error: 'write-failed' }, 500));
+  req.pipe(ws);
+  ws.on('finish', () => {
+    if (aborted) return;
+    const child = spawn(ffmpeg, args, { cwd: tmp });
+    let err = '';
+    child.stderr.on('data', d => { err += d; if (err.length > 20000) err = err.slice(-20000); });
+    child.on('error', e => { cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
+    child.on('close', code => {
+      if (code !== 0 || !fs.existsSync(outPath)) { const d = err.slice(-2500); cleanup(tmp); return sendJSON(res, { error: 'tool-failed', detail: d || ('ffmpeg exit ' + code) }, 500); }
+      let data; try { data = fs.readFileSync(outPath); } catch { cleanup(tmp); return sendJSON(res, { error: 'read-failed' }, 500); }
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Length', data.length);
+      res.end(data);
+      cleanup(tmp);
+    });
+  });
+}
+
 // ---- update notifier: compare the local version to the latest GitHub release ----
 function ghRepo() {
   const pub = (PKG.build && PKG.build.publish) || [];
@@ -210,6 +268,7 @@ function startServer(appRoot, binDir, updater) {
         return sendJSON(res, { error: 'unavailable' }, 400);
       }
       if (url === '/api/download' && req.method === 'POST') return handleDownload(req, res, binDir);
+      if (url === '/api/ffmpeg' && req.method === 'POST') return handleFFmpeg(req, res, binDir);
       // Static files, confined to appRoot. Reject backslashes/NUL (Windows traversal),
       // then require the resolved path to sit on a separator boundary inside the root
       // (so a sibling like app.asar.unpacked can't satisfy a loose prefix match).
