@@ -18,6 +18,7 @@ async function create() {
   win = new BrowserWindow({
     width: 1180, height: 840, minWidth: 720, minHeight: 560,
     title: 'Junk Drawer', backgroundColor: '#23262b', show: false,
+    icon: path.join(__dirname, '..', 'icon.ico'),
     // Pin the renderer-hardening flags explicitly so a future edit can't silently regress
     // the sandbox. The renderer processes untrusted file contents + pasted/dragged URLs.
     webPreferences: {

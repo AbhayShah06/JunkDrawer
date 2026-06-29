@@ -39,6 +39,7 @@
       "index.html",
       "electron/**/*",
       "vendor/**/*",
+      "icon.ico",
       "package.json"
     ],
     "mac": {
@@ -58,6 +59,7 @@
       ]
     },
     "win": {
+      "icon": "icon.ico",
       "target": [
         "nsis"
       ],
@@ -70,6 +72,10 @@
           ]
         }
       ]
+    },
+    "nsis": {
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico"
     },
     "publish": [
       {

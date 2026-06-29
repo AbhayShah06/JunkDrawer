@@ -11,7 +11,7 @@
     --hi:#ffffff; --sh:#808080; --sh2:#3f3f3f; --ink:#0a0a0a; --ink2:#444444; --line:#808080;
     --pdf:#a8200f; --img:#2f7d3a; --vid:#000087; --aud:#946000; --data:#46505c;
     --dev:#5a3a9a; --arc:#a8531f; --weird:#7a2a68; --web:#117a78; --ok:#2f7a2f; --doc:#0a5a8a;
-    --title1:#000082; --title2:#1083d0; --titletx:#ffffff;
+    --title1:#000082; --title2:#1083d0; --titletx:#ffffff; --hover:#e8ebee;
     --mono:"Lucida Console","Consolas","Courier New",monospace;
     --sans:"MS Sans Serif","Tahoma","Segoe UI",Verdana,sans-serif;
     --rb:var(--hi) var(--sh2) var(--sh2) var(--hi);  /* raised bevel */
@@ -22,7 +22,7 @@
     --hi:#5a606a; --sh:#202327; --sh2:#101214; --ink:#e9e6dd; --ink2:#a6a194; --line:#4a4e54;
     --pdf:#cf6149; --img:#82a458; --vid:#6f8fd0; --aud:#bd942f; --data:#828c9a;
     --dev:#8a83d0; --arc:#c8732f; --weird:#b06a98; --web:#46a0a7; --ok:#5b9a4c; --doc:#4fb3cf;
-    --title1:#0a2a6a; --title2:#1e5fa0; --titletx:#ffffff;
+    --title1:#0a2a6a; --title2:#1e5fa0; --titletx:#ffffff; --hover:#2f3339;
   }
   *{box-sizing:border-box}
   html,body{margin:0; min-height:100%}
@@ -48,12 +48,12 @@
   .hero h1{font:bold 21px var(--sans); margin:0 0 6px; text-align:center}
   .hero p{color:var(--ink2); margin:0 auto 14px; max-width:70ch; font-size:12.5px; text-align:center}
   /* drop well */
-  #drop{background:var(--well); border:2px solid; border-color:var(--sb); padding:18px; text-align:center; cursor:pointer}
-  #drop:hover{background:#fff}
-  #drop.hot{background:#eef3da}
-  #drop .stamp{font-size:26px}
-  #drop .big{font:bold 15px var(--sans); margin-top:4px}
-  #drop .sub{color:var(--ink2); font-size:11.5px; margin-top:5px}
+  #drop{background:var(--well); border:2px solid; border-color:var(--sb); padding:9px 13px; cursor:pointer;
+    display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+  #drop:hover{background:var(--hover)}
+  #drop.hot{background:var(--hover); border-color:var(--vid)}
+  #drop .big{font:bold 13px var(--sans)}
+  #drop .sub{color:var(--ink2); font-size:11.5px}
   .pasterow{display:flex; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap}
   .pastebtn{font:bold 12px var(--sans); background:var(--face); color:var(--ink);
     border:2px solid; border-color:var(--rb); padding:6px 12px; cursor:pointer; border-radius:2px}
@@ -125,7 +125,7 @@
   #drawerwrap{margin-top:12px}
   .tool{display:flex; gap:9px; align-items:flex-start; background:var(--well); border:2px solid; border-color:var(--rb);
     padding:9px 10px; cursor:pointer}
-  .tool:hover{background:var(--faceD)}
+  .tool:hover{background:var(--hover)}
   .tool:active{border-color:var(--sb)}
   /* category color = a small beveled chip (a Win95-style icon swatch), not a side strip */
   .tool .dot{display:block; flex:none; width:16px; height:16px; margin-top:1px; background:var(--c,#888);
@@ -239,10 +239,10 @@
 </head>
 <body>
 <header><div class="topbar">
-  <div class="brand"><span class="mk">🗄️</span>Junk&nbsp;Drawer
+  <div class="brand"><span class="mk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16"/><path d="M3 12h18M9.5 8h5M9.5 16h5"/></svg></span>Junk&nbsp;Drawer
     <small>every annoying file tool in one place</small></div>
   <nav>
-    <a href="#" id="themeToggle">◐ Theme</a>
+    <a href="#" id="themeToggle">Theme</a>
     <a href="#cabinet">Tools</a>
     <a href="#" id="navPrivacy">Privacy</a>
     <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">About</a>
@@ -257,31 +257,26 @@
 
 <main>
   <section class="hero">
-    <h1>Every annoying file job, in one place.</h1>
-    <p>Fix files without hunting for a website. Drop one in and the right tools open. Everything happens on your computer, and your files never leave it.</p>
-
     <div id="drop" tabindex="0">
-      <div class="stamp">🗃️</div>
-      <div class="big">Drop a file here</div>
-      <div class="sub">photo, video, audio, PDF, Markdown, text, or zip. Or click to pick one.</div>
+      <span class="big">Open a file</span>
+      <span class="sub">drop one anywhere, or click to choose. Photo, video, audio, PDF, Markdown, text, or zip.</span>
     </div>
     <input type="file" id="file" multiple hidden />
 
     <div class="pasterow">
-      <button class="pastebtn" id="pasteBtn">📋 Paste an image</button>
-      <span>Copied an image from somewhere? Click here, or press ⌘V.</span>
+      <button class="pastebtn" id="pasteBtn">Paste an image</button>
+      <span>Copied an image somewhere? Click here, or paste it.</span>
     </div>
 
     <div class="quick qrow" id="recentRow" hidden><span class="qlabel">Recent</span><div class="qtools" id="recentTools"></div></div>
 
     <div class="cmd">
-      <span class="pmt">🔍</span>
-      <input id="q" autocomplete="off" placeholder="Search for what you want to do, like shrink a video or sign a PDF" />
+      <span class="pmt"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="7"/><path d="M21 21l-5.2-5.2"/></svg></span>
+      <input id="q" autocomplete="off" placeholder="Search for a tool, like shrink a video or sign a PDF" />
       <div class="pal" id="pal"></div>
     </div>
 
     <div class="quick qrow"><span class="qlabel">Popular</span><div class="qtools" id="starTools"></div></div>
-    <div class="hints">Search, paste a YouTube link, or open a drawer below.</div>
   </section>
 
   <section id="receipt"></section>
@@ -425,34 +420,32 @@ function jsonToCSV(text){ const a=JSON.parse(text); if(!Array.isArray(a))throw n
 function progress(label){ $('#status').innerHTML=`<div><span class="spin"></span>${label} …</div><div class="prog"><i id="bar"></i></div>`;
   return p=>{ const b=$('#bar'); if(b)b.style.width=Math.round((p||0)*100)+'%'; }; }
 const clearStatus=()=>{ $('#status').innerHTML=''; };
-function fail(e){ clearStatus(); $('#output').innerHTML=''; $('#status').innerHTML=`<div class="err">⚠ ${esc(e&&e.message||e)}</div>`; }
+function fail(e){ clearStatus(); $('#output').innerHTML=''; $('#status').innerHTML=`<div class="err">${esc(e&&e.message||e)}</div>`; }
 function showResult(blob,filename,{note}={}){
   clearStatus(); const out=$('#output'); out.innerHTML='';
   const url=URL.createObjectURL(blob), isImg=/^image\//.test(blob.type);
   const box=el('div',{className:'result'});
-  box.append(el('h3',{textContent:'✓ done · '+filename}), el('div',{className:'sz',textContent:fmt(blob.size)}));
+  box.append(el('h3',{textContent:'Done · '+filename}), el('div',{className:'sz',textContent:fmt(blob.size)}));
   const row=el('div',{className:'row'});
-  if(isImg){ const im=el('img',{className:'preview',src:url,draggable:true,title:'Drag me into Discord / Finder'});
-    im.addEventListener('dragstart',e=>e.dataTransfer.setData('DownloadURL',`${blob.type}:${filename}:${url}`)); row.append(im); }
+  if(isImg){ const im=el('img',{className:'preview',src:url,title:filename}); row.append(im); }
   const right=el('div',{style:'flex:1;min-width:210px'});
-  const actions=el('div',{className:'actions'},[el('a',{className:'btn',href:url,download:filename,textContent:'⬇ Download'})]);
-  if(isImg){ const cp=el('button',{className:'btn ghost',textContent:'📋 Copy'});
-    cp.onclick=async()=>{ try{ await navigator.clipboard.write([new ClipboardItem({[blob.type]:blob})]); toast('Copied. Paste into Discord'); }
-      catch{ toast('Copy unsupported here. Use Download'); } }; actions.append(cp); }
-  const ag=el('button',{className:'btn ghost',textContent:'↺ Drawers'}); ag.onclick=resetStage; actions.append(ag);
+  const actions=el('div',{className:'actions'},[el('a',{className:'btn',href:url,download:filename,textContent:'Download'})]);
+  if(isImg){ const cp=el('button',{className:'btn ghost',textContent:'Copy'});
+    cp.onclick=async()=>{ try{ await navigator.clipboard.write([new ClipboardItem({[blob.type]:blob})]); toast('Copied'); }
+      catch{ toast('Copy not supported here. Use Download'); } }; actions.append(cp); }
+  const ag=el('button',{className:'btn ghost',textContent:'Drawers'}); ag.onclick=resetStage; actions.append(ag);
   right.append(actions);
-  if(isImg) right.append(el('div',{className:'note',textContent:'tip: drag the preview straight into Discord, no download needed.'}));
   if(note) right.append(el('div',{className:'note',textContent:note}));
   row.append(right); box.append(row); out.append(box); out.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function showText(str,filename){
   clearStatus(); const out=$('#output'); out.innerHTML='';
   const box=el('div',{className:'result'});
-  box.append(el('h3',{textContent:'✓ '+filename}));
+  box.append(el('h3',{textContent:'Done · '+filename}));
   const ta=el('textarea',{value:str,readOnly:true,style:'width:100%;min-height:160px;font:12px var(--mono);margin-top:10px;background:var(--well);border:2px solid;border-color:var(--sb);padding:9px;color:var(--ink)'});
   box.append(ta);
-  const cp=el('button',{className:'btn ghost',textContent:'📋 Copy'}); cp.onclick=()=>{ navigator.clipboard.writeText(str); toast('Copied'); };
-  const dl=el('a',{className:'btn',textContent:'⬇ Download',download:filename,href:URL.createObjectURL(new Blob([str],{type:mimeOf(filename)}))});
+  const cp=el('button',{className:'btn ghost',textContent:'Copy'}); cp.onclick=()=>{ navigator.clipboard.writeText(str); toast('Copied'); };
+  const dl=el('a',{className:'btn',textContent:'Download',download:filename,href:URL.createObjectURL(new Blob([str],{type:mimeOf(filename)}))});
   box.append(el('div',{className:'actions',style:'margin-top:10px'},[dl,cp])); out.append(box);
 }
 function showMulti(files,zipName,note){ const z=zipSync(Object.fromEntries(files.map(f=>[f.name,f.data])),{level:0});
@@ -586,7 +579,7 @@ add({cat:'audio',kinds:['audio'],nm:'Shrink Audio File',ds:'Make the file smalle
 
 /* ---- PDF ---- */
 add({cat:'pdf',kinds:['pdf'],rec:1,custom:f=>pdfSignFill(f),nm:'Sign & Fill PDF',ds:'Add a signature, text, and the date',kw:'sign signature fill form text date annotate edit adobe acrobat esign initials',
-  more:'Open a PDF and drop your signature, text, and today\'s date anywhere on the page, then save it. Your file stays on your Mac.'});
+  more:'Open a PDF and drop your signature, text, and today\'s date anywhere on the page, then save it. Your file stays on your computer.'});
 add({cat:'pdf',kinds:['pdf'],rec:1,nm:'Shrink a PDF',ds:'Make a big PDF smaller',kw:'compress shrink pdf smaller size squish',
   more:'Turns each page into a picture to cut the file size. Best for scanned documents. The text still shows but you can no longer select it.',
   run:async f=>{ const onP=progress('Compressing PDF'); const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
@@ -739,7 +732,7 @@ add({cat:'arc',multi:1,nm:'Zip Files',ds:'Put several files into one .zip',kw:'z
 
 /* ---- WEIRD ---- */
 add({cat:'weird',kinds:['any'],rec:1,nm:'Look Inside a File',ds:'See what a file really is',kw:'inspect identify type metadata what is detective info magic',
-  more:'Tells you what a file truly is even when its name lies, plus its size and a unique fingerprint. The file stays on your Mac.',
+  more:'Tells you what a file truly is even when its name lies, plus its size and a unique fingerprint. The file stays on your computer.',
   run:async f=>{ const onP=progress('Investigating'); onP(.3); const buf=new Uint8Array(await f.slice(0,16).arrayBuffer());
     const hex=[...buf].map(b=>b.toString(16).padStart(2,'0')).join(' ');
     const sig=magic(buf); let extra='';
@@ -758,15 +751,15 @@ mime (os)    ${f.type||'-'}
 ${extra}magic bytes  ${hex}
 sha-256      ${sha}`, base(f.name)+'-report.txt'); }});
 add({cat:'weird',kinds:['video','image'],nm:'GIF to Video',ds:'Turn a GIF into a small video',kw:'gif to mp4 convert animation',
-  more:'Turns an animated GIF into a small MP4 video that is easy to share. Runs on your Mac.',
+  more:'Turns an animated GIF into a small MP4 video that is easy to share. Runs on your computer.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-movflags','faststart','-pix_fmt','yuv420p','-vf','scale=trunc(iw/2)*2:trunc(ih/2)*2',out],'Converting'),base(f.name)+'.mp4'); }});
 add({cat:'weird',kinds:['image'],nm:'iPhone Photo to JPG',ds:'Change an iPhone HEIC photo to JPG',kw:'heic heif iphone jpg convert',
-  more:'Changes an iPhone HEIC photo into a normal JPG that opens on any device. The photo stays on your Mac.',
+  more:'Changes an iPhone HEIC photo into a normal JPG that opens on any device. The photo stays on your computer.',
   run:async f=>{ showResult(await imgConvert(f,{type:'image/jpeg',quality:.92}),base(f.name)+'.jpg'); }});
 
 /* ---- WEB / DOWNLOAD (link in, file out; needs the local server) ---- */
 add({cat:'web',input:'url',mode:'video',needs:'ytdlp',nm:'YouTube to Video',ds:'Save a video as an MP4 file',kw:'youtube download video mp4 vimeo twitch save',
-  more:'Paste a YouTube link and save the video to your Mac as an MP4. Works with many other video sites too.'});
+  more:'Paste a YouTube link and save the video to your computer as an MP4. Works with many other video sites too.'});
 add({cat:'web',input:'url',mode:'audio',needs:'ytdlp',nm:'YouTube to MP3',ds:'Save just the sound as an MP3',kw:'youtube download audio mp3 song music rip',
   more:'Paste a video link and save only the sound as an MP3 file. Good for songs, talks, and podcasts.'});
 
@@ -791,7 +784,7 @@ function bindTip(node,text){ if(!text)return;
 
 /* drawers */
 /* starred + recent quick-access tools (no forced setup — recents fill in as you go) */
-const STARRED=['Remove Background','Shrink File Size','Shrink a Video','Sign & Fill PDF','Open & Preview','Make a QR Code'];
+const STARRED=['Remove Background','Shrink File Size','Shrink a Video','Sign & Fill PDF','Open & Preview','iPhone Photo to JPG'];
 function recentList(){ try{ return JSON.parse(localStorage.getItem('jd-recent')||'[]'); }catch{ return []; } }
 function pushRecent(nm){ let r=recentList().filter(x=>x!==nm); r.unshift(nm); try{ localStorage.setItem('jd-recent',JSON.stringify(r.slice(0,5))); }catch{} }
 function renderQuick(){
@@ -1037,7 +1030,7 @@ async function openViewer(file){
   p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Open & Preview'}),el('span',{className:'badge',textContent:'Open'})]));
   p.append(el('div',{className:'filechip'},[svg(icon('clip')), `${file.name} · ${fmt(file.size)}`]));
   const ch=el('button',{className:'btn ghost',textContent:'Open another file'}); ch.onclick=()=>pickFiles(false,fs=>openViewer(fs[0]));
-  const dw=el('button',{className:'btn ghost',textContent:'↺ Drawers'}); dw.onclick=resetStage;
+  const dw=el('button',{className:'btn ghost',textContent:'Drawers'}); dw.onclick=resetStage;
   p.append(el('div',{className:'runrow'},[ch,dw]));
   const host=el('div',{className:'viewer'}); p.append(host);
   const e=ext(file.name);
@@ -1092,7 +1085,7 @@ async function pdfSignFill(file){
       am.onclick=()=>{ it.size=Math.max(8,it.size-2); it.content.style.fontSize=it.size+'px'; };
       ap.onclick=()=>{ it.size+=2; it.content.style.fontSize=it.size+'px'; }; right.append(am,ap); }
     const del=el('span',{className:'del',textContent:'✕',title:'Remove'}); right.append(del);
-    const grip=el('div',{className:'grip'},[el('span',{textContent:it.type==='text'?'✎':'✍'}),right]); node.append(grip);
+    const grip=el('div',{className:'grip'},[el('span',{textContent:it.type==='text'?'text':'sig'}),right]); node.append(grip);
     if(it.type==='text'){ const t=el('div',{className:'txt',contentEditable:'true',textContent:it.text||'Type here'}); t.style.fontSize=it.size+'px'; node.append(t); it.content=t; }
     else { const img=el('img',{src:it.dataUrl}); img.style.width=it.w+'px'; img.style.height=it.h+'px'; node.append(img); it.content=img;
       const hdl=el('div',{className:'hdl'}); node.append(hdl); resizeHandle(hdl,img,it); }
@@ -1104,11 +1097,11 @@ async function pdfSignFill(file){
   }
 
   const bar=el('div',{className:'pdfedit-toolbar'});
-  const bSig=el('button',{className:'btn ghost',textContent:'✍ Signature'});
-  const bText=el('button',{className:'btn ghost',textContent:'✎ Text'});
-  const bDate=el('button',{className:'btn ghost',textContent:'📅 Date'});
-  const bExport=el('button',{className:'btn',textContent:'⬇ Export signed PDF'});
-  const bClose=el('button',{className:'btn ghost',textContent:'↺ Drawers'}); bClose.onclick=resetStage;
+  const bSig=el('button',{className:'btn ghost',textContent:'Signature'});
+  const bText=el('button',{className:'btn ghost',textContent:'Text'});
+  const bDate=el('button',{className:'btn ghost',textContent:'Date'});
+  const bExport=el('button',{className:'btn',textContent:'Export signed PDF'});
+  const bClose=el('button',{className:'btn ghost',textContent:'Drawers'}); bClose.onclick=resetStage;
   bar.append(bSig,bText,bDate,bExport,bClose,el('span',{className:'pdfedit-hint',textContent:`${pages.length} page${pages.length>1?'s':''} · drag items by the blue bar`}));
   const sigHost=el('div');
   bText.onclick=()=>{ measure(); addItem({type:'text',text:'Type here',size:18}); };
@@ -1149,7 +1142,7 @@ async function pdfSignFill(file){
 /* signature pad: draw / type / upload → transparent PNG dataURL */
 function signaturePad(host, onUse){
   host.innerHTML=''; const box=el('div',{className:'pdfedit-sigpad'}); const area=el('div');
-  const tDraw=el('button',{className:'btn ghost on',textContent:'✍ Draw'}), tType=el('button',{className:'btn ghost',textContent:'⌨ Type'}), tUp=el('button',{className:'btn ghost',textContent:'🖼 Upload'});
+  const tDraw=el('button',{className:'btn ghost on',textContent:'Draw'}), tType=el('button',{className:'btn ghost',textContent:'Type'}), tUp=el('button',{className:'btn ghost',textContent:'Upload'});
   box.append(el('div',{className:'pdfedit-tabs'},[tDraw,tType,tUp]),area); host.append(box);
 
   // DRAW
@@ -1244,7 +1237,7 @@ document.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove(
   (dt.getData('text/uri-list')||'').split(/\s+/).forEach(push);
   (dt.getData('text/plain')||'').split(/\s+/).forEach(push);
   const htm=dt.getData('text/html'); if(htm){ const re=/<img[^>]+src=["']([^"']+)["']/ig; let m; while((m=re.exec(htm)))push(m[1]); }
-  if(cands.length) fetchDropped(cands); else toast('Drop a file, or copy the image and press ⌘V');
+  if(cands.length) fetchDropped(cands); else toast('Drop a file, or copy an image and paste it here');
 });
 const isMedia=t=>/^(image|video|audio)\//.test(t)||t==='application/pdf';
 function unwrap(raw){ try{ const u=new URL(raw); const inner=u.searchParams.get('imgurl')||u.searchParams.get('url')||u.searchParams.get('mediaurl');
@@ -1272,8 +1265,8 @@ function pasteFallback(isBlob){
     : 'That site blocks other apps from reading its images by drag. Copy + paste carries the actual pixels, which always works:'}));
   const steps=el('div',{className:'opts',style:'font:13px var(--sans)'});
   steps.append(el('div',{style:'margin:6px 0'},['1. Right-click the image → ',el('b',{textContent:'Copy Image'}),'.']));
-  steps.append(el('div',{style:'margin:6px 0'},['2. Come back here and hit the ',el('b',{textContent:'Paste an image'}),' button (or press ⌘V).']));
-  const go=el('button',{className:'btn',textContent:'📋 Paste an image now'}); go.onclick=pasteFromClipboard;
+  steps.append(el('div',{style:'margin:6px 0'},['2. Come back here and hit the ',el('b',{textContent:'Paste an image'}),' button (or just paste it).']));
+  const go=el('button',{className:'btn',textContent:'Paste an image now'}); go.onclick=pasteFromClipboard;
   const ok=el('button',{className:'btn ghost',textContent:'Close'}); ok.onclick=resetStage;
   p.append(el('div',{className:'runrow'},[go,ok]));
 }
@@ -1282,7 +1275,7 @@ async function pasteFromClipboard(){
     for(const it of items){ const type=it.types.find(t=>isMedia(t)); if(type){ const blob=await it.getType(type);
       resetStage(); intake([new File([blob],'pasted.'+(type.split('/')[1]||'png'),{type})]); return; } }
     toast('No image on the clipboard yet. Copy Image first.');
-  }catch{ toast('Browser blocked clipboard read. Press ⌘V instead.'); }
+  }catch{ toast('Clipboard read blocked. Paste it instead.'); }
 }
 $('#pasteBtn').onclick=pasteFromClipboard;
 window.addEventListener('paste',e=>{ let f=[...(e.clipboardData?.files||[])];
@@ -1309,7 +1302,7 @@ function svg(path){ const ns='http://www.w3.org/2000/svg'; const s=document.crea
 buildDrawers();
 renderQuick();
 $('#allToggle').onclick=()=>{ const open=$('#cabinet').classList.toggle('open'); $('#drawerwrap').hidden=!open; };
-console.log('%c🗄️ Junk Drawer ready · '+T.length+' tools','color:#9a3f29;font-weight:bold');
+console.log('%cJunk Drawer ready · '+T.length+' tools','color:#000080;font-weight:bold');
 </script>
 </body>
 </html>
