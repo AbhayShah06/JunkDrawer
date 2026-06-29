@@ -166,9 +166,21 @@ function handleFFmpeg(req, res, binDir) {
 
 // ---- update notifier: compare the local version to the latest GitHub release ----
 function ghRepo() {
+  // Dev (`npm start`) reads coordinates straight from package.json's build.publish.
   const pub = (PKG.build && PKG.build.publish) || [];
   const g = (Array.isArray(pub) ? pub : [pub]).find(p => p && p.provider === 'github');
-  return g ? { owner: g.owner, repo: g.repo } : null;
+  if (g && g.owner && g.repo) return { owner: g.owner, repo: g.repo };
+  // Packaged: electron-builder strips the entire `build` block from the bundled
+  // package.json, so PKG.build.publish is gone — but it writes the same GitHub
+  // coordinates to app-update.yml under resourcesPath. Read them from there.
+  try {
+    const base = process.resourcesPath || path.join(__dirname, '..');
+    const yml = fs.readFileSync(path.join(base, 'app-update.yml'), 'utf8');
+    const field = k => ((yml.match(new RegExp('^' + k + ':\\s*(.+)$', 'm')) || [])[1] || '').trim();
+    const owner = field('owner'), repo = field('repo'), provider = field('provider');
+    if (owner && repo && provider === 'github') return { owner, repo };
+  } catch {}
+  return null;
 }
 function cmpVer(a, b) { // > 0 when a is newer than b
   const pa = String(a).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
