@@ -421,9 +421,11 @@ function progress(label){ $('#status').innerHTML=`<div><span class="spin"></span
   return p=>{ const b=$('#bar'); if(b)b.style.width=Math.round((p||0)*100)+'%'; }; }
 const clearStatus=()=>{ $('#status').innerHTML=''; };
 function fail(e){ clearStatus(); $('#output').innerHTML=''; $('#status').innerHTML=`<div class="err">${esc(e&&e.message||e)}</div>`; }
+let _resUrls=[];
+function freeResUrls(){ for(const u of _resUrls){ try{ URL.revokeObjectURL(u); }catch{} } _resUrls=[]; }
 function showResult(blob,filename,{note}={}){
-  clearStatus(); const out=$('#output'); out.innerHTML='';
-  const url=URL.createObjectURL(blob), isImg=/^image\//.test(blob.type);
+  clearStatus(); const out=$('#output'); out.innerHTML=''; freeResUrls();
+  const url=URL.createObjectURL(blob), isImg=/^image\//.test(blob.type); _resUrls.push(url);
   const box=el('div',{className:'result'});
   box.append(el('h3',{textContent:'Done · '+filename}), el('div',{className:'sz',textContent:fmt(blob.size)}));
   const row=el('div',{className:'row'});
@@ -439,13 +441,14 @@ function showResult(blob,filename,{note}={}){
   row.append(right); box.append(row); out.append(box); out.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function showText(str,filename){
-  clearStatus(); const out=$('#output'); out.innerHTML='';
+  clearStatus(); const out=$('#output'); out.innerHTML=''; freeResUrls();
   const box=el('div',{className:'result'});
   box.append(el('h3',{textContent:'Done · '+filename}));
   const ta=el('textarea',{value:str,readOnly:true,style:'width:100%;min-height:160px;font:12px var(--mono);margin-top:10px;background:var(--well);border:2px solid;border-color:var(--sb);padding:9px;color:var(--ink)'});
   box.append(ta);
   const cp=el('button',{className:'btn ghost',textContent:'Copy'}); cp.onclick=()=>{ navigator.clipboard.writeText(str); toast('Copied'); };
-  const dl=el('a',{className:'btn',textContent:'Download',download:filename,href:URL.createObjectURL(new Blob([str],{type:mimeOf(filename)}))});
+  const txtUrl=URL.createObjectURL(new Blob([str],{type:mimeOf(filename)})); _resUrls.push(txtUrl);
+  const dl=el('a',{className:'btn',textContent:'Download',download:filename,href:txtUrl});
   box.append(el('div',{className:'actions',style:'margin-top:10px'},[dl,cp])); out.append(box);
 }
 function showMulti(files,zipName,note){ const z=zipSync(Object.fromEntries(files.map(f=>[f.name,f.data])),{level:0});
@@ -536,7 +539,7 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make the file sma
   opts:oNum('target','10','MB','mb',{min:1,step:1}),
   run:async (f,o)=>{ const onP=progress('Reading length'); const dur=await videoDuration(f)||30;
     const target=(o.mb||10)*1048576*8; const vkbps=Math.max(150,Math.floor(target/dur/1000-128));
-    showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-b:v',vkbps+'k','-maxrate',vkbps+'k',
+    showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-b:v',vkbps+'k','-maxrate',vkbps+'k',
       '-bufsize',(vkbps*2)+'k','-preset','veryfast','-vf','scale=-2:min(720\\,ih)','-c:a','aac','-b:a','128k',out],'Compressing video'),
       base(f.name)+'-small.mp4',{note:`~${o.mb} MB target (${vkbps}kbps video).`}); }});
 add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the sound out as an MP3',kw:'extract audio mp3 sound from video',
@@ -544,12 +547,12 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the s
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-acodec','libmp3lame','-q:a','2',out],'Extracting audio'),base(f.name)+'.mp3'); }});
 add({cat:'video',kinds:['video'],nm:'Make It an MP4',ds:'Change a video to MP4',kw:'convert mp4 h264 mov mkv webm',
   more:'Changes a MOV, MKV, WEBM, or AVI video into an MP4 that plays almost anywhere.',
-  run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-crf','23','-preset','veryfast','-c:a','aac',out],'Converting to MP4'),base(f.name)+'.mp4'); }});
+  run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-crf','23','-preset','veryfast','-c:a','aac',out],'Converting to MP4'),base(f.name)+'.mp4'); }});
 add({cat:'video',kinds:['video'],nm:'Trim a Video',ds:'Keep just one part of the clip',kw:'trim cut clip shorten',
   more:'Keeps only the part between a start and end time and drops the rest. Times are in minutes and seconds.',
   opts:()=>{ const a=el('input',{type:'text',value:'00:00',placeholder:'mm:ss'}); const b=el('input',{type:'text',value:'00:10',placeholder:'mm:ss'});
     return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
-  run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-c:v','libx264','-preset','veryfast','-c:a','aac',out],'Clipping'),base(f.name)+'-clip.mp4'); }});
+  run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-c:v','libx264','-pix_fmt','yuv420p','-preset','veryfast','-c:a','aac',out],'Clipping'),base(f.name)+'-clip.mp4'); }});
 add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'mute remove audio silence',
   more:'Removes the sound and keeps the picture. Good for hiding background noise before you share.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
@@ -676,9 +679,9 @@ add({cat:'dev',input:'text',nm:'Make a Text Fingerprint',ds:'Get a unique code f
 add({cat:'dev',input:'text',nm:'Read a Computer Timestamp',ds:'Turn a number timestamp into a date',kw:'timestamp epoch unix date time convert',
   more:'Computers often store time as a long number of seconds. This turns that number into a readable date, or turns a date back into the number.',
   opts:oSel('dir',[['t2d','Timestamp → date'],['d2t','Date → timestamp']],'d'),
-  run:(text,o)=>{ const v=text.trim(); if(o.d==='t2d'){ const n=+v; const ms=v.length>11?n:n*1000;
+  run:(text,o)=>{ const v=text.trim(); if(o.d==='t2d'){ const n=+v; if(!v||isNaN(n)) throw new Error('Enter a number timestamp, like 1700000000.'); const ms=v.length>11?n:n*1000;
     showText(new Date(ms).toString()+'\n'+new Date(ms).toISOString(),'date.txt'); }
-    else showText(String(Math.floor(new Date(v).getTime()/1000)),'epoch.txt'); }});
+    else { const ms=new Date(v).getTime(); if(isNaN(ms)) throw new Error('That is not a date I can read. Try like 2026-06-29.'); showText(String(Math.floor(ms/1000)),'epoch.txt'); } }});
 add({cat:'dev',input:'text',rec:1,nm:'Make a QR Code',ds:'Turn a link or text into a QR code',kw:'qr code generate make url link create barcode',
   more:'Type a web link or any text and get a QR code picture you can save or share. Pick a bigger size to make it easy to scan from far away.',
   opts:oSel('size',[['8','Medium'],['5','Small'],['13','Large']],'scale'),
@@ -845,7 +848,7 @@ function renderRun(t,fileOrFiles){
   const ni=p.querySelector('input[type=number]');
   if(state.pendingMb!=null && ni){ ni.value=state.pendingMb; state.pendingMb=null; }
   const go=el('button',{className:'btn',textContent:'Run '+t.nm});
-  const ch=el('button',{className:'btn ghost',textContent:'Choose different file'}); ch.onclick=()=>openTool(t);
+  const ch=el('button',{className:'btn ghost',textContent:'Choose different file'}); ch.onclick=()=>pickFiles(false,fs=>{ state.file=fs[0]; renderRun(t,fs[0]); });
   go.onclick=async()=>{ go.disabled=true; clearStatus(); $('#output').innerHTML='';
     try{ await t.run(fileOrFiles,get()); }catch(e){ fail(e); } finally{ go.disabled=false; } };
   p.append(el('div',{className:'runrow'},[go, t.multi?null:ch]));
@@ -884,11 +887,9 @@ fetch('/api/update-check').then(r=>r.ok?r.json():null).then(j=>{
 }).catch(()=>{});
 function codeLine(cmd){ return el('div',{style:'font:12px var(--mono);background:var(--well);border:2px solid;border-color:var(--sb);padding:8px 10px;margin:6px 0'},cmd); }
 function installPanel(p,needs){
-  const tool = 'yt-dlp';
-  p.append(el('div',{className:'ds',style:'margin-bottom:8px'},`${tool} isn’t installed on this machine, so this tool can’t run yet.`));
+  p.append(el('div',{className:'ds',style:'margin-bottom:8px'},'The downloader (yt-dlp) isn’t available, so this tool can’t run yet.'));
   const box=el('div',{className:'opts',style:'font:13px var(--sans)'});
-  box.append(el('div',{},'Install it once in Terminal:'), codeLine('brew install yt-dlp ffmpeg'));
-  box.append(el('div',{className:'note',style:'margin-top:8px'},'Then quit start.command, run it again, and reload this page.'));
+  box.append(el('div',{},'Junk Drawer normally bundles it. Reinstall the latest version to restore it, then reopen the app.'));
   p.append(box);
   p.append(el('div',{className:'runrow'},[ (()=>{ const b=el('button',{className:'btn ghost',textContent:'Close'}); b.onclick=resetStage; return b; })() ]));
 }
@@ -896,10 +897,10 @@ function renderUrl(t){ const color=CATS[t.cat].color; openStage();
   const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',color);
   p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:t.nm}),el('span',{className:'badge',textContent:CATS[t.cat].label})]));
   p.append(el('div',{className:'ds',textContent:t.more||t.ds}));
-  if(!backend.up){ p.append(el('div',{className:'opts'},[el('div',{},'The link-download tools need the local server. Launch the app with start.command (not by opening index.html directly), then reload.')]));
+  if(!backend.up){ p.append(el('div',{className:'opts'},[el('div',{},'The link tools need the app’s local server. Open Junk Drawer itself (not the HTML in a browser), then reload.')]));
     p.append(el('div',{className:'runrow'},[ (()=>{ const b=el('button',{className:'btn ghost',textContent:'Close'}); b.onclick=resetStage; return b; })() ])); return; }
   if(t.needs && !backend.ok[t.needs]){ return installPanel(p,t.needs); }
-  if(!backend.ok.ffmpeg){ p.append(el('div',{className:'note',style:'margin:2px 0 6px'},'Heads up: ffmpeg isn’t installed. It’s needed to merge HD video and to make MP3s. Run: brew install ffmpeg')); }
+  if(!backend.ok.ffmpeg){ p.append(el('div',{className:'note',style:'margin:2px 0 6px'},'Heads up: ffmpeg isn’t available, which HD video and MP3s need. Reinstall Junk Drawer to restore it.')); }
   const inp=el('input',{type:'text',placeholder: t.mode==='spotify'?'https://open.spotify.com/track/…':'https://www.youtube.com/watch?v=…', style:'width:460px;max-width:100%'});
   if(state.pendingUrl){ inp.value=state.pendingUrl; state.pendingUrl=null; }
   p.append(el('div',{className:'opts'},[el('label',{},['link ',inp])]));
@@ -914,9 +915,9 @@ async function postDownload(url,mode){
   progress('Fetching from the web (this can take a while for video)');
   const r=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,mode})});
   if(!r.ok){ let msg; try{ const j=await r.json();
-      if(j.error==='ytdlp-missing') msg='yt-dlp isn’t installed. Run: brew install yt-dlp ffmpeg';
+      if(j.error==='ytdlp-missing') msg='yt-dlp isn’t available. Reinstall Junk Drawer to restore it.';
       else if(j.error==='ffmpeg-missing') msg='Couldn’t find the MP3 converter (ffmpeg). Restart the app and try again.';
-      else if(j.error==='spotdl-missing') msg='spotdl isn’t installed. Run: pip3 install spotdl';
+      else if(j.error==='spotdl-missing') msg='spotdl isn’t installed. Install it with pip: pip install spotdl';
       else if(j.error==='tool-failed') msg='The downloader errored. Last lines:\n'+(j.detail||'').split('\n').filter(Boolean).slice(-4).join('\n');
       else msg=j.error||('HTTP '+r.status);
     }catch{ msg='HTTP '+r.status; } throw new Error(msg); }
@@ -926,7 +927,7 @@ async function postDownload(url,mode){
 }
 
 function openStage(){ $('#stage').style.display='block'; $('#stage').scrollIntoView({behavior:'smooth',block:'start'}); }
-function resetStage(){ $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; }
+function resetStage(){ $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; freeResUrls(); }
 
 /* receipt after a file is dropped */
 function showReceipt(file){
@@ -983,7 +984,7 @@ function mdToHtml(src){
     if(/^[a-z][\w+.-]*:/i.test(u))return '#';           // block javascript:, file:, etc.
     return u; };                                        // relative paths + #anchors pass through
   const inline=raw=>{ let t=escTxt(raw);
-    t=t.replace(/!\[([^\]]*)\]\(\s*([^)\s]+)[^)]*\)/g,(m,a,u)=>`<img alt="${a}" src="${escAttr(safeUrl(u))}">`);
+    t=t.replace(/!\[([^\]]*)\]\(\s*([^)\s]+)[^)]*\)/g,(m,a,u)=>`<img alt="${escAttr(a)}" src="${escAttr(safeUrl(u))}">`);
     t=t.replace(/\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g,(m,a,u)=>`<a href="${escAttr(safeUrl(u))}" target="_blank" rel="noopener">${a}</a>`);
     t=t.replace(/`([^`]+)`/g,(m,c)=>`<code>${c}</code>`);
     t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
