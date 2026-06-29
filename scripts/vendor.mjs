@@ -38,8 +38,11 @@ await build({ ...common, entryPoints: [path.join(root, 'node_modules/@ffmpeg/ffm
 const cp = (from, to) => cpSync(path.join(root, from), path.join(V, to), { recursive: true });
 cp('node_modules/pdfjs-dist/build/pdf.min.mjs', 'pdfjs/pdf.min.mjs');
 cp('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'pdfjs/pdf.worker.min.mjs');
-cp('node_modules/@ffmpeg/core-mt/dist/umd', 'ffmpeg/core-mt');  // ffmpeg-core.{js,wasm,worker.js}
-cp('node_modules/@ffmpeg/core/dist/umd', 'ffmpeg/core');        // ffmpeg-core.{js,wasm}
+// ESM builds (not UMD): @ffmpeg/ffmpeg runs its worker as type:"module", where
+// importScripts() is unavailable, so it loads the core via `import(coreURL).default`.
+// The UMD core has no default export → "failed to import ffmpeg-core.js". ESM has it.
+cp('node_modules/@ffmpeg/core-mt/dist/esm', 'ffmpeg/core-mt');  // ffmpeg-core.{js,wasm,worker.js}
+cp('node_modules/@ffmpeg/core/dist/esm', 'ffmpeg/core');        // ffmpeg-core.{js,wasm}
 cp('node_modules/@imgly/background-removal-data/dist', 'imgly/data');  // the background-removal model
 
 console.log('vendor/ rebuilt');
