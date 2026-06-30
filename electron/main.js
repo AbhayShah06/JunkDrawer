@@ -6,6 +6,27 @@ const { autoUpdater } = require('electron-updater');
 
 let win, srv;
 
+// Files opened from the OS ("Open with → Junk Drawer" on a PDF/Markdown/text file).
+// We queue the absolute path; the local server hands its bytes to the renderer via
+// /api/opened-file, which loads it into the read-only viewer.
+let pendingOpenPath = null;
+const OPENABLE = /\.(pdf|md|markdown|txt|text|log|csv|json)$/i;
+const opener = { take: () => { const p = pendingOpenPath; pendingOpenPath = null; return p; } };
+function queueOpen(p) {
+  if (!p || !OPENABLE.test(p)) return;
+  try { if (!fs.existsSync(p)) return; } catch { return; }
+  pendingOpenPath = p;
+  if (win) { try { win.focus(); win.webContents.focus(); } catch {} }
+}
+// On Windows the opened file arrives as a command-line argument; pick the last real, openable path.
+function argvOpenPath(argv) {
+  for (let i = argv.length - 1; i >= 1; i--) {
+    const a = argv[i];
+    if (a && !a.startsWith('-') && OPENABLE.test(a)) { try { if (fs.existsSync(a)) return a; } catch {} }
+  }
+  return null;
+}
+
 // ---- in-app auto-update. Windows only: electron-updater downloads the new build from
 // the GitHub release and applies it on restart. macOS needs a signed app for Squirrel.Mac,
 // so there it stays disabled and the renderer falls back to opening the release page.
@@ -89,8 +110,10 @@ async function create() {
   // Don't nag about updates while developing (npm start) — only the packaged app checks.
   process.env.JD_DEV = app.isPackaged ? '' : '1';
   updater.enabled = app.isPackaged && process.platform === 'win32';
-  const { port, server } = await startServer(appRoot(), binDir(), updater);
+  const { port, server } = await startServer(appRoot(), binDir(), updater, opener);
   srv = server;
+  // Launched by opening a file? Queue it so the renderer picks it up on first load.
+  if (!pendingOpenPath) { const initial = argvOpenPath(process.argv); if (initial) pendingOpenPath = initial; }
   if (updater.enabled) updater.check();
   win = new BrowserWindow({
     width: 1180, height: 840, minWidth: 720, minHeight: 560,
@@ -130,7 +153,15 @@ app.on('web-contents-created', (_e, contents) => {
   contents.on('will-attach-webview', (e) => e.preventDefault());
 });
 
-app.whenReady().then(create);
-app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) create(); });
+// Single instance: a second "Open with → Junk Drawer" should focus this window and queue
+// the new file, not launch a duplicate app.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', (_e, argv) => { const p = argvOpenPath(argv); if (p) queueOpen(p); else if (win) { try { win.focus(); } catch {} } });
+  app.on('open-file', (e, p) => { e.preventDefault(); queueOpen(p); });   // macOS delivers file-opens here
+  app.whenReady().then(create);
+  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) create(); });
+}
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('quit', () => { try { srv && srv.close(); } catch {} });

@@ -263,7 +263,7 @@ function localOnly(req, expectedHost) {
   return true;
 }
 
-function startServer(appRoot, binDir, updater) {
+function startServer(appRoot, binDir, updater, opener) {
   return new Promise(resolve => {
     let expectedHost = null;  // set once the ephemeral port is known (below)
     const rootResolved = path.resolve(appRoot);
@@ -298,6 +298,15 @@ function startServer(appRoot, binDir, updater) {
       if (url === '/api/ffmpeg-progress')
         return sendJSON(res, { percent: ffProgress.get(new URLSearchParams(req.url.split('?')[1] || '').get('id') || '') || 0 });
       if (url === '/api/ffmpeg' && req.method === 'POST') return handleFFmpeg(req, res, binDir);
+      // A file the user opened from the OS ("Open with → Junk Drawer"). main.js queues its
+      // absolute path; we read it once and hand the renderer the bytes for the viewer. The
+      // path is set only by main.js from OS open events — never from client input.
+      if (url === '/api/opened-file') {
+        const p = opener && opener.take && opener.take();
+        if (!p) return sendJSON(res, { none: true });
+        try { return sendJSON(res, { name: path.basename(p), b64: fs.readFileSync(p).toString('base64') }); }
+        catch { return sendJSON(res, { none: true }); }
+      }
       // Static files, confined to appRoot. Reject backslashes/NUL (Windows traversal),
       // then require the resolved path to sit on a separator boundary inside the root
       // (so a sibling like app.asar.unpacked can't satisfy a loose prefix match).

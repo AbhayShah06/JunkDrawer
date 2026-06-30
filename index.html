@@ -239,9 +239,10 @@
 </head>
 <body>
 <header><div class="topbar">
-  <div class="brand"><span class="mk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16"/><path d="M3 12h18M9.5 8h5M9.5 16h5"/></svg></span>Junk&nbsp;Drawer
+  <div class="brand" id="brandHome" title="Start over" style="cursor:pointer"><span class="mk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16"/><path d="M3 12h18M9.5 8h5M9.5 16h5"/></svg></span>Junk&nbsp;Drawer
     <small>every annoying file tool in one place</small></div>
   <nav>
+    <a href="#" id="resetBtn" title="Clear everything and start over">↺ Reset</a>
     <a href="#" id="themeToggle">Theme</a>
     <a href="#cabinet">Tools</a>
     <a href="#" id="navPrivacy">Privacy</a>
@@ -415,7 +416,9 @@ function videoDuration(file){ return new Promise(res=>{ const v=document.createE
 /* ---------------- image primitives ---------------- */
 async function toImage(file){ let src=file; const e=ext(file.name);
   if(e==='heic'||e==='heif'){ const h=(await import("./vendor/heic2any.mjs")).default;
-    src=await h({blob:file,toType:'image/png'}); }
+    try{ src=await h({blob:file,toType:'image/png'}); }
+    catch{ throw new Error('Could not read that iPhone photo — it may be an unsupported HEIC variant. Try a different photo, or save it as JPG on your phone first.'); }
+    if(Array.isArray(src)) src=src[0]; }  // Live Photos / bursts decode to several frames — use the first
   const url=URL.createObjectURL(src); const img=new Image();
   await new Promise((ok,no)=>{ img.onload=ok; img.onerror=()=>no(new Error('Could not read that image')); img.src=url; });
   return {img,url}; }
@@ -737,10 +740,10 @@ add({cat:'pdf',kinds:['pdf'],multi:1,nm:'Combine PDFs',ds:'Join several PDFs int
       (await m.copyPages(d,d.getPageIndices())).forEach(p=>m.addPage(p)); }
     showResult(new Blob([await m.save()],{type:'application/pdf'}),'merged.pdf'); }});
 
-/* ---- OPEN / READ (read-only preview; nothing leaves the machine) ---- */
-add({cat:'doc',kinds:['pdf','doc'],rec:1,custom:f=>openViewer(f),nm:'Open & Preview',ds:'Read a PDF, Markdown, or text file right here',
-  kw:'open view preview read pdf markdown md text txt log reader quick look display show render document',
-  more:'Opens a PDF, Markdown (.md), or plain-text file right in the app so you can read it without another program. PDFs show every page; Markdown is rendered with headings, lists, and links. Nothing leaves your computer.'});
+/* ---- OPEN / READ (read-only preview) ----
+   No longer a tool tile: the viewer (openViewer) is reached by right-clicking a PDF/MD/TXT
+   in the OS and choosing "Open with → Junk Drawer". main.js queues the file and index.html
+   loads it via /api/opened-file on startup/focus. */
 
 /* ---- DATA ---- */
 add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'CSV to JSON',ds:'Turn a spreadsheet into JSON',kw:'csv json convert data table',
@@ -817,19 +820,6 @@ add({cat:'dev',input:'text',nm:'Morse Code',ds:'English ↔ Morse code',kw:'mors
     else out=text.trim().split(/\s*\/\s*/).map(w=>w.split(/\s+/).map(s=>UNMORSE[s]||'').join('')).join(' ');
     showText(out,'morse.txt'); }});
 
-/* ---- ARCHIVE ---- */
-add({cat:'arc',kinds:['archive'],rec:1,nm:'Unzip a File',ds:'Pull the files out of a .zip',kw:'unzip extract archive open zip',
-  more:'Opens a .zip and pulls the files back out. It also clears out the hidden Mac junk that zips often carry.',
-  run:async f=>{ const onP=progress('Unpacking'); onP(.3); const data=new Uint8Array(await f.arrayBuffer()); const files=unzipSync(data);
-    const out=Object.entries(files).filter(([n])=>!n.endsWith('/')&&!n.startsWith('__MACOSX')).map(([name,d])=>({name,data:d}));
-    if(!out.length)throw new Error('Empty or unsupported archive (only .zip is supported here).');
-    showMulti(out,base(f.name)+'-unpacked.zip',`unpacked ${out.length} files (re-zipped, junk removed).`); }});
-add({cat:'arc',multi:1,nm:'Zip Files',ds:'Put several files into one .zip',kw:'zip compress archive bundle package',
-  more:'Bundles the files you drop in into one .zip, handy for sending. Drop more than one file to use it.',
-  run:async fs=>{ const onP=progress('Zipping'); const entries={};
-    for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); entries[fs[i].name]=new Uint8Array(await fs[i].arrayBuffer()); }
-    showMulti(Object.entries(entries).map(([name,data])=>({name,data})),'bundle.zip'); }});
-
 /* ---- WEIRD ---- */
 add({cat:'weird',kinds:['any'],rec:1,nm:'Look Inside a File',ds:'See what a file really is',kw:'inspect identify type metadata what is detective info magic',
   more:'Tells you what a file truly is even when its name lies, plus its size and a unique fingerprint. The file stays on your computer.',
@@ -884,7 +874,7 @@ function bindTip(node,text){ if(!text)return;
 
 /* drawers */
 /* starred + recent quick-access tools (no forced setup — recents fill in as you go) */
-const STARRED=['Remove Background','Shrink File Size','Shrink a Video','Sign & Fill PDF','Open & Preview','iPhone Photo to JPG'];
+const STARRED=['Remove Background','Shrink File Size','Shrink a Video','Sign & Fill PDF','iPhone Photo to JPG'];
 function recentList(){ try{ return JSON.parse(localStorage.getItem('jd-recent')||'[]'); }catch{ return []; } }
 function pushRecent(nm){ let r=recentList().filter(x=>x!==nm); r.unshift(nm); try{ localStorage.setItem('jd-recent',JSON.stringify(r.slice(0,5))); }catch{} }
 function renderQuick(){
@@ -897,6 +887,7 @@ function renderQuick(){
 function buildDrawers(){
   const host=$('#drawers');
   for(const id in CATS){ const c=CATS[id]; const tools=T.filter(t=>t.cat===id);
+    if(!tools.length) continue;  // skip categories with no tools (archive/open were removed)
     const d=el('div',{className:'drawer'}); d.style.setProperty('--c',c.color);
     const tab=el('button',{className:'drawer-tab'},[
       el('span',{className:'ico'},[svg(c.icon)]),
@@ -1076,12 +1067,11 @@ function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
     el('button',{className:'clearbtn',textContent:'✕ clear'})]));
   card.querySelector('.clearbtn').onclick=clearAll;
   card.append(el('div',{className:'meta',innerHTML:fs.map(f=>`<div>${esc(f.name)} <span class="k">(${fmt(f.size)})</span></div>`).join('')}));
-  card.append(el('div',{className:'want',textContent:'batch actions:'}));
   const rr=el('div',{className:'recos'});
-  rr.append(reco('Zip Files',()=>{ const t=T.find(x=>x.nm==='Zip Files'); renderRun(t,fs); $('#panel .btn').click(); }));
   if(allPdf) rr.append(reco('Merge PDFs',()=>{ const t=T.find(x=>x.nm==='Combine PDFs'); renderRun(t,fs); $('#panel .btn').click(); }));
   if(allImg) rr.append(reco('Images → one PDF',()=>imagesToPdf(fs)));
-  card.append(rr); r.append(card); r.scrollIntoView({behavior:'smooth'});
+  if(rr.children.length){ card.append(el('div',{className:'want',textContent:'batch actions:'})); card.append(rr); }
+  r.append(card); r.scrollIntoView({behavior:'smooth'});
 }
 const reco=(label,fn)=>{ const b=el('button',{className:'reco',textContent:label}); b.onclick=fn; return b; };
 
@@ -1443,6 +1433,22 @@ function svg(path){ const ns='http://www.w3.org/2000/svg'; const s=document.crea
 buildDrawers();
 renderQuick();
 $('#allToggle').onclick=()=>{ const open=$('#cabinet').classList.toggle('open'); $('#drawerwrap').hidden=!open; };
+// Always-available reset: the brand logo and the "↺ Reset" nav link both clear everything
+// and return to the start screen, from anywhere in the app.
+const goHome=e=>{ if(e)e.preventDefault(); clearAll(); window.scrollTo(0,0); };
+$('#resetBtn').onclick=goHome; $('#brandHome').onclick=goHome;
+
+// Opened from the OS ("Open with → Junk Drawer" on a PDF/MD/TXT): main.js queues the file
+// and exposes it at /api/opened-file. Pull it on startup and whenever the window regains
+// focus (a second "Open with" while we're already running focuses us and re-queues).
+async function checkOpenedFile(){
+  try{ const j=await (await fetch('/api/opened-file')).json();
+    if(j && j.name && j.b64){ const bin=atob(j.b64); const u=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+      openViewer(new File([u], j.name)); } }catch{}
+}
+window.addEventListener('focus', checkOpenedFile);
+checkOpenedFile();
 console.log('%cJunk Drawer ready · '+T.length+' tools','color:#000080;font-weight:bold');
 </script>
 </body>

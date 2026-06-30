@@ -1,6 +1,6 @@
 {
   "name": "junk-drawer",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "Every annoying file tool in one place.",
   "author": "Abhay Shah",
   "license": "MIT",
@@ -35,6 +35,12 @@
   "build": {
     "appId": "vc.axl.junkdrawer",
     "productName": "Junk Drawer",
+    "fileAssociations": [
+      { "ext": "pdf", "name": "PDF Document", "role": "Viewer" },
+      { "ext": "md", "name": "Markdown Document", "role": "Viewer" },
+      { "ext": "markdown", "name": "Markdown Document", "role": "Viewer" },
+      { "ext": "txt", "name": "Text Document", "role": "Viewer" }
+    ],
     "files": [
       "index.html",
       "electron/**/*",
