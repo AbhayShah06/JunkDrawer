@@ -84,6 +84,7 @@
   .receipt .meta .k{color:var(--ink2)}
   .receipt .preview{margin:9px 0; background:var(--well); border:2px solid; border-color:var(--sb); padding:8px; display:flex; justify-content:center}
   .receipt .preview img{max-width:100%; max-height:220px; display:block}
+  .receipt .preview-load{color:var(--ink2); font:11px var(--mono); letter-spacing:.5px; padding:34px 0}
   .receipt .want{margin-top:12px; font:bold 11px var(--mono); text-transform:uppercase; letter-spacing:.5px; color:var(--ink2)}
   .recos{display:flex; flex-wrap:wrap; gap:7px; margin-top:8px}
   .reco{font:bold 12px var(--sans); background:var(--face); color:var(--ink); border:2px solid; border-color:var(--rb);
@@ -348,6 +349,10 @@ function kind(f){ const e=ext(f.name);
 /* ---------------- lazy heavy deps ---------------- */
 let _bg=null, _bgGpu=null;  // _bgGpu: null=untried, true=GPU works, false=fell back to CPU
 async function bgRemove(blob,onP){ if(!_bg) _bg=(await import("./vendor/imgly/background-removal.mjs")).removeBackground;
+  // imgly can't decode HEIC, so an iPhone photo would fail outright — convert it to PNG first.
+  const e=blob.name?ext(blob.name):'';
+  if(e==='heic'||e==='heif'){ const {img,url}=await toImage(blob); const c=el('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
+    c.getContext('2d').drawImage(img,0,0); URL.revokeObjectURL(url); blob=await blobOf(c,'image/png'); }
   const base={publicPath:new URL('vendor/imgly/data/',location.origin+'/').href,progress:(k,c,t)=>onP&&onP(c/t)};
   // WebGPU (when present) runs the segmentation model far faster than the wasm CPU path.
   // The jsep/WebGPU runtime is vendored locally, so this stays fully offline. Fall back to
@@ -1040,7 +1045,7 @@ function showReceipt(file){
     el('button',{className:'clearbtn',textContent:'✕ clear'},[])]));
   card.querySelector('.clearbtn').onclick=clearAll;
   r.append(card);
-  if(k==='image') addPreview(card,file);
+  if(k==='image'||k==='video') addPreview(card,file,k);
   meta(file,k).then(m=>{ const md=el('div',{className:'meta'}); md.innerHTML=m; card.insertBefore(md,card.children[1]||null);
     const recos=T.filter(t=>t.rec && (t.kinds&&(t.kinds.includes(k)||t.kinds.includes('any'))));
     if(recos.length){ card.append(el('div',{className:'want',textContent:'What you can do'}));
@@ -1055,17 +1060,33 @@ function showReceipt(file){
 }
 // Low-res thumbnail of an uploaded image so you can see what you dropped — uses toImage,
 // so it works for any format we can decode (incl. HEIC, which a browser <img> can't show).
-async function addPreview(card,file){
+// Thumbnail of an uploaded image/video in the receipt. Shows a loading placeholder
+// immediately (HEIC + video frames take a moment to decode), then swaps in the thumbnail.
+async function addPreview(card,file,k){
+  const box=el('div',{className:'preview'},[el('span',{className:'preview-load',textContent:'rendering preview…'})]);
+  card.insertBefore(box, card.children[1]||null);
+  const thumb=(w,h,draw)=>{ const max=260, sc=Math.min(1,(max/Math.max(w,h))||1);
+    const c=el('canvas'); c.width=Math.max(1,Math.round(w*sc)); c.height=Math.max(1,Math.round(h*sc));
+    draw(c.getContext('2d'),c.width,c.height); return c.toDataURL('image/png'); };
   try{
-    const {img,url}=await toImage(file);
-    const max=260, sc=Math.min(1, (max/Math.max(img.naturalWidth,img.naturalHeight))||1);
-    const c=el('canvas'); c.width=Math.max(1,Math.round(img.naturalWidth*sc)); c.height=Math.max(1,Math.round(img.naturalHeight*sc));
-    c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
-    if(state.file!==file) return;  // a newer file was dropped while we were decoding — don't clobber it
-    const prev=el('div',{className:'preview'},[el('img',{src:c.toDataURL('image/png'),alt:'preview of '+file.name})]);
-    card.insertBefore(prev, card.children[1]||null);
-  }catch{}
+    let dataUrl;
+    if(k==='video'){ dataUrl=await videoThumb(file); }
+    else { const {img,url}=await toImage(file); dataUrl=thumb(img.naturalWidth,img.naturalHeight,(x,w,h)=>x.drawImage(img,0,0,w,h)); URL.revokeObjectURL(url); }
+    if(state.file!==file){ box.remove(); return; }  // a newer file was dropped while decoding
+    box.innerHTML=''; box.append(el('img',{src:dataUrl,alt:'preview of '+file.name}));
+  }catch{ box.remove(); }  // no preview available for this file — just drop the placeholder
 }
+// Grab the first frame of a video as a thumbnail (browser-decoded; bails on codecs Chromium can't play).
+function videoThumb(file){ return new Promise((res,rej)=>{
+  const v=document.createElement('video'); v.muted=true; v.preload='metadata'; const url=URL.createObjectURL(file);
+  const to=setTimeout(()=>{ URL.revokeObjectURL(url); rej(new Error('timeout')); }, 6000);
+  const draw=()=>{ try{ const max=260, sc=Math.min(1,(max/Math.max(v.videoWidth,v.videoHeight))||1);
+      const c=el('canvas'); c.width=Math.max(1,Math.round(v.videoWidth*sc)); c.height=Math.max(1,Math.round(v.videoHeight*sc));
+      c.getContext('2d').drawImage(v,0,0,c.width,c.height); clearTimeout(to); URL.revokeObjectURL(url); res(c.toDataURL('image/png')); }
+    catch(err){ clearTimeout(to); URL.revokeObjectURL(url); rej(err); } };
+  v.onloadeddata=()=>{ try{ v.currentTime=Math.min(0.1,(v.duration||1)/2); }catch{ draw(); } };
+  v.onseeked=draw; v.onerror=()=>{ clearTimeout(to); URL.revokeObjectURL(url); rej(new Error('decode failed')); };
+  v.src=url; }); }
 async function meta(file,k){ let extra='';
   try{ if(k==='image'){ const {img,url}=await toImage(file); extra=`<div><span class="k">size  </span> ${img.naturalWidth}×${img.naturalHeight}px</div>`; URL.revokeObjectURL(url); }
     if(k==='video'){ const d=await videoDuration(file); if(d)extra=`<div><span class="k">length</span> ${d.toFixed(1)}s</div>`; } }catch{}
