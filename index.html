@@ -82,6 +82,8 @@
   .receipt .hd b{font:bold 11px var(--mono); letter-spacing:.5px; text-transform:uppercase}
   .receipt .meta{font-size:12px; color:var(--ink); line-height:1.7; background:var(--well); border:2px solid; border-color:var(--sb); padding:9px 11px}
   .receipt .meta .k{color:var(--ink2)}
+  .receipt .preview{margin:9px 0; background:var(--well); border:2px solid; border-color:var(--sb); padding:8px; display:flex; justify-content:center}
+  .receipt .preview img{max-width:100%; max-height:220px; display:block}
   .receipt .want{margin-top:12px; font:bold 11px var(--mono); text-transform:uppercase; letter-spacing:.5px; color:var(--ink2)}
   .recos{display:flex; flex-wrap:wrap; gap:7px; margin-top:8px}
   .reco{font:bold 12px var(--sans); background:var(--face); color:var(--ink); border:2px solid; border-color:var(--rb);
@@ -1038,6 +1040,7 @@ function showReceipt(file){
     el('button',{className:'clearbtn',textContent:'✕ clear'},[])]));
   card.querySelector('.clearbtn').onclick=clearAll;
   r.append(card);
+  if(k==='image') addPreview(card,file);
   meta(file,k).then(m=>{ const md=el('div',{className:'meta'}); md.innerHTML=m; card.insertBefore(md,card.children[1]||null);
     const recos=T.filter(t=>t.rec && (t.kinds&&(t.kinds.includes(k)||t.kinds.includes('any'))));
     if(recos.length){ card.append(el('div',{className:'want',textContent:'What you can do'}));
@@ -1049,6 +1052,19 @@ function showReceipt(file){
     // off-screen, making a fresh drop look like it did nothing.
     requestAnimationFrame(()=>r.scrollIntoView({behavior:'smooth',block:'start'}));
   });
+}
+// Low-res thumbnail of an uploaded image so you can see what you dropped — uses toImage,
+// so it works for any format we can decode (incl. HEIC, which a browser <img> can't show).
+async function addPreview(card,file){
+  try{
+    const {img,url}=await toImage(file);
+    const max=260, sc=Math.min(1, (max/Math.max(img.naturalWidth,img.naturalHeight))||1);
+    const c=el('canvas'); c.width=Math.max(1,Math.round(img.naturalWidth*sc)); c.height=Math.max(1,Math.round(img.naturalHeight*sc));
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+    if(state.file!==file) return;  // a newer file was dropped while we were decoding — don't clobber it
+    const prev=el('div',{className:'preview'},[el('img',{src:c.toDataURL('image/png'),alt:'preview of '+file.name})]);
+    card.insertBefore(prev, card.children[1]||null);
+  }catch{}
 }
 async function meta(file,k){ let extra='';
   try{ if(k==='image'){ const {img,url}=await toImage(file); extra=`<div><span class="k">size  </span> ${img.naturalWidth}×${img.naturalHeight}px</div>`; URL.revokeObjectURL(url); }
