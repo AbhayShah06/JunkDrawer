@@ -169,6 +169,9 @@
   .prog>i{display:block; height:100%; width:0; background:var(--vid); transition:width .2s;
     background-image:linear-gradient(90deg,#0000 0 50%,#ffffff22 50% 100%); background-size:12px 100%}
   .err{color:var(--pdf); font:bold 12.5px var(--sans); margin-top:9px}
+  .guide{margin-top:10px; background:var(--well); border:2px solid; border-color:var(--sb); padding:11px 13px; font:13px/1.5 var(--sans); color:var(--ink)}
+  .guide .g-t{font-weight:bold; margin-bottom:3px}
+  .guide .g-act{margin-top:10px}
   /* result */
   .result{background:var(--face); border:2px solid var(--ok); padding:14px 16px; margin-top:14px}
   .result h3{margin:0 0 3px; font:bold 14px var(--sans)}
@@ -243,7 +246,7 @@
 <body>
 <header><div class="topbar">
   <div class="brand" id="brandHome" title="Start over" style="cursor:pointer"><span class="mk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16"/><path d="M3 12h18M9.5 8h5M9.5 16h5"/></svg></span>Junk&nbsp;Drawer
-    <small>every annoying file tool in one place</small></div>
+    <small>It just works</small></div>
   <nav>
     <a href="#" id="resetBtn" title="Clear everything and start over">↺ Reset</a>
     <a href="#" id="themeToggle">Theme</a>
@@ -462,7 +465,51 @@ function jsonToCSV(text){ const a=JSON.parse(text); if(!Array.isArray(a))throw n
 function progress(label){ $('#status').innerHTML=`<div><span class="spin"></span>${label} …</div><div class="prog"><i id="bar"></i></div>`;
   return p=>{ const b=$('#bar'); if(b)b.style.width=Math.round((p||0)*100)+'%'; }; }
 const clearStatus=()=>{ $('#status').innerHTML=''; };
-function fail(e){ clearStatus(); $('#output').innerHTML=''; $('#status').innerHTML=`<div class="err">${esc(e&&e.message||e)}</div>`; }
+/* ---- gentle guidance instead of scary red errors ----
+   fail() is the single sink for thrown errors; friendly() maps a raw error (+ the current
+   tool/file context in state.ctx) to a kind, plain-English nudge — often with a button to
+   the tool the user probably wanted. preCheck() catches misuse BEFORE running. */
+const KINDWORD={image:'photo',video:'video',audio:'sound file',pdf:'PDF',archive:'zip file',data:'data file',doc:'document'};
+// a tool of the file's kind whose name best matches the current tool's intent (shared word)
+function suggestFor(t,fk){ const words=(t&&t.nm||'').toLowerCase().split(/\W+/).filter(w=>w.length>3);
+  const cand=T.filter(x=>x.kinds&&x.kinds.includes(fk)&&x!==t);
+  return cand.find(x=>words.some(w=>x.nm.toLowerCase().includes(w))) || cand.find(x=>x.rec) || cand[0] || null; }
+function friendly(e,t,f){
+  const raw=((e&&e.message)||String(e||'')).toLowerCase();
+  const M=[
+    [/failed to parse|no pdf header|not a valid pdf|invalid pdf|pdf.* header/, "This doesn’t look like a real PDF inside. If it’s a Word document, open it and choose Save As → PDF first, then try again."],
+    [/is encrypted|encrypted pdf|password/, "This PDF is locked with a password. Open it, type the password, and save an unlocked copy — then bring that one here."],
+    [/invalid data found|does not contain any stream|moov atom|could not find codec|invalid duration|does not contain|no such file|codec not/, "This file doesn’t look like the video or audio this tool expects. Double-check you picked the right file."],
+    [/unexpected token|unexpected end of json|not valid json|expected property name|in json at position/, "That isn’t valid JSON — check for a missing comma, quote, or bracket."],
+    [/must be an array|array of objects/, "This tool needs a list of items, like [ {…}, {…} ]. Wrap your data in square brackets and try again."],
+    [/invalidcharacter|uri malformed|failed to execute 'atob'|atob/, "That doesn’t look like the right format to un-scramble — did you mean to Encode instead?"],
+    [/tool-failed|downloader errored|no-output|unsupported url|unable to download/, "Couldn’t fetch that. The video may be private, removed, age-restricted, or need a sign-in — try one that plays for you, and check you’re online."],
+    [/ytdlp-missing|ffmpeg-missing|spotdl-missing|isn.t available|is missing/, "A needed helper is missing from this copy. Reinstall the latest Junk Drawer to restore it, then reopen the app."],
+    [/no qr|find a qr|detect|couldn.t find a qr/, "Couldn’t find a QR code in that image — try a sharper, straight-on picture of the code."],
+  ];
+  for(const [re,msg] of M){ if(re.test(raw)) return {msg}; }
+  return {msg:(e&&e.message)||'Something went wrong. Double-check the file and give it another go.'};
+}
+function showGuide(g){ clearStatus(); $('#output').innerHTML='';
+  const box=el('div',{className:'guide'});
+  if(g.title) box.append(el('div',{className:'g-t',textContent:g.title}));
+  box.append(el('div',{textContent:g.msg}));
+  const rt=g.redirect&&T.find(x=>x.nm===g.redirect);
+  if(rt){ const b=el('button',{className:'btn',textContent:'Use “'+rt.nm+'” instead'}); b.onclick=()=>openTool(rt);
+    box.append(el('div',{className:'g-act'},[b])); }
+  $('#status').innerHTML=''; $('#status').append(box); }
+function fail(e){ const c=state.ctx||{}; showGuide(friendly(e,c.t,c.f)); }
+// misuse caught before running: wrong file kind (→ suggest the right tool), too-few files, or a tool's own check()
+function preCheck(t,fileOrFiles,opts){
+  const multi=Array.isArray(fileOrFiles); const f=multi?fileOrFiles[0]:fileOrFiles;
+  if(t.multi && multi && fileOrFiles.length<2)
+    return {title:'Pick two or more', msg:`“${t.nm}” needs at least two files — add another and I’ll handle them together.`};
+  if(!multi && f && t.kinds && !t.kinds.includes('any')){ const fk=kind(f);
+    if(!t.kinds.includes(fk)){ const s=suggestFor(t,fk);
+      return {title:'Wrong kind of file', msg:`This looks like a ${KINDWORD[fk]||fk}, not something “${t.nm}” can use.`, redirect:s&&s.nm}; } }
+  if(t.check){ try{ const g=t.check(f,opts,fileOrFiles); if(g) return g; }catch{} }
+  return null;
+}
 let _resUrls=[];
 function freeResUrls(){ for(const u of _resUrls){ try{ URL.revokeObjectURL(u); }catch{} } _resUrls=[]; }
 function showResult(blob,filename,{note}={}){
@@ -529,11 +576,15 @@ add({cat:'image',kinds:['image'],rec:1,nm:'Remove Background',ds:'Cut out the su
 add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'Switch between PNG, JPG, and WEBP',kw:'convert format png jpg jpeg webp heic',
   more:'Change an image to PNG, JPG, or WEBP. Use JPG for photos, PNG when you need a clear background, and WEBP for websites.',
   opts:oSel('to',[['image/png','PNG'],['image/jpeg','JPG'],['image/webp','WEBP']],'type'),
+  check:(f,o)=>{ const cur=ext(f.name), tgt={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[o.type];
+    return (cur===tgt||(cur==='jpeg'&&tgt==='jpg')) ? {msg:`This picture is already a ${tgt.toUpperCase()}, so there’s nothing to change. Pick a different type — JPG for photos, PNG for a clear background, WEBP for websites.`} : null; },
   run:async (f,o)=>{ const e={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[o.type];
     showResult(await imgConvert(f,{type:o.type}),base(f.name)+'.'+e); }});
 add({cat:'image',kinds:['image'],rec:1,nm:'Shrink File Size',ds:'Squeeze an image under a size you pick',kw:'compress smaller reduce size optimize',
   more:'Make an image fit a size limit you set, like under 8 MB. It keeps the picture as big and sharp as it can while hitting your target.',
   opts:oNum('target','8','MB','mb',{min:.2,step:.5}),
+  check:(f,o)=> (!o.mb||o.mb<=0) ? {msg:'Enter a target size like 1 or 2 MB, and I’ll get the image as close as I can.'}
+    : (f && f.size<=o.mb*1048576 ? {title:'Already small enough', msg:`Good news — this image is already ${fmt(f.size)}, under your ${o.mb} MB target. Nothing to shrink! Pick a smaller number if you’d like it tinier.`} : null),
   run:async (f,o)=>{ showResult(await compressTo(f,(o.mb||8)*1048576,'image/jpeg'),base(f.name)+'-small.jpg',{note:`aimed at ${o.mb} MB`}); }});
 add({cat:'image',kinds:['image'],nm:'Resize Image',ds:'Set the longest side in pixels',kw:'resize scale dimensions shrink',
   more:'Set how long the longest side can be, so the image is no bigger than you need. For example, use 1920 pixels for the web.',
@@ -639,6 +690,8 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Video to GIF',ds:'Turn a clip into a 
 add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make the file smaller to send',kw:'compress shrink smaller size discord email tiny',
   more:'Makes a video small enough to fit an email or upload limit. You pick the size you want in MB.',
   opts:oNum('target','10','MB','mb',{min:1,step:1}),
+  check:(f,o)=> (!o.mb||o.mb<=0) ? {msg:'Enter a target size in MB, like 10 or 25.'}
+    : (f && f.size<=o.mb*1048576 ? {title:'Already small enough', msg:`This video is already ${fmt(f.size)}, under your ${o.mb} MB target — there’s nothing to shrink. Try a smaller number if you want it tinier.`} : null),
   run:async (f,o)=>{ const onP=progress('Reading length'); const dur=await videoDuration(f)||30;
     const mb=o.mb||10;
     // Split the MB budget across the whole duration. 1 MB ≈ 8388.6 kbit; keep ~8% headroom for
@@ -945,6 +998,8 @@ function renderRun(t,fileOrFiles){
   const go=el('button',{className:'btn',textContent:'Run '+t.nm});
   const ch=el('button',{className:'btn ghost',textContent:'Choose different file'}); ch.onclick=()=>pickFiles(false,fs=>{ state.file=fs[0]; renderRun(t,fs[0]); });
   go.onclick=async()=>{ go.disabled=true; clearStatus(); $('#output').innerHTML='';
+    state.ctx={t,f}; const pre=preCheck(t,fileOrFiles,get());
+    if(pre){ go.disabled=false; return showGuide(pre); }
     try{ await t.run(fileOrFiles,get()); }catch(e){ fail(e); } finally{ go.disabled=false; } };
   p.append(el('div',{className:'runrow'},[go, t.multi?null:ch]));
 }
@@ -960,6 +1015,8 @@ function renderText(t,prefill=''){ const color=CATS[t.cat].color; openStage();
   p.append(wrap);
   const go=el('button',{className:'btn',textContent:'Run '+t.nm});
   go.onclick=async()=>{ go.disabled=true; clearStatus(); $('#output').innerHTML='';
+    state.ctx={t,f:null};
+    if(!ta.value.trim()){ go.disabled=false; return showGuide({msg:'Looks like nothing was typed in yet — paste or type something first, then give it a go.'}); }
     try{ await t.run(ta.value, get()); }catch(e){ fail(e); } finally{ go.disabled=false; } };
   p.append(el('div',{className:'runrow'},[go]));
 }
@@ -1013,7 +1070,7 @@ function renderUrl(t){ const color=CATS[t.cat].color; openStage();
   p.append(el('div',{className:'opts'},[el('label',{},['link ',inp])]));
   const go=el('button',{className:'btn',textContent:'Download'});
   go.onclick=async()=>{ const url=inp.value.trim(); if(!/^https?:/i.test(url)){ toast('Paste a full https:// link'); return; }
-    go.disabled=true; clearStatus(); $('#output').innerHTML='';
+    go.disabled=true; clearStatus(); $('#output').innerHTML=''; state.ctx={t,f:null};
     try{ await postDownload(url,t.mode); }catch(e){ fail(e); } finally{ go.disabled=false; } };
   p.append(el('div',{className:'runrow'},[go]));
   setTimeout(()=>inp.focus(),0);
