@@ -706,7 +706,7 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make the file sma
     const akbps=totalKbps<300?64:128;
     const vkbps=Math.max(64,Math.floor(totalKbps-akbps));
     showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-b:v',vkbps+'k','-maxrate',vkbps+'k',
-      '-bufsize',(vkbps*2)+'k','-preset','ultrafast','-vf',"scale=-2:'min(720,ih)'",'-c:a','aac','-b:a',akbps+'k',out],'Compressing video'),
+      '-bufsize',(vkbps*2)+'k','-preset','slow','-vf',"scale=-2:'min(720,ih)',fps='min(30,source_fps)'",'-c:a','aac','-b:a',akbps+'k',out],'Compressing video'),
       base(f.name)+'-small.mp4',{note:`~${mb} MB target (${vkbps}k video, ${akbps}k audio)${vkbps===64?'. A long clip may still exceed the target':''}.`}); }});
 add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the sound out as an MP3',kw:'extract audio mp3 sound from video',
   more:'Takes just the sound from a video and saves it as an MP3 file.',
