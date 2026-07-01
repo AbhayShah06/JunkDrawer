@@ -266,13 +266,13 @@
   <section class="hero">
     <div id="drop" tabindex="0">
       <span class="big">Open a file</span>
-      <span class="sub">Click to pick one from your computer, or paste an image you copied. Photo, video, audio, PDF, Markdown, text, or zip.</span>
+      <span class="sub">Click to pick one from your computer, or paste an image. Works with photos, video, audio, PDF, Markdown, and text.</span>
     </div>
     <input type="file" id="file" multiple hidden />
 
     <div class="pasterow">
       <button class="pastebtn" id="pasteBtn">Paste an image</button>
-      <span>Copied an image somewhere? Click here, or paste it.</span>
+      <span>Copied an image? Click here, or just paste it.</span>
     </div>
 
     <div class="cmd">
@@ -387,7 +387,7 @@ async function nativeFFAvailable(){
   return _nativeFF;
 }
 async function runFF(file,outName,argsFn,label){
-  if(file.size>500*1048576) throw new Error(`This video is ${Math.round(file.size/1048576)} MB — too big to process in-app without running out of memory (the limit is about 500 MB). Try trimming it to a shorter clip first, or export a smaller version from your phone/editor.`);
+  if(file.size>500*1048576) throw new Error(`This video is ${Math.round(file.size/1048576)} MB, past the roughly 500 MB the app can handle in memory. Trim it to a shorter clip first, or export a smaller version from your phone or editor.`);
   const inName='in.'+ext(file.name);
   const args=argsFn(inName,outName);
   // Desktop app: run the bundled NATIVE ffmpeg (≈10× faster than wasm) through the
@@ -427,7 +427,7 @@ function videoDuration(file){ return new Promise(res=>{ const v=document.createE
 async function toImage(file){ let src=file; const e=ext(file.name);
   if(e==='heic'||e==='heif'){ const h=(await import("./vendor/heic2any.mjs")).default;
     try{ src=await h({blob:file,toType:'image/png'}); }
-    catch{ throw new Error('Could not read that iPhone photo — it may be an unsupported HEIC variant. Try a different photo, or save it as JPG on your phone first.'); }
+    catch{ throw new Error('Couldn’t read that iPhone photo. Try a different one, or save it as JPG on your phone first.'); }
     if(Array.isArray(src)) src=src[0]; }  // Live Photos / bursts decode to several frames — use the first
   const url=URL.createObjectURL(src); const img=new Image();
   await new Promise((ok,no)=>{ img.onload=ok; img.onerror=()=>no(new Error('Could not read that image')); img.src=url; });
@@ -477,15 +477,15 @@ function suggestFor(t,fk){ const words=(t&&t.nm||'').toLowerCase().split(/\W+/).
 function friendly(e,t,f){
   const raw=((e&&e.message)||String(e||'')).toLowerCase();
   const M=[
-    [/failed to parse|no pdf header|not a valid pdf|invalid pdf|pdf.* header/, "This doesn’t look like a real PDF inside. If it’s a Word document, open it and choose Save As → PDF first, then try again."],
+    [/failed to parse|no pdf header|not a valid pdf|invalid pdf|pdf.* header/, "This doesn’t look like a real PDF inside. If it’s a Word document, open it, choose Save As → PDF, then try again."],
     [/is encrypted|encrypted pdf|password/, "This PDF is locked with a password. Open it, type the password, and save an unlocked copy — then bring that one here."],
     [/invalid data found|does not contain any stream|moov atom|could not find codec|invalid duration|does not contain|no such file|codec not/, "This file doesn’t look like the video or audio this tool expects. Double-check you picked the right file."],
-    [/unexpected token|unexpected end of json|not valid json|expected property name|in json at position/, "That isn’t valid JSON — check for a missing comma, quote, or bracket."],
+    [/unexpected token|unexpected end of json|not valid json|expected property name|in json at position/, "That isn’t valid JSON. Check for a missing comma, quote, or bracket."],
     [/must be an array|array of objects/, "This tool needs a list of items, like [ {…}, {…} ]. Wrap your data in square brackets and try again."],
     [/invalidcharacter|uri malformed|failed to execute 'atob'|atob/, "That doesn’t look like the right format to un-scramble — did you mean to Encode instead?"],
-    [/tool-failed|downloader errored|no-output|unsupported url|unable to download/, "Couldn’t fetch that. The video may be private, removed, age-restricted, or need a sign-in — try one that plays for you, and check you’re online."],
+    [/tool-failed|downloader errored|no-output|unsupported url|unable to download/, "Couldn’t fetch that. The video may be private, removed, or need a sign-in. Try one that plays for you, and check you’re online."],
     [/ytdlp-missing|ffmpeg-missing|spotdl-missing|isn.t available|is missing/, "A needed helper is missing from this copy. Reinstall the latest Junk Drawer to restore it, then reopen the app."],
-    [/no qr|find a qr|detect|couldn.t find a qr/, "Couldn’t find a QR code in that image — try a sharper, straight-on picture of the code."],
+    [/no qr|find a qr|detect|couldn.t find a qr/, "Couldn’t find a QR code in that image. Try a sharper, straight-on picture of the code."],
   ];
   for(const [re,msg] of M){ if(re.test(raw)) return {msg}; }
   return {msg:(e&&e.message)||'Something went wrong. Double-check the file and give it another go.'};
@@ -503,7 +503,7 @@ function fail(e){ const c=state.ctx||{}; showGuide(friendly(e,c.t,c.f)); }
 function preCheck(t,fileOrFiles,opts){
   const multi=Array.isArray(fileOrFiles); const f=multi?fileOrFiles[0]:fileOrFiles;
   if(t.multi && multi && fileOrFiles.length<2)
-    return {title:'Pick two or more', msg:`“${t.nm}” needs at least two files — add another and I’ll handle them together.`};
+    return {title:'Pick two or more', msg:`“${t.nm}” needs at least two files. Add another and I’ll handle them together.`};
   if(!multi && f && t.kinds && !t.kinds.includes('any')){ const fk=kind(f);
     if(!t.kinds.includes(fk)){ const s=suggestFor(t,fk);
       return {title:'Wrong kind of file', msg:`This looks like a ${KINDWORD[fk]||fk}, not something “${t.nm}” can use.`, redirect:s&&s.nm}; } }
@@ -550,7 +550,7 @@ function showMulti(files,zipName,note){ const z=zipSync(Object.fromEntries(files
 
 /* ================= TOOL REGISTRY ================= */
 const CATS = {
-  image:{label:'Image', color:'var(--img)', icon:icon('img'),  blurb:'fix, convert, shrink, and clean up photos'},
+  image:{label:'Image', color:'var(--img)', icon:icon('img'),  blurb:'fix, convert, and shrink photos'},
   pdf:  {label:'PDF',   color:'var(--pdf)', icon:icon('doc'),   blurb:'sign, merge, split, shrink, and more'},
   doc:  {label:'Open',  color:'var(--doc)', icon:icon('eye'),   blurb:'open and read PDFs, Markdown, and text'},
   video:{label:'Video', color:'var(--vid)', icon:icon('film'), blurb:'shrink, trim, convert, grab frames'},
@@ -559,7 +559,7 @@ const CATS = {
   data: {label:'Data',  color:'var(--data)',icon:icon('grid'), blurb:'switch between spreadsheet and JSON'},
   arc:  {label:'Archive',color:'var(--arc)',icon:icon('box'),  blurb:'zip and unzip files'},
   weird:{label:'Weird', color:'var(--weird)',icon:icon('star'),blurb:'the odd jobs'},
-  dev:  {label:'Dev',   color:'var(--dev)', icon:icon('code'), blurb:'codes, data files, and QR codes'},
+  dev:  {label:'Dev',   color:'var(--dev)', icon:icon('code'), blurb:'code, data files, and QR codes'},
 };
 const T = []; // tools
 const add = t => { T.push(t); return t; };
@@ -570,7 +570,7 @@ const oSel=(label,pairs,key)=>()=>{ const s=el('select'); pairs.forEach(([v,l])=
 
 /* ---- IMAGE ---- */
 add({cat:'image',kinds:['image'],rec:1,nm:'Remove Background',ds:'Cut out the subject and get a clear PNG',kw:'remove background transparent cutout zap',
-  more:'Cuts the subject out of a photo and gives you a see-through PNG. Great for product shots, profile pics, and stickers. The first run loads a small model from the app, then it’s instant.',
+  more:'Cuts the subject out of a photo and gives you a see-through PNG. Great for product shots, profile pics, and stickers. The first run loads a small model from the app, then it works right away.',
   run:async f=>{ const onP=progress('Removing background (first run loads the model — a few seconds)'); const b=await bgRemove(f,onP);
     showResult(b,base(f.name)+'-nobg.png'); }});
 add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'Switch between PNG, JPG, and WEBP',kw:'convert format png jpg jpeg webp heic',
@@ -584,7 +584,7 @@ add({cat:'image',kinds:['image'],rec:1,nm:'Shrink File Size',ds:'Squeeze an imag
   more:'Make an image fit a size limit you set, like under 8 MB. It keeps the picture as big and sharp as it can while hitting your target.',
   opts:oNum('target','8','MB','mb',{min:.2,step:.5}),
   check:(f,o)=> (!o.mb||o.mb<=0) ? {msg:'Enter a target size like 1 or 2 MB, and I’ll get the image as close as I can.'}
-    : (f && f.size<=o.mb*1048576 ? {title:'Already small enough', msg:`Good news — this image is already ${fmt(f.size)}, under your ${o.mb} MB target. Nothing to shrink! Pick a smaller number if you’d like it tinier.`} : null),
+    : (f && f.size<=o.mb*1048576 ? {title:'Already small enough', msg:`This image is already ${fmt(f.size)}, under your ${o.mb} MB target. Pick a smaller number if you’d like it tinier.`} : null),
   run:async (f,o)=>{ showResult(await compressTo(f,(o.mb||8)*1048576,'image/jpeg'),base(f.name)+'-small.jpg',{note:`aimed at ${o.mb} MB`}); }});
 add({cat:'image',kinds:['image'],nm:'Resize Image',ds:'Set the longest side in pixels',kw:'resize scale dimensions shrink',
   more:'Set how long the longest side can be, so the image is no bigger than you need. For example, use 1920 pixels for the web.',
@@ -610,9 +610,15 @@ add({cat:'image',kinds:['image'],rec:1,nm:'Remove Hidden Info',ds:'Drop GPS, cam
 // then walks IFD0 + the Exif and GPS sub-IFDs and pulls the human-useful tags.
 function readExif(buf){
   const u8=new Uint8Array(buf), dv=new DataView(buf);
-  let tiff=-1; const lim=Math.min(u8.length-8, 6000000);
-  for(let i=0;i<lim;i++){ if(u8[i]===0x45&&u8[i+1]===0x78&&u8[i+2]===0x69&&u8[i+3]===0x66&&u8[i+4]===0&&u8[i+5]===0){ tiff=i+6; break; } }
-  if(tiff<0){ for(let i=0;i<lim;i++){ if((u8[i]===0x49&&u8[i+1]===0x49&&u8[i+2]===0x2a&&u8[i+3]===0)||(u8[i]===0x4d&&u8[i+1]===0x4d&&u8[i+2]===0&&u8[i+3]===0x2a)){ tiff=i; break; } } }
+  let tiff=-1; const lim=Math.min(u8.length-8, 20000000);
+  const isTiff=t=> t>=0 && t+8<=u8.length && ((u8[t]===0x49&&u8[t+1]===0x49&&u8[t+2]===0x2a&&u8[t+3]===0)||(u8[t]===0x4d&&u8[t+1]===0x4d&&u8[t+2]===0&&u8[t+3]===0x2a));
+  // "Exif\0\0" (JPEG APP1) — but ONLY if a real TIFF header follows. A HEIC's box structure holds
+  // a decoy "Exif\0\0" (in iinf) that isn't the photo's EXIF, so the header check is required.
+  for(let i=0;i<lim;i++){ if(u8[i]===0x45&&u8[i+1]===0x78&&u8[i+2]===0x69&&u8[i+3]===0x66&&u8[i+4]===0&&u8[i+5]===0&&isTiff(i+6)){ tiff=i+6; break; } }
+  // else the raw TIFF header (HEIC stores its Exif item as TIFF with no "Exif\0\0" prefix); require
+  // a sane IFD0 entry count so we don't latch onto random II*/MM* bytes inside the image data.
+  if(tiff<0){ for(let i=0;i<lim;i++){ if(isTiff(i)){ const l=u8[i]===0x49, off=dv.getUint32(i+4,l), base=i+off;
+    if(off>=8&&base+2<=u8.length){ const n=dv.getUint16(base,l); if(n>=1&&n<=512){ tiff=i; break; } } } } }
   if(tiff<0||tiff+8>u8.length) return null;
   const le=u8[tiff]===0x49, rd16=a=>dv.getUint16(a,le), rd32=a=>dv.getUint32(a,le);
   if(rd16(tiff+2)!==0x2a) return null;
@@ -643,7 +649,7 @@ function readExif(buf){
   return Object.keys(out).length?out:null;
 }
 add({cat:'image',kinds:['image','pdf'],rec:1,nm:'See Hidden Info',ds:'Read the GPS, camera, and date tags',kw:'metadata exif gps location camera date read see info hidden pdf author show',
-  more:'Shows the hidden tags inside a photo (where and when it was taken, the camera) or a PDF (title, author, dates). The read-only twin of Remove Hidden Info. Nothing leaves your computer.',
+  more:'Shows the hidden tags inside a photo (where and when it was taken, the camera) or a PDF (title, author, dates). It only reads them and never changes your file. Nothing leaves your computer.',
   run:async f=>{ const onP=progress('Reading metadata'); onP(.4); const lines=[]; const row=(k,v)=>{ if(v!=null&&v!=='')lines.push(String(k).padEnd(12)+' '+v); };
     if(ext(f.name)==='pdf'){ try{ const d=await PDFDocument.load(await f.arrayBuffer(),{ignoreEncryption:true});
       const dstr=dt=>{ try{ return dt?dt.toISOString().slice(0,19).replace('T',' '):null; }catch{ return null; } };
@@ -682,7 +688,7 @@ add({cat:'image',kinds:['image'],nm:'Image to PDF',ds:'Turn an image into a one-
 
 /* ---- VIDEO ---- */
 add({cat:'video',kinds:['video'],rec:1,nm:'Video to GIF',ds:'Turn a clip into a looping GIF',kw:'gif convert to gif loop discord',
-  more:'Turns a short clip into a looping GIF you can post in a chat. You set the width and smoothness.',
+  more:'Turns a short clip into a looping GIF you can post in a chat. You set the width and how smooth it looks.',
   opts:()=>{ const fps=el('input',{type:'number',value:12,min:4,max:30}); const w=el('input',{type:'number',value:480,min:120,step:20});
     return {node:el('div',{},[el('label',{},['fps ',fps]),el('label',{},['width ',w,' px'])]),get:()=>({fps:+fps.value||12,w:+w.value||480})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.gif',(i,out)=>['-i',i,'-vf',
@@ -691,7 +697,7 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make the file sma
   more:'Makes a video small enough to fit an email or upload limit. You pick the size you want in MB.',
   opts:oNum('target','10','MB','mb',{min:1,step:1}),
   check:(f,o)=> (!o.mb||o.mb<=0) ? {msg:'Enter a target size in MB, like 10 or 25.'}
-    : (f && f.size<=o.mb*1048576 ? {title:'Already small enough', msg:`This video is already ${fmt(f.size)}, under your ${o.mb} MB target — there’s nothing to shrink. Try a smaller number if you want it tinier.`} : null),
+    : (f && f.size<=o.mb*1048576 ? {title:'Already small enough', msg:`This video is already ${fmt(f.size)}, under your ${o.mb} MB target. Try a smaller number if you want it tinier.`} : null),
   run:async (f,o)=>{ const onP=progress('Reading length'); const dur=await videoDuration(f)||30;
     const mb=o.mb||10;
     // Split the MB budget across the whole duration. 1 MB ≈ 8388.6 kbit; keep ~8% headroom for
@@ -701,7 +707,7 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make the file sma
     const vkbps=Math.max(64,Math.floor(totalKbps-akbps));
     showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-b:v',vkbps+'k','-maxrate',vkbps+'k',
       '-bufsize',(vkbps*2)+'k','-preset','ultrafast','-vf',"scale=-2:'min(720,ih)'",'-c:a','aac','-b:a',akbps+'k',out],'Compressing video'),
-      base(f.name)+'-small.mp4',{note:`~${mb} MB target (${vkbps}k video, ${akbps}k audio)${vkbps===64?' — a long clip may still exceed the target':''}.`}); }});
+      base(f.name)+'-small.mp4',{note:`~${mb} MB target (${vkbps}k video, ${akbps}k audio)${vkbps===64?'. A long clip may still exceed the target':''}.`}); }});
 add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the sound out as an MP3',kw:'extract audio mp3 sound from video',
   more:'Takes just the sound from a video and saves it as an MP3 file.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-acodec','libmp3lame','-q:a','2',out],'Extracting audio'),base(f.name)+'.mp3'); }});
@@ -717,7 +723,7 @@ add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'m
   more:'Removes the sound and keeps the picture. Good for hiding background noise before you share.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
 add({cat:'video',kinds:['video'],nm:'Save a Photo from a Video',ds:'Save one moment as a picture',kw:'thumbnail frame screenshot still poster',
-  more:'Saves a single still picture from a moment you pick. Good for a thumbnail or poster image.',
+  more:'Saves a still picture from the moment you pick. Handy for a thumbnail or cover image.',
   opts:()=>{ const t=el('input',{type:'text',value:'00:01',placeholder:'mm:ss'}); return {node:el('label',{},['at ',t]),get:()=>({t:t.value})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.png',(i,out)=>['-ss',o.t,'-i',i,'-vframes','1','-update','1',out],'Grabbing frame'),base(f.name)+'-frame.png'); }});
 
@@ -736,7 +742,7 @@ add({cat:'audio',kinds:['audio'],nm:'Trim Audio',ds:'Keep only the part you want
     return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-acodec','libmp3lame','-q:a','2',out],'Trimming'),base(f.name)+'-trim.mp3'); }});
 add({cat:'audio',kinds:['audio'],nm:'Shrink Audio File',ds:'Make the file smaller',kw:'bitrate compress smaller audio',
-  more:'Saves the sound at a lower quality so the file takes up less space. Lower quality means a smaller file.',
+  more:'Saves the sound at a lower quality so the file takes up less space.',
   opts:oSel('bitrate',[['128','128 kbps'],['96','96 kbps'],['64','64 kbps'],['192','192 kbps']],'kb'),
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-b:a',o.kb+'k','-acodec','libmp3lame',out],'Re-encoding'),base(f.name)+'-'+o.kb+'k.mp3'); }});
 
@@ -744,7 +750,7 @@ add({cat:'audio',kinds:['audio'],nm:'Shrink Audio File',ds:'Make the file smalle
 add({cat:'pdf',kinds:['pdf'],rec:1,custom:f=>pdfSignFill(f),nm:'Sign & Fill PDF',ds:'Add a signature, text, and the date',kw:'sign signature fill form text date annotate edit adobe acrobat esign initials',
   more:'Open a PDF and drop your signature, text, and today\'s date anywhere on the page, then save it. Your file stays on your computer.'});
 add({cat:'pdf',kinds:['pdf'],rec:1,nm:'Shrink a PDF',ds:'Make a big PDF smaller',kw:'compress shrink pdf smaller size squish',
-  more:'Turns each page into a picture to cut the file size. Best for scanned documents. The text still shows but you can no longer select it.',
+  more:'Turns each page into a picture to shrink the file. Best for scanned documents. The text still shows, but you can no longer select it.',
   run:async f=>{ const onP=progress('Compressing PDF'); const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
     const pdf=await PDFDocument.create();
     for(let p=1;p<=doc.numPages;p++){ onP(p/doc.numPages); const pg=await doc.getPage(p); const vp=pg.getViewport({scale:1.5});
@@ -753,7 +759,7 @@ add({cat:'pdf',kinds:['pdf'],rec:1,nm:'Shrink a PDF',ds:'Make a big PDF smaller'
       pdf.addPage([vp.width,vp.height]).drawImage(im,{x:0,y:0,width:vp.width,height:vp.height}); }
     showResult(new Blob([await pdf.save()],{type:'application/pdf'}),base(f.name)+'-small.pdf'); }});
 add({cat:'pdf',kinds:['pdf'],rec:1,nm:'PDF to Pictures',ds:'Save each page as a PNG image',kw:'pdf to images png export pages',
-  more:'Turns every page into a sharp PNG picture and puts them in a zip. Handy for sharing pages as images.',
+  more:'Turns every page into a sharp PNG picture and puts them in a zip. Good for sharing pages as images.',
   run:async f=>{ const onP=progress('Rendering pages'); const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise; const out=[];
     for(let p=1;p<=doc.numPages;p++){ onP(p/doc.numPages); const pg=await doc.getPage(p); const vp=pg.getViewport({scale:2});
       const c=el('canvas'); c.width=vp.width; c.height=vp.height; await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
@@ -807,15 +813,15 @@ add({cat:'pdf',kinds:['pdf'],multi:1,nm:'Combine PDFs',ds:'Join several PDFs int
 
 /* ---- DATA ---- */
 add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'CSV to JSON',ds:'Turn a spreadsheet into JSON',kw:'csv json convert data table',
-  more:'Takes a spreadsheet-style CSV and turns it into JSON. The first row becomes the field names.',
+  more:'Turns a spreadsheet-style CSV into JSON. The first row becomes the field names.',
   fileToText:1, run:(text)=>showText(csvToJSON(text),'data.json')});
 add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'JSON to CSV',ds:'Turn JSON into a spreadsheet',kw:'json csv convert data table',
-  more:'Takes a JSON list and turns it into a CSV you can open in a spreadsheet. The field names become the top row.',
+  more:'Turns a JSON list into a CSV you can open in a spreadsheet. The field names become the top row.',
   fileToText:1, run:(text)=>showText(jsonToCSV(text),'data.csv')});
 
 /* ---- DEV (text in / text out) ---- */
 add({cat:'dev',input:'text',nm:'Tidy Up JSON',ds:'Clean up or shrink a JSON file',kw:'json format pretty minify beautify tidy',
-  more:'Paste messy JSON and get it laid out neatly, or squeezed onto one line. It also tells you if the JSON has a mistake.',
+  more:'Paste messy JSON and get it laid out neatly, or squeezed onto one line. It flags any mistake in the JSON.',
   opts:oSel('mode',[['pretty','Prettify'],['min','Minify']],'m'),
   run:(text,o)=>showText(JSON.stringify(JSON.parse(text),null,o.m==='min'?0:2),'tidy.json')});
 add({cat:'dev',input:'text',nm:'Switch Between JSON and YAML',ds:'Turn JSON into YAML or back again',kw:'json yaml convert',
@@ -823,21 +829,21 @@ add({cat:'dev',input:'text',nm:'Switch Between JSON and YAML',ds:'Turn JSON into
   opts:oSel('direction',[['j2y','JSON → YAML'],['y2j','YAML → JSON']],'d'),
   run:async (text,o)=>{ const YAML=await import("./vendor/js-yaml.mjs");
     if(o.d==='j2y') showText(YAML.dump(JSON.parse(text)),'out.yaml'); else showText(JSON.stringify(YAML.load(text),null,2),'out.json'); }});
-add({cat:'dev',input:'text',nm:'Scramble Text to Base64',ds:'Turn text into Base64 or back',kw:'base64 encode decode',
-  more:'Turns plain text into Base64, a scrambled form some apps and emails use. It can also turn Base64 back into normal text.',
+add({cat:'dev',input:'text',nm:'Scramble Text to Base64',ds:'Turn text into Base64 and back',kw:'base64 encode decode',
+  more:'Turns plain text into Base64, a scrambled form some apps and emails use, and turns Base64 back into normal text.',
   opts:oSel('do',[['enc','Encode'],['dec','Decode']],'d'),
   run:(text,o)=>showText(o.d==='enc'?btoa(unescape(encodeURIComponent(text))):decodeURIComponent(escape(atob(text.trim()))),'base64.txt')});
 add({cat:'dev',input:'text',nm:'Make Text Safe for a Web Link',ds:'Fix text so it works in a web link',kw:'url encode decode percent escape',
-  more:'Rewrites spaces and symbols so your text fits safely inside a web link. It can also turn an encoded link back into plain text.',
+  more:'Rewrites spaces and symbols so your text fits safely inside a web link, and turns an encoded link back into plain text.',
   opts:oSel('do',[['enc','Encode'],['dec','Decode']],'d'),
   run:(text,o)=>showText(o.d==='enc'?encodeURIComponent(text):decodeURIComponent(text),'url.txt')});
 add({cat:'dev',input:'text',nm:'Make a Text Fingerprint',ds:'Get a unique code for your text',kw:'hash sha256 sha1 checksum digest',
-  more:'Turns your text into a fixed string of letters and numbers that acts like a fingerprint. The same text always gives the same code, so you can check if two things match.',
+  more:'Turns your text into a fixed string of letters and numbers that acts like a fingerprint. The same text always gives the same code, so you can check whether two things match.',
   opts:oSel('algo',[['SHA-256','SHA-256'],['SHA-1','SHA-1'],['SHA-512','SHA-512']],'a'),
   run:async (text,o)=>{ const buf=await crypto.subtle.digest(o.a,new TextEncoder().encode(text));
     showText([...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''),'hash.txt'); }});
-add({cat:'dev',input:'text',nm:'Read a Computer Timestamp',ds:'Turn a number timestamp into a date',kw:'timestamp epoch unix date time convert',
-  more:'Computers often store time as a long number of seconds. This turns that number into a readable date, or turns a date back into the number.',
+add({cat:'dev',input:'text',nm:'Read a Computer Timestamp',ds:'Turn a number timestamp into a date and back',kw:'timestamp epoch unix date time convert',
+  more:'Computers often store time as a long count of seconds. Turn that number into a readable date, or a date back into the number.',
   opts:oSel('dir',[['t2d','Timestamp → date'],['d2t','Date → timestamp']],'d'),
   run:(text,o)=>{ const v=text.trim(); if(o.d==='t2d'){ const n=+v; if(!v||isNaN(n)) throw new Error('Enter a number timestamp, like 1700000000.'); const ms=v.length>11?n:n*1000;
     showText(new Date(ms).toString()+'\n'+new Date(ms).toISOString(),'date.txt'); }
@@ -848,7 +854,7 @@ add({cat:'dev',input:'text',rec:1,nm:'Make a QR Code',ds:'Turn a link or text in
   run:async (text,o)=>{ const t=(text||'').trim(); if(!t) throw new Error('Type a URL or some text first.');
     const QR=await qrGen(); const dataUrl=await QR.toDataURL(t,{margin:2,scale:+o.scale||8,errorCorrectionLevel:'M'});
     showResult(await (await fetch(dataUrl)).blob(),'qr.png',{note:'Scan to open: '+(t.length>60?t.slice(0,60)+'…':t)}); }});
-add({cat:'dev',kinds:['image'],rec:1,nm:'Read a QR Code',ds:'Pull the link out of a QR code image',kw:'qr code read scan decode reverse barcode image',
+add({cat:'dev',kinds:['image'],nm:'Read a QR Code',ds:'Pull the link out of a QR code image',kw:'qr code read scan decode reverse barcode image',
   more:'Drop in a photo or screenshot with a QR code and it shows you the link or text inside. This is the reverse of making a QR code.',
   run:async f=>{ const onP=progress('Reading QR'); onP(.3); const {img,url}=await toImage(f);
     const c=canvasOf(img,1600); const d=c.getContext('2d').getImageData(0,0,c.width,c.height); URL.revokeObjectURL(url);
@@ -856,7 +862,7 @@ add({cat:'dev',kinds:['image'],rec:1,nm:'Read a QR Code',ds:'Pull the link out o
     if(!res||!res.data) throw new Error('No QR code found. Try a sharper image or crop closer to the code.');
     showText(res.data,'qr.txt'); }});
 add({cat:'dev',input:'text',nm:'Number Base Converter',ds:'Decimal, hex, binary, octal',kw:'base convert hex hexadecimal binary octal decimal radix base10 base16 base2',
-  more:'Convert a number from one base to another, like decimal to hexadecimal or binary to decimal. Pick what you are starting from and what you want.',
+  more:'Convert a number from one base to another, like decimal to hexadecimal or binary to decimal. Pick what you are starting from and what you want out.',
   opts:()=>{ const mk=()=>{ const s=el('select'); [['10','Decimal (base 10)'],['16','Hex (base 16)'],['2','Binary (base 2)'],['8','Octal (base 8)']].forEach(([v,l])=>s.append(el('option',{value:v,textContent:l}))); return s; };
     const f=mk(), t=mk(); t.value='16';
     return {node:el('div',{},[el('label',{},['from ',f]),el('label',{},['to ',t])]),get:()=>({from:+f.value,to:+t.value})}; },
@@ -882,7 +888,7 @@ add({cat:'dev',input:'text',nm:'Morse Code',ds:'English ↔ Morse code',kw:'mors
 
 /* ---- WEIRD ---- */
 add({cat:'weird',kinds:['any'],rec:1,nm:'Look Inside a File',ds:'See what a file really is',kw:'inspect identify type metadata what is detective info magic',
-  more:'Tells you what a file truly is even when its name lies, plus its size and a unique fingerprint. The file stays on your computer.',
+  more:'Tells you what a file truly is, even when the name says otherwise, plus its size and a fingerprint no other file shares. The file stays on your computer.',
   run:async f=>{ const onP=progress('Investigating'); onP(.3); const buf=new Uint8Array(await f.slice(0,16).arrayBuffer());
     const hex=[...buf].map(b=>b.toString(16).padStart(2,'0')).join(' ');
     const sig=magic(buf); let extra='';
@@ -901,7 +907,7 @@ mime (os)    ${f.type||'-'}
 ${extra}magic bytes  ${hex}
 sha-256      ${sha}`, base(f.name)+'-report.txt'); }});
 add({cat:'weird',kinds:['video','image'],nm:'GIF to Video',ds:'Turn a GIF into a small video',kw:'gif to mp4 convert animation',
-  more:'Turns an animated GIF into a small MP4 video that is easy to share. Runs on your computer.',
+  more:'Turns an animated GIF into a small MP4 you can share anywhere. Runs on your computer.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-movflags','faststart','-pix_fmt','yuv420p','-vf','scale=trunc(iw/2)*2:trunc(ih/2)*2',out],'Converting'),base(f.name)+'.mp4'); }});
 add({cat:'weird',kinds:['image'],nm:'iPhone Photo to JPG',ds:'Change an iPhone HEIC photo to JPG',kw:'heic heif iphone jpg convert',
   more:'Changes an iPhone HEIC photo into a normal JPG that opens on any device. The photo stays on your computer.',
@@ -1016,7 +1022,7 @@ function renderText(t,prefill=''){ const color=CATS[t.cat].color; openStage();
   const go=el('button',{className:'btn',textContent:'Run '+t.nm});
   go.onclick=async()=>{ go.disabled=true; clearStatus(); $('#output').innerHTML='';
     state.ctx={t,f:null};
-    if(!ta.value.trim()){ go.disabled=false; return showGuide({msg:'Looks like nothing was typed in yet — paste or type something first, then give it a go.'}); }
+    if(!ta.value.trim()){ go.disabled=false; return showGuide({msg:'Nothing typed in yet. Paste or type something first, then give it a go.'}); }
     try{ await t.run(ta.value, get()); }catch(e){ fail(e); } finally{ go.disabled=false; } };
   p.append(el('div',{className:'runrow'},[go]));
 }
@@ -1358,7 +1364,7 @@ async function pdfSignFill(file){
           const page=out.addPage([pages[pi].wPt,pages[pi].hPt]); page.drawImage(im,{x:0,y:0,width:pages[pi].wPt,height:pages[pi].hPt}); made.push(page);
         }
         await placeItems(out, pi=>made[pi]);
-        showResult(new Blob([await out.save()],{type:'application/pdf'}), base(file.name)+'-signed.pdf', {note:'Flattened to a fresh PDF — the original couldn’t be edited in place.'});
+        showResult(new Blob([await out.save()],{type:'application/pdf'}), base(file.name)+'-signed.pdf', {note:'Flattened to a fresh PDF, since the original couldn’t be edited in place.'});
       }catch(e2){ fail(e2); }
     } finally{ bExport.disabled=false; }
   };
