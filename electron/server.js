@@ -34,6 +34,21 @@ function findBin(name, binDir) {
 }
 const have = (n, b) => !!findBin(n, b);
 
+// Kill a spawned child and everything it started. POSIX: children are spawned
+// detached so they lead their own process group — signal the group via -pid.
+// Windows: Node can't signal process groups, so taskkill /t walks the tree;
+// process.kill(-pid) there just throws and only the parent would die,
+// orphaning yt-dlp/ffmpeg helpers.
+function killTree(child) {
+  if (!child || child.pid == null) return;
+  if (process.platform === 'win32') {
+    const r = spawnSync('taskkill', ['/pid', String(child.pid), '/t', '/f']);
+    if (r.error || r.status !== 0) { try { child.kill('SIGKILL'); } catch {} }
+  } else {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch {} }
+  }
+}
+
 function sendJSON(res, obj, code=200) {
   const b = Buffer.from(JSON.stringify(obj));
   res.statusCode = code;
@@ -83,10 +98,9 @@ function handleDownload(req, res, binDir) {
     // leaves those orphaned and running.
     const child = spawn(bin, args, { cwd: tmp, env, detached: true });
     let err = '';   // reuse the outer `aborted` (declared at the top of handleDownload)
-    const killTree = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch {} } };
     // If the client goes away mid-download (e.g. the user switches from MP3 to MP4), kill the
     // whole download tree and clean up — otherwise it keeps running, orphaned, and piles up.
-    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(); cleanup(tmp); } });
+    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(child); cleanup(tmp); } });
     child.stderr.on('data', d => { err += d; });
     child.on('error', e => { if (aborted) return; cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
     child.on('close', code => {
@@ -209,9 +223,8 @@ function handleFFmpeg(req, res, binDir) {
     // detached → child leads its own process group, so we can kill ffmpeg (and any children) as a tree
     const child = spawn(ffmpeg, args, { cwd: tmp, detached: true });
     let err = '', durSec = 0;
-    const killTree = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch {} } };
     // If the client goes away mid-job (tool switch / reset), kill the tree so ffmpeg isn't left orphaned.
-    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(); if (id) ffProgress.delete(id); cleanup(tmp); } });
+    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(child); if (id) ffProgress.delete(id); cleanup(tmp); } });
     const hms = s => { const m = /(\d+):(\d\d):(\d\d(?:\.\d+)?)/.exec(s); return m ? (+m[1] * 3600 + +m[2] * 60 + +m[3]) : 0; };
     child.stderr.on('data', d => {
       const s = String(d); err += s; if (err.length > 20000) err = err.slice(-20000);
@@ -535,9 +548,8 @@ function handleTool(req, res, binDir, modelsDir) {
     if (aborted) return;
     if (late) { const bad = late(inPath); if (bad) { cleanup(tmp); return sendJSON(res, { error: bad }, 400); } }
     let err = '', curChild = null;
-    const killTree = () => { if (!curChild) return; try { process.kill(-curChild.pid, 'SIGKILL'); } catch { try { curChild.kill('SIGKILL'); } catch {} } };
     // If the client goes away mid-job (tool switch / reset), kill the running step so whisper/tts/stems/upscale/raw aren't left orphaned.
-    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(); if (id) ffProgress.delete(id); cleanup(tmp); } });
+    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(curChild); if (id) ffProgress.delete(id); cleanup(tmp); } });
     const runStep = k => {
       if (aborted) return;
       if (k >= plan.length) {
