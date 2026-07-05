@@ -24,7 +24,11 @@ mkdir -p "$OUT/libraw"
 find "$TMP/libraw" -name dcraw_emu -type f -exec cp {} "$OUT/libraw/" \;
 find "$TMP/libraw" -name "*.dylib" -type f -exec cp {} "$OUT/libraw/" \;
 chmod +x "$OUT/libraw/dcraw_emu"
-"$OUT/libraw/dcraw_emu" 2>&1 | head -2 || { echo "dcraw_emu failed to run — check dylib paths (otool -L $OUT/libraw/dcraw_emu)"; exit 1; }
+# dcraw_emu exits non-zero when run with no input (it just prints usage), so under
+# `set -o pipefail` a piped check aborts the build even though the binary is fine. Capture
+# its output instead and confirm the usage banner (a dylib-load failure would not print it).
+draw_out="$("$OUT/libraw/dcraw_emu" 2>&1 || true)"
+case "$draw_out" in *dcraw*) printf '%s\n' "$draw_out" | head -2 ;; *) echo "dcraw_emu failed to run — check dylib paths (otool -L $OUT/libraw/dcraw_emu)"; exit 1 ;; esac
 
 echo "==> Real-ESRGAN ncnn-vulkan (official macOS build)"
 curl -sL -o "$TMP/esrgan.zip" "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-macos.zip"
