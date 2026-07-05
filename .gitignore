@@ -17,3 +17,7 @@ HANDOFF.md
 JunkDrawer.zip
 .claude/settings.local.json
 .claude/worktrees/
+
+# icon source — regenerable; icon.ico is the shipped icon
+icon.iconset/
+icongen.js
