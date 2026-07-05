@@ -34,20 +34,21 @@ the macOS Gatekeeper "unidentified developer" right-click → Open dance.
    npm install
    ```
 
-4. **Fetch the Windows binaries.** This downloads `yt-dlp.exe` and a static `ffmpeg.exe`
-   into `resources\bin\win\` (these are gitignored — too big for GitHub, so they're not in
-   the repo and must be fetched on the build machine):
+4. **Fetch the Windows binaries.** This downloads every bundled engine into
+   `resources\bin\win\` (gitignored — too big for GitHub, so they're fetched on the
+   build machine):
    ```
    npm run fetch-bins:win
    ```
-   - `yt-dlp.exe` comes from the yt-dlp GitHub releases (`.../releases/latest/download/yt-dlp.exe`).
-   - `ffmpeg.exe` is extracted from BtbN's static win64 GPL build
-     (`ffmpeg-master-latest-win64-gpl.zip`). The script unzips it using Windows' built-in
-     `tar` (present on Windows 10 1803+ and Windows 11).
-   - **If the script can't unzip** (no `tar`), it prints manual instructions: download
-     <https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip>,
-     open it, and copy `bin\ffmpeg.exe` into `resources\bin\win\`.
-   - When done, `resources\bin\win\` should contain exactly `yt-dlp.exe` and `ffmpeg.exe`.
+   - `yt-dlp.exe` from the yt-dlp GitHub releases, `ffmpeg.exe` from BtbN's static win64
+     GPL build. Zips are extracted with Windows' built-in `tar` (Windows 10 1803+).
+   - `whisper\` (whisper-cli + dlls, from whisper.cpp v1.9.1 releases — speech-to-text),
+     `libraw\` (dcraw_emu + libraw.dll, LibRaw 0.22.1 — camera RAW developing), and
+     `esrgan\` (realesrgan-ncnn-vulkan + models — 4× upscaling).
+   - When done, `resources\bin\win\` contains `yt-dlp.exe`, `ffmpeg.exe`, and the
+     `whisper\`, `libraw\`, `esrgan\` folders.
+   - The macOS counterpart is `bash scripts/fetch-bins-mac.sh` (run on the Mac build
+     machine; whisper-cli is built from source there, so it needs cmake + Xcode CLT).
 
 5. **Build the installer:**
    ```
