@@ -208,11 +208,17 @@
   .pdfedit-toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0}
   .pdfedit-hint{font:11px var(--sans); color:var(--ink2); margin-left:auto}
   .pdfedit-scroll{max-height:62vh; overflow:auto; background:#5a5e63; border:2px solid; border-color:var(--sb); padding:14px; margin-top:6px}
+.pdfedit-wrap:fullscreen{background:var(--bg); padding:10px 16px; overflow:auto}
+.pdfedit-wrap:fullscreen .pdfedit-scroll{max-height:calc(100vh - 70px)}
+.pdfedit-pg{font:11px var(--sans); color:var(--ink2); display:flex; align-items:center; gap:4px}
+.pdfedit-pg input{width:52px}
   .pdfedit-stack{position:relative; width:820px; max-width:100%; margin:0 auto}
   .pdfedit-page{display:block; width:100%; box-shadow:0 1px 5px rgba(0,0,0,.4); margin-bottom:12px; background:#fff}
   .pdfedit-overlay{position:absolute; inset:0; pointer-events:none}
-  .pdfedit-item{position:absolute; pointer-events:auto; border:1px dashed #2b6fd6; box-sizing:border-box}
-  .pdfedit-item .grip{display:flex; justify-content:space-between; align-items:center; gap:8px; font:10px var(--sans); background:#2b6fd6; color:#fff; cursor:move; padding:1px 4px 1px 6px; user-select:none}
+  .pdfedit-item{position:absolute; pointer-events:auto; border:1px dashed #2b6fd6; box-sizing:border-box; cursor:move}
+  .pdfedit-item.sel{border-style:solid; box-shadow:0 0 0 1px #2b6fd6}
+  .pdfedit-item .txt{cursor:text}
+  .pdfedit-item .grip{display:flex; justify-content:space-between; align-items:center; gap:8px; font:11px var(--sans); background:#2b6fd6; color:#fff; cursor:move; padding:3px 5px 3px 7px; user-select:none}
   .pdfedit-item .grip .del{cursor:pointer; font-weight:bold; padding:0 3px}
   .pdfedit-item .grip .del:hover{color:#ffd0d0}
   .pdfedit-item .txt{min-width:30px; outline:none; padding:2px 4px; color:#111; font-family:var(--sans); white-space:pre-wrap; line-height:1.15}
@@ -224,6 +230,7 @@
   .pdfedit-tabs .on{outline:2px solid #2b6fd6}
   /* Open & Preview viewer (read-only) */
   .viewer{margin-top:10px}
+.viewer:fullscreen{background:var(--bg); overflow:auto; padding:14px 18px; margin:0}
   .view-img{display:block; max-width:100%; max-height:64vh; margin:0 auto; border:2px solid; border-color:var(--sb); background:#fff}
   .txt-view{background:var(--well); border:2px solid; border-color:var(--sb); padding:14px; max-height:64vh; overflow:auto;
     font:12.5px/1.6 var(--mono); color:var(--ink); white-space:pre-wrap; word-break:break-word; margin:0}
@@ -434,12 +441,45 @@ async function toImage(file){ let src=file; const e=ext(file.name);
   return {img,url}; }
 function canvasOf(img,maxDim){ let w=img.naturalWidth,h=img.naturalHeight;
   if(maxDim&&Math.max(w,h)>maxDim){ const s=maxDim/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
-  const c=el('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); return c; }
+  const c=el('canvas'); c.width=w; c.height=h; const x=c.getContext('2d');
+  x.imageSmoothingEnabled=true; x.imageSmoothingQuality='high'; x.drawImage(img,0,0,w,h); return c; }
 const blobOf=(c,t,q)=>new Promise(r=>c.toBlob(r,t,q));
-async function imgConvert(file,{type='image/png',quality=.92,maxDim=0}={}){
+// Desktop-quality image path: the bundled native ffmpeg instead of a <canvas> re-render.
+// The canvas route quietly wrecks photos — it clips wide-gamut (Display P3) colors to an
+// 8-bit sRGB surface and the browser JPEG encoder forces 4:2:0 chroma. ffmpeg keeps the
+// ICC profile, bakes in EXIF rotation, and encodes JPEG at 4:4:4 with a real quantizer.
+// (WebP via ffmpeg drops the ICC profile — same as the canvas did, so no regression.)
+const FF_IMG_IN=['jpg','jpeg','png','webp','bmp','tif','tiff'];
+const FF_IMG_OUT={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'};
+async function imgFFOk(file,type){ return FF_IMG_IN.includes(ext(file.name)) && FF_IMG_OUT[type] && await nativeFFAvailable(); }
+function imgFFArgs({type,quality=.92,maxDim=0,scaleF=0,strip=false,sub=false}){
+  return (i,out)=>{ const a=['-i',i,'-frames:v','1','-update','1'];
+    if(strip) a.push('-map_metadata','-1');
+    if(maxDim) a.push('-vf',`scale=w='if(gte(iw,ih),min(${maxDim},iw),-1)':h='if(lt(iw,ih),min(${maxDim},ih),-1)':flags=lanczos`);
+    else if(scaleF&&scaleF<1) a.push('-vf',`scale=trunc(iw*${scaleF}):-1:flags=lanczos`);
+    if(type==='image/jpeg') a.push('-c:v','mjpeg','-q:v',String(Math.max(2,Math.min(31,Math.round((1-quality)*31)))),'-pix_fmt',sub?'yuvj420p':'yuvj444p');
+    else if(type==='image/webp') a.push('-c:v','libwebp','-quality',String(Math.round(quality*100)));
+    a.push(out); return a; };
+}
+async function imgConvert(file,{type='image/png',quality=.92,maxDim=0,strip=false}={}){
+  if(await imgFFOk(file,type)){
+    try{ return await runFF(file,'out.'+FF_IMG_OUT[type],imgFFArgs({type,quality,maxDim,strip}),'Converting image'); }
+    catch{} // fall through to the canvas route
+  }
   const {img,url}=await toImage(file); const c=canvasOf(img,maxDim);
   const b=await blobOf(c,type,quality); URL.revokeObjectURL(url); return b; }
 async function compressTo(file,target,type='image/jpeg'){
+  if(await imgFFOk(file,type)){
+    try{
+      let best=null,scaleF=1;
+      for(let p=0;p<6;p++){
+        for(const q of [.9,.75,.55,.35,.15,0]){
+          const b=await runFF(file,'out.'+FF_IMG_OUT[type],imgFFArgs({type,quality:q,scaleF:scaleF<1?scaleF:0,sub:true}),'Shrinking image');
+          if(b.size<=target) return b; best=b; }
+        scaleF*=.82; }
+      return best;
+    }catch{}
+  }
   const {img,url}=await toImage(file); let maxDim=Math.max(img.naturalWidth,img.naturalHeight); let best=null;
   for(let p=0;p<8;p++){ const c=canvasOf(img,maxDim);
     for(let q=.95;q>=.3;q-=.07){ const b=await blobOf(c,type,q); if(b.size<=target){URL.revokeObjectURL(url);return b;} best=b; }
@@ -589,21 +629,30 @@ add({cat:'image',kinds:['image'],rec:1,nm:'Shrink File Size',ds:'Squeeze an imag
 add({cat:'image',kinds:['image'],nm:'Resize Image',ds:'Set the longest side in pixels',kw:'resize scale dimensions shrink',
   more:'Set how long the longest side can be, so the image is no bigger than you need. For example, use 1920 pixels for the web.',
   opts:oNum('max side','1920','px','maxDim',{min:16,step:16}),
-  run:async (f,o)=>{ showResult(await imgConvert(f,{type:'image/png',maxDim:o.maxDim||1920}),base(f.name)+'-'+(o.maxDim||1920)+'.png'); }});
+  run:async (f,o)=>{ const photo=['jpg','jpeg','webp','heic','heif'].includes(ext(f.name)); // photos stay photos — a resized PNG of a photo is huge
+    const type=photo?'image/jpeg':'image/png', oe=photo?'jpg':'png';
+    showResult(await imgConvert(f,{type,quality:.92,maxDim:o.maxDim||1920}),base(f.name)+'-'+(o.maxDim||1920)+'.'+oe); }});
 add({cat:'image',kinds:['image'],nm:'Rotate or Flip',ds:'Turn or mirror an image',kw:'rotate flip mirror turn',
   more:'Turn an image a quarter or half turn, or mirror it side to side or top to bottom. Handy for sideways phone photos.',
   opts:oSel('do',[['r90','Rotate 90° CW'],['r270','Rotate 90° CCW'],['r180','Rotate 180°'],['fh','Flip horizontal'],['fv','Flip vertical']],'op'),
-  run:async (f,o)=>{ const {img,url}=await toImage(f); const swap=o.op==='r90'||o.op==='r270';
+  run:async (f,o)=>{
+    const isJpg=['jpg','jpeg'].includes(ext(f.name)), type=isJpg?'image/jpeg':'image/png', oe=isJpg?'jpg':'png';
+    if(await imgFFOk(f,type)){
+      const vf={r90:'transpose=1',r270:'transpose=2',r180:'hflip,vflip',fh:'hflip',fv:'vflip'}[o.op];
+      const enc=isJpg?['-c:v','mjpeg','-q:v','2','-pix_fmt','yuvj444p']:[];
+      showResult(await runFF(f,'out.'+oe,(i,out)=>['-i',i,'-frames:v','1','-update','1','-vf',vf,...enc,out],'Turning image'),base(f.name)+'-turned.'+oe);
+      return; }
+    const {img,url}=await toImage(f); const swap=o.op==='r90'||o.op==='r270';
     const c=el('canvas'); c.width=swap?img.naturalHeight:img.naturalWidth; c.height=swap?img.naturalWidth:img.naturalHeight;
     const x=c.getContext('2d'); x.translate(c.width/2,c.height/2);
     if(o.op==='r90')x.rotate(Math.PI/2); else if(o.op==='r270')x.rotate(-Math.PI/2); else if(o.op==='r180')x.rotate(Math.PI);
     else if(o.op==='fh')x.scale(-1,1); else if(o.op==='fv')x.scale(1,-1);
     x.drawImage(img,-img.naturalWidth/2,-img.naturalHeight/2); URL.revokeObjectURL(url);
-    showResult(await blobOf(c,'image/png',.95),base(f.name)+'-turned.png'); }});
+    showResult(await blobOf(c,type,.95),base(f.name)+'-turned.'+oe); }});
 add({cat:'image',kinds:['image'],rec:1,nm:'Remove Hidden Info',ds:'Drop GPS, camera, and date tags',kw:'remove metadata exif gps location privacy strip clean',
   more:'Removes hidden tags like your location, camera, and date by saving the image fresh. Do this before you post a photo in public.',
   run:async f=>{ const onP=progress('Scrubbing metadata'); onP(.4);
-    const isPng=ext(f.name)==='png'; const b=await imgConvert(f,{type:isPng?'image/png':'image/jpeg',quality:.95});
+    const isPng=ext(f.name)==='png'; const b=await imgConvert(f,{type:isPng?'image/png':'image/jpeg',quality:.95,strip:true});
     showResult(b,base(f.name)+'-clean.'+(isPng?'png':'jpg'),{note:'re-encoded with no embedded metadata.'}); }});
 // Self-contained EXIF reader (no deps — keeps the app fully offline). Finds the TIFF/EXIF
 // block (JPEG APP1 or HEIC Exif item) by scanning for the "Exif\0\0" marker or a TIFF magic,
@@ -706,19 +755,19 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make the file sma
     const akbps=totalKbps<300?64:128;
     const vkbps=Math.max(64,Math.floor(totalKbps-akbps));
     showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-b:v',vkbps+'k','-maxrate',vkbps+'k',
-      '-bufsize',(vkbps*2)+'k','-preset','slow','-vf',"scale=-2:'min(720,ih)',fps='min(30,source_fps)'",'-c:a','aac','-b:a',akbps+'k',out],'Compressing video'),
+      '-bufsize',(vkbps*2)+'k','-preset','slow','-vf',"scale=-2:'min(720,ih)',fps='min(30,source_fps)'",'-c:a','aac','-b:a',akbps+'k','-movflags','+faststart',out],'Compressing video'),
       base(f.name)+'-small.mp4',{note:`~${mb} MB target (${vkbps}k video, ${akbps}k audio)${vkbps===64?'. A long clip may still exceed the target':''}.`}); }});
 add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the sound out as an MP3',kw:'extract audio mp3 sound from video',
   more:'Takes just the sound from a video and saves it as an MP3 file.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-acodec','libmp3lame','-q:a','2',out],'Extracting audio'),base(f.name)+'.mp3'); }});
 add({cat:'video',kinds:['video'],nm:'Make It an MP4',ds:'Change a video to MP4',kw:'convert mp4 h264 mov mkv webm',
   more:'Changes a MOV, MKV, WEBM, or AVI video into an MP4 that plays almost anywhere.',
-  run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-crf','23','-preset','veryfast','-c:a','aac',out],'Converting to MP4'),base(f.name)+'.mp4'); }});
+  run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Converting to MP4'),base(f.name)+'.mp4'); }});
 add({cat:'video',kinds:['video'],nm:'Trim a Video',ds:'Keep just one part of the clip',kw:'trim cut clip shorten',
   more:'Keeps only the part between a start and end time and drops the rest. Times are in minutes and seconds.',
   opts:()=>{ const a=el('input',{type:'text',value:'00:00',placeholder:'mm:ss'}); const b=el('input',{type:'text',value:'00:10',placeholder:'mm:ss'});
     return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
-  run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-c:v','libx264','-pix_fmt','yuv420p','-preset','veryfast','-c:a','aac',out],'Clipping'),base(f.name)+'-clip.mp4'); }});
+  run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Clipping'),base(f.name)+'-clip.mp4'); }});
 add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'mute remove audio silence',
   more:'Removes the sound and keeps the picture. Good for hiding background noise before you share.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
@@ -1236,9 +1285,14 @@ async function openViewer(file){
   p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Open & Preview'}),el('span',{className:'badge',textContent:'Open'})]));
   p.append(el('div',{className:'filechip'},[svg(icon('clip')), `${file.name} · ${fmt(file.size)}`]));
   const ch=el('button',{className:'btn ghost',textContent:'Open another file'}); ch.onclick=()=>pickFiles(false,fs=>openViewer(fs[0]));
-  const dw=el('button',{className:'btn ghost',textContent:'Home'}); dw.onclick=resetStage;
-  p.append(el('div',{className:'runrow'},[ch,dw]));
+  const fu=el('button',{className:'btn ghost',textContent:'Fullscreen'});
+  const dw=el('button',{className:'btn ghost',textContent:'Home'}); dw.onclick=()=>{ if(document.fullscreenElement)document.exitFullscreen().catch(()=>{}); resetStage(); };
+  p.append(el('div',{className:'runrow'},[ch,fu,dw]));
   const host=el('div',{className:'viewer'}); p.append(host);
+  fu.onclick=()=>{ if(document.fullscreenElement)document.exitFullscreen().catch(()=>{}); else host.requestFullscreen().catch(()=>{}); };
+  const onFs=()=>{ if(!document.body.contains(host)){ document.removeEventListener('fullscreenchange',onFs); return; }
+    fu.textContent=document.fullscreenElement?'Exit fullscreen':'Fullscreen'; };
+  document.addEventListener('fullscreenchange',onFs);
   const e=ext(file.name);
   try{
     if(e==='pdf') await viewPDF(file,host);
@@ -1273,8 +1327,16 @@ async function pdfSignFill(file){
   const measure=()=>pages.forEach(pg=>{ pg.top=pg.cv.offsetTop; pg.left=pg.cv.offsetLeft; pg.w=pg.cv.offsetWidth; pg.h=pg.cv.offsetHeight; });
 
   const items=[]; // {type:'text'|'sig', node, content, x,y, size, dataUrl, w,h, ratio}
-  function dragGrip(grip,node,it){ grip.addEventListener('pointerdown',e=>{ if(e.target.classList.contains('del'))return;
-    e.preventDefault(); grip.setPointerCapture(e.pointerId); const sx=e.clientX,sy=e.clientY,ox=node.offsetLeft,oy=node.offsetTop;
+  let selected=null;
+  const select=it=>{ if(selected===it)return; if(selected)selected.node.classList.remove('sel'); selected=it; if(it)it.node.classList.add('sel'); };
+  function removeItem(it){ const k=items.indexOf(it); if(k>=0)items.splice(k,1); it.node.remove(); if(selected===it)select(null); }
+  // Drag by grabbing anywhere on the box. Clicking the text itself still edits it (drag those
+  // by the bar or the dashed edge); the ✕/A± buttons and the resize handle keep their jobs.
+  function dragFrom(node,it){ node.addEventListener('pointerdown',e=>{
+    if(e.target.classList.contains('del')||e.target.classList.contains('hdl'))return;
+    select(it);
+    if(e.target.classList.contains('txt'))return;
+    e.preventDefault(); node.setPointerCapture(e.pointerId); const sx=e.clientX,sy=e.clientY,ox=node.offsetLeft,oy=node.offsetTop;
     const mv=ev=>{ it.x=Math.max(0,ox+ev.clientX-sx); it.y=Math.max(0,oy+ev.clientY-sy); node.style.left=it.x+'px'; node.style.top=it.y+'px'; };
     const up=()=>{ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); };
     window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up); }); }
@@ -1283,8 +1345,15 @@ async function pdfSignFill(file){
     const mv=ev=>{ const w=Math.max(40,ow+ev.clientX-sx); it.w=w; it.h=w/r; img.style.width=w+'px'; img.style.height=(w/r)+'px'; };
     const up=()=>{ window.removeEventListener('pointermove',mv); window.removeEventListener('pointerup',up); };
     window.addEventListener('pointermove',mv); window.addEventListener('pointerup',up); }); }
+  // New boxes appear in the part of the document you're looking at, not at the top of page 1;
+  // repeated adds cascade instead of piling on the same spot.
+  function viewSpot(){ measure();
+    let x=Math.max(20,Math.round((stack.offsetWidth-220)/2));
+    let y=Math.max(10,Math.round(scroll.scrollTop+scroll.clientHeight*.25));
+    while(items.some(o=>Math.abs(o.x-x)<14&&Math.abs(o.y-y)<14)){ x+=20; y+=20; }
+    return {x,y}; }
   function addItem(opts){
-    const it=Object.assign({x:60,y:70,size:18,type:'text'},opts);
+    const it=Object.assign({size:18,type:'text'},viewSpot(),opts);
     const node=el('div',{className:'pdfedit-item'}); node.style.left=it.x+'px'; node.style.top=it.y+'px';
     const right=el('span',{style:'display:flex;gap:5px;align-items:center'});
     if(it.type==='text'){ const am=el('span',{className:'del',textContent:'A−',title:'Smaller'}), ap=el('span',{className:'del',textContent:'A+',title:'Bigger'});
@@ -1295,33 +1364,68 @@ async function pdfSignFill(file){
     if(it.type==='text'){ const t=el('div',{className:'txt',contentEditable:'true',textContent:it.text||'Type here'}); t.style.fontSize=it.size+'px'; node.append(t); it.content=t; }
     else { const img=el('img',{src:it.dataUrl}); img.style.width=it.w+'px'; img.style.height=it.h+'px'; node.append(img); it.content=img;
       const hdl=el('div',{className:'hdl'}); node.append(hdl); resizeHandle(hdl,img,it); }
-    it.node=node; dragGrip(grip,node,it);
-    del.onclick=()=>{ const k=items.indexOf(it); if(k>=0)items.splice(k,1); node.remove(); };
-    overlay.append(node); items.push(it);
+    it.node=node; dragFrom(node,it);
+    del.onclick=()=>removeItem(it);
+    overlay.append(node); items.push(it); select(it);
     if(it.type==='text') setTimeout(()=>{ const r=document.createRange(); r.selectNodeContents(it.content); const s=getSelection(); s.removeAllRanges(); s.addRange(r); it.content.focus(); },0);
     return it;
   }
+  // Backspace/Delete removes the selected box (unless you're typing in it); Esc deselects.
+  const onKey=e=>{
+    if(!document.body.contains(scroll)){ document.removeEventListener('keydown',onKey); return; }
+    const editing=document.activeElement&&document.activeElement.classList&&document.activeElement.classList.contains('txt');
+    if(e.key==='Escape'){ if(editing)document.activeElement.blur(); else select(null); return; }
+    if((e.key==='Delete'||e.key==='Backspace')&&selected&&!editing){ e.preventDefault(); removeItem(selected); } };
+  document.addEventListener('keydown',onKey);
+  scroll.addEventListener('pointerdown',e=>{ if(!e.target.closest('.pdfedit-item'))select(null); });
+  // If the page stack changes width (window resize, fullscreen), keep every box glued to the
+  // same spot on its page by scaling positions and sizes along with it.
+  let stackW=0;
+  new ResizeObserver(()=>{ const w=stack.offsetWidth; if(!w)return;
+    if(stackW&&Math.abs(w-stackW)>1){ const f=w/stackW;
+      items.forEach(it=>{ it.x*=f; it.y*=f; it.node.style.left=it.x+'px'; it.node.style.top=it.y+'px';
+        if(it.type==='text'){ it.size*=f; it.content.style.fontSize=it.size+'px'; }
+        else if(it.w){ it.w*=f; it.h*=f; it.content.style.width=it.w+'px'; it.content.style.height=it.h+'px'; } }); }
+    stackW=w; measure(); }).observe(stack);
 
+  const wrap=el('div',{className:'pdfedit-wrap'});
   const bar=el('div',{className:'pdfedit-toolbar'});
   const bSig=el('button',{className:'btn ghost',textContent:'Signature'});
   const bText=el('button',{className:'btn ghost',textContent:'Text'});
   const bDate=el('button',{className:'btn ghost',textContent:'Date'});
   const bExport=el('button',{className:'btn',textContent:'Export signed PDF'});
-  const bClose=el('button',{className:'btn ghost',textContent:'Home'}); bClose.onclick=resetStage;
-  bar.append(bSig,bText,bDate,bExport,bClose,el('span',{className:'pdfedit-hint',textContent:`${pages.length} page${pages.length>1?'s':''} · drag items by the blue bar`}));
+  const bFull=el('button',{className:'btn ghost',textContent:'Fullscreen'});
+  const bClose=el('button',{className:'btn ghost',textContent:'Home'});
+  bClose.onclick=()=>{ if(document.fullscreenElement)document.exitFullscreen().catch(()=>{}); resetStage(); };
+  bFull.onclick=()=>{ if(document.fullscreenElement)document.exitFullscreen().catch(()=>{}); else wrap.requestFullscreen().catch(()=>{}); };
+  const onFs=()=>{ if(!document.body.contains(wrap)){ document.removeEventListener('fullscreenchange',onFs); return; }
+    bFull.textContent=document.fullscreenElement?'Exit fullscreen':'Fullscreen'; requestAnimationFrame(measure); };
+  document.addEventListener('fullscreenchange',onFs);
+  bar.append(bSig,bText,bDate,bExport,bFull,bClose);
+  if(pages.length>1){ // page counter + jump — so page 30 of a long PDF is one keystroke away
+    const pgIn=el('input',{type:'number',min:1,max:pages.length,value:1,className:'pdfedit-pgnum'});
+    pgIn.onchange=()=>{ const n=Math.max(1,Math.min(pages.length,Math.round(+pgIn.value||1))); pgIn.value=n;
+      measure(); scroll.scrollTo({top:Math.max(0,pages[n-1].cv.offsetTop-6)}); };
+    scroll.addEventListener('scroll',()=>{ if(document.activeElement===pgIn)return;
+      const mid=scroll.scrollTop+scroll.clientHeight*.4; let n=1;
+      pages.forEach((pg,k)=>{ if(pg.cv.offsetTop<=mid)n=k+1; }); pgIn.value=n; },{passive:true});
+    bar.append(el('label',{className:'pdfedit-pg'},['page ',pgIn,' / '+pages.length]));
+  }
+  bar.append(el('span',{className:'pdfedit-hint',textContent:'drag a box anywhere · Backspace removes the selected box'}));
   const sigHost=el('div');
-  bText.onclick=()=>{ measure(); addItem({type:'text',text:'Type here',size:18}); };
-  bDate.onclick=()=>{ measure(); addItem({type:'text',size:16,text:new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'})}); };
+  bText.onclick=()=>addItem({type:'text',text:'Type here',size:18});
+  bDate.onclick=()=>addItem({type:'text',size:16,text:new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'})});
   bSig.onclick=()=>{ if(sigHost.firstChild){ sigHost.innerHTML=''; return; }
-    signaturePad(sigHost, dataUrl=>{ sigHost.innerHTML=''; measure(); const im=new Image(); im.onload=()=>{ const r=(im.width/im.height)||3; addItem({type:'sig',dataUrl,w:200,h:Math.round(200/r),ratio:r}); }; im.src=dataUrl; }); };
+    signaturePad(sigHost, dataUrl=>{ sigHost.innerHTML=''; const im=new Image(); im.onload=()=>{ const r=(im.width/im.height)||3; addItem({type:'sig',dataUrl,w:200,h:Math.round(200/r),ratio:r}); }; im.src=dataUrl; }); };
 
-  p.append(bar, sigHost, scroll);
+  wrap.append(bar, sigHost, scroll); p.append(wrap);
   requestAnimationFrame(measure);
 
   // Draw all placed items (text/date + signatures) onto `out`; `pageFor(pi)` returns the
   // target page in `out` for page index pi. Shared by the in-place and rasterized export paths.
   async function placeItems(out, pageFor){
     const helv=await out.embedFont(StandardFonts.Helvetica);
+    let dropped=false;
     for(const it of items){
       const cTop=it.node.offsetTop+it.content.offsetTop, cLeft=it.node.offsetLeft+it.content.offsetLeft;
       let pi=0; for(let k=0;k<pages.length;k++){ if(cTop>=pages[k].top-2) pi=k; }
@@ -1329,7 +1433,10 @@ async function pdfSignFill(file){
       const sx=pg.wPt/pg.w, localX=(cLeft-pg.left)*sx, localTop=(cTop-pg.top)*sx;
       if(it.type==='text'){
         const sizePt=it.size*sx; const lines=(it.content.innerText||'').replace(/ /g,' ').replace(/\r/g,'').split('\n');
-        lines.forEach((ln,li)=>{ ln=ln.replace(/[^\x20-\x7E\xA0-\xFF]/g,''); if(!ln) return;
+        // Keep everything the built-in Helvetica (WinAnsi) can draw — including smart quotes,
+        // dashes, € and bullets; anything else (emoji, CJK) is skipped and reported, not silent.
+        lines.forEach((ln,li)=>{ const kept=ln.replace(/[^\x20-\x7E\xA0-\xFFŒœŠšŸŽžƒˆ˜–—‘’‚“”„†‡•…‰‹›€™]/g,'');
+          if(kept!==ln)dropped=true; ln=kept; if(!ln) return;
           const baseline=pg.hPt-(localTop+li*sizePt*1.18+sizePt*0.80);
           page.drawText(ln,{x:localX,y:baseline,size:sizePt,font:helv,color:rgb(.06,.06,.06)}); });
       } else if(it.dataUrl){
@@ -1337,7 +1444,9 @@ async function pdfSignFill(file){
         page.drawImage(png,{x:localX,y:pg.hPt-(localTop+hPt),width:wPt,height:hPt});
       }
     }
+    return dropped;
   }
+  const droppedNote=d=>d?' A few characters (like emoji) can’t be drawn into a PDF and were skipped.':'';
   bExport.onclick=async()=>{
     if(!items.length){ toast('Add a signature or text first'); return; }
     bExport.disabled=true; const onP2=progress('Building signed PDF'); onP2(.25);
@@ -1346,8 +1455,8 @@ async function pdfSignFill(file){
       // Primary: overlay onto the original PDF (keeps existing pages vector + text selectable).
       const out=await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
       const opages=out.getPages();
-      await placeItems(out, pi=>opages[pi]);
-      showResult(new Blob([await out.save()],{type:'application/pdf'}), base(file.name)+'-signed.pdf', {note:'Your signature & text are flattened onto the PDF.'});
+      const dropped=await placeItems(out, pi=>opages[pi]);
+      showResult(new Blob([await out.save()],{type:'application/pdf'}), base(file.name)+'-signed.pdf', {note:'Your signature & text are flattened onto the PDF.'+droppedNote(dropped)});
     }catch(e){
       // Some PDFs can't be edited in place (pdf-lib can't resolve their object graph — e.g. a
       // dangling reference or an unusual stream filter). Rebuild a fresh PDF from the page images
@@ -1363,8 +1472,8 @@ async function pdfSignFill(file){
           const jpg=await blobOf(rc,'image/jpeg',.92); const im=await out.embedJpg(await jpg.arrayBuffer());
           const page=out.addPage([pages[pi].wPt,pages[pi].hPt]); page.drawImage(im,{x:0,y:0,width:pages[pi].wPt,height:pages[pi].hPt}); made.push(page);
         }
-        await placeItems(out, pi=>made[pi]);
-        showResult(new Blob([await out.save()],{type:'application/pdf'}), base(file.name)+'-signed.pdf', {note:'Flattened to a fresh PDF, since the original couldn’t be edited in place.'});
+        const dropped=await placeItems(out, pi=>made[pi]);
+        showResult(new Blob([await out.save()],{type:'application/pdf'}), base(file.name)+'-signed.pdf', {note:'Flattened to a fresh PDF, since the original couldn’t be edited in place.'+droppedNote(dropped)});
       }catch(e2){ fail(e2); }
     } finally{ bExport.disabled=false; }
   };

@@ -178,10 +178,13 @@ def main():
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
         url = f"http://127.0.0.1:{PORT}/index.html"
-        print("\n  🗄️  Junk Drawer is running")
-        print(f"  →  {url}")
-        print(f"  link-downloads: yt-dlp {'✓' if have('yt-dlp') else '✗ (not installed)'}  "
-              f"spotdl {'✓' if have('spotdl') else '✗'}  ffmpeg {'✓' if have('ffmpeg') else '✗'}")
+        def say(s):  # Windows consoles often use cp1252, which can't print the emoji/arrows
+            try: print(s)
+            except UnicodeEncodeError: print(s.encode("ascii", "replace").decode())
+        say("\n  🗄️  Junk Drawer is running")
+        say(f"  →  {url}")
+        say(f"  link-downloads: yt-dlp {'✓' if have('yt-dlp') else '✗ (not installed)'}  "
+            f"spotdl {'✓' if have('spotdl') else '✗'}  ffmpeg {'✓' if have('ffmpeg') else '✗'}")
         print("\n  Leave this window open. Close it (or press Ctrl+C) to stop.\n")
         try:
             webbrowser.open(url)
