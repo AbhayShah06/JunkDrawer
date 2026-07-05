@@ -300,7 +300,8 @@
 
 <footer><div class="wrap">
   <div>Built by <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">Abhay Shah</a>
-    · <a href="https://x.com/AbhayShahCA" target="_blank" rel="noopener">@AbhayShahCA</a></div>
+    · <a href="https://x.com/AbhayShahCA" target="_blank" rel="noopener">@AbhayShahCA</a>
+    · <a href="#" id="manageStorage">Manage storage</a></div>
   <div class="cr">Everything runs on your computer. Your files never leave it.
     <details class="credits" style="margin-top:6px">
       <summary style="cursor:pointer; font-weight:bold; color:var(--ink)">Open-source credits</summary>
@@ -438,21 +439,26 @@ async function runFF(file,outName,argsFn,label,extra){ // extra:{name,data:Blob}
   if(extra) ff.deleteFile(extra.name).catch(()=>{});
   return new Blob([data.buffer],{type:mimeOf(outName)});
 }
+let _jobCtl=null;  // in-flight ffmpeg/tool job; aborted when the user switches tools / resets / starts another
 async function runFFNative(file,inName,outName,args,label,extra){
+  if(_jobCtl){ try{ _jobCtl.abort(); }catch{} }   // cancel any previous job (the SPA tool switch doesn't close the fetch on its own)
+  const ctl=new AbortController(); _jobCtl=ctl;
   const onP=progress(label); onP(.04);
   const meta=encodeURIComponent(JSON.stringify({inName,outName,args,extraName:extra?extra.name:undefined}));
   const id=(((self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'-'+Math.random()))+'').replace(/[^a-z0-9-]/gi,'').slice(0,64);
-  if(extra){ const r=await fetch('/api/ffmpeg-extra?id='+id+'&name='+encodeURIComponent(extra.name),{method:'POST',body:extra.data});
+  if(extra){ const r=await fetch('/api/ffmpeg-extra?id='+id+'&name='+encodeURIComponent(extra.name),{method:'POST',body:extra.data,signal:ctl.signal});
     if(!r.ok) throw new Error('Could not read the extra file'); }
   // Poll the server for ffmpeg's real encode progress so the bar advances during long jobs.
   const poll=setInterval(async()=>{ try{ const r=await fetch('/api/ffmpeg-progress?id='+id); const j=await r.json();
     if(j&&typeof j.percent==='number') onP(.04+0.9*Math.min(1,Math.max(0,j.percent))); }catch{} },600);
   try{
-    const res=await fetch('/api/ffmpeg?meta='+meta+'&id='+id,{method:'POST',body:file});
+    const res=await fetch('/api/ffmpeg?meta='+meta+'&id='+id,{method:'POST',body:file,signal:ctl.signal});
     if(!res.ok){ let m=''; try{ const j=await res.json(); m=j.detail||j.error||''; }catch{} throw new Error(m?('ffmpeg: '+m):('ffmpeg failed ('+res.status+')')); }
     const buf=await res.arrayBuffer(); onP(1);
+    if(_jobCtl===ctl) _jobCtl=null;
     return new Blob([buf],{type:mimeOf(outName)});
-  } finally { clearInterval(poll); }
+  } catch(e){ if(e&&e.name==='AbortError') return; throw e; }
+  finally { clearInterval(poll); }
 }
 /* Native helper tools beyond ffmpeg (whisper / RAW / upscale) — desktop app only.
    The server builds the argv; we just name the tool, simple options, and stream the file. */
@@ -461,6 +467,8 @@ async function nativeInfo(){ if(_nativeInfo) return _nativeInfo;
   try{ const r=await fetch('/api/check'); _nativeInfo=await r.json(); }catch{ _nativeInfo={}; }
   return _nativeInfo; }
 async function runTool(file,tool,opts,outName,label){
+  if(_jobCtl){ try{ _jobCtl.abort(); }catch{} }   // cancel any previous job (the SPA tool switch doesn't close the fetch on its own)
+  const ctl=new AbortController(); _jobCtl=ctl;
   const inName='in.'+ext(file.name);
   const onP=progress(label); onP(.03);
   const id=(((self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'-'+Math.random()))+'').replace(/[^a-z0-9-]/gi,'').slice(0,64);
@@ -468,11 +476,13 @@ async function runTool(file,tool,opts,outName,label){
   const poll=setInterval(async()=>{ try{ const r=await fetch('/api/ffmpeg-progress?id='+id); const j=await r.json();
     if(j&&typeof j.percent==='number') onP(.03+.94*Math.min(1,Math.max(0,j.percent))); }catch{} },600);
   try{
-    const res=await fetch('/api/tool?meta='+meta+'&id='+id,{method:'POST',body:file});
+    const res=await fetch('/api/tool?meta='+meta+'&id='+id,{method:'POST',body:file,signal:ctl.signal});
     if(!res.ok){ let m=''; try{ const j=await res.json(); m=j.detail||j.error||''; }catch{} throw new Error(m||('tool failed ('+res.status+')')); }
     const buf=await res.arrayBuffer(); onP(1);
+    if(_jobCtl===ctl) _jobCtl=null;
     return new Blob([buf],{type:mimeOf(outName)});
-  } finally { clearInterval(poll); }
+  } catch(e){ if(e&&e.name==='AbortError') return; throw e; }
+  finally { clearInterval(poll); }
 }
 async function ensureModel(name,readyFlag,label){
   const info=await nativeInfo();
@@ -925,10 +935,13 @@ add({cat:'video',kinds:['video'],nm:'Fix Phone Video for Editing',ds:'Stop audio
 add({cat:'video',kinds:['video'],nm:'Burn In Subtitles',ds:'Print captions right onto the video',kw:'subtitles captions srt vtt burn hardcode hardsub tiktok reels muted',
   more:'Prints a subtitle file permanently onto the picture, so captions show even where subtitles aren’t supported. Most social video is watched on mute — captions keep people watching.',
   opts:()=>{ const inp=el('input',{type:'file',accept:'.srt,.vtt,.ass'});
-    return {node:el('label',{},['subtitle file ',inp]),get:()=>({sub:inp.files&&inp.files[0]})}; },
+    const sz=el('select'); [['18','Small'],['28','Medium'],['40','Large']].forEach(([v,l])=>sz.append(el('option',{value:v,textContent:l}))); sz.value='28';
+    const pos=el('select'); [['bottom','Bottom'],['top','Top']].forEach(([v,l])=>pos.append(el('option',{value:v,textContent:l})));
+    return {node:el('div',{},[el('label',{},['subtitle file ',inp]),' ',el('label',{},['size ',sz]),' ',el('label',{},['position ',pos])]),get:()=>({sub:inp.files&&inp.files[0],fsize:sz.value,fpos:pos.value})}; },
   check:(f,o)=>!o.sub?{msg:'Pick the subtitle file (.srt or .vtt) that goes with this video. You can export one from a captions app, or write one in any text editor.'}:null,
   run:async (f,o)=>{ const se=ext(o.sub.name); const sn='sub.'+(['srt','vtt','ass'].includes(se)?se:'srt');
-    showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-vf',`subtitles=${sn}:force_style='FontName=Arial,FontSize=20,Outline=1'`,'-c:v','libx264','-pix_fmt','yuv420p','-crf','21','-preset','veryfast','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Burning in captions',{name:sn,data:o.sub}),base(f.name)+'-captioned.mp4'); }});
+    const fstyle=jdCapStyle(o.fsize,o.fpos);
+    showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-vf',`subtitles=${sn}:force_style='${fstyle}'`,'-c:v','libx264','-pix_fmt','yuv420p','-crf','21','-preset','veryfast','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Burning in captions',{name:sn,data:o.sub}),base(f.name)+'-captioned.mp4'); }});
 add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'mute remove audio silence',
   more:'Removes the sound and keeps the picture. Good for hiding background noise before you share.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
@@ -980,12 +993,17 @@ add({cat:'audio',input:'text',nm:'Make a Voiceover',ds:'Turn typed words into na
     showResult(wav,'voiceover.wav',{note:txt.length>5000?'That was a lot of text — the first ~5,000 characters were read.':''}); }});
 add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitles',ds:'Turn speech into text or an SRT caption file',kw:'transcribe transcription speech to text subtitles captions srt vtt whisper voice memo interview lecture auto',
   more:'Listens to a recording or video and writes out what was said — as plain text, or as an SRT subtitle file you can burn in with the captions tool. The first run downloads the speech model once (~140 MB); after that it works fully offline. Handles most languages.',
-  opts:oSel('give me',[['srt','Subtitles (SRT)'],['txt','Plain text'],['vtt','Web captions (VTT)']],'fmt'),
+  opts:()=>{ const fmt=el('select'); [['srt','Subtitles (SRT)'],['txt','Plain text'],['vtt','Web captions (VTT)']].forEach(([v,l])=>fmt.append(el('option',{value:v,textContent:l})));
+    const q=el('select'); [['base','Fast (~140 MB) — quickest, fine for clear speech'],['small','Balanced (~465 MB) — much better, recommended'],['medium','Accurate (~1.5 GB) — best, slow, catches the hard parts']].forEach(([v,l])=>q.append(el('option',{value:v,textContent:l}))); q.value='small';
+    return {node:el('div',{},[el('label',{},['give me ',fmt]),el('label',{style:'margin-left:12px'},['quality ',q])]),get:()=>({fmt:fmt.value,model:q.value})}; },
   run:async (f,o)=>{ const info=await nativeInfo(); if(!info.whisper) return showGuide(needDesktop('Transcribing'));
-    if(!info.whisperModel) await ensureModel('ggml-base.bin','whisperModel','Downloading the speech model (one time, ~140 MB)');
+    const MODELS={base:{file:'ggml-base.bin',flag:'whisperModel',label:'Fast',size:'~140 MB'},small:{file:'ggml-small.bin',flag:'whisperSmall',label:'Balanced',size:'~465 MB'},medium:{file:'ggml-medium.bin',flag:'whisperMedium',label:'Accurate',size:'~1.5 GB'}};
+    const model=['base','small','medium'].includes(o.model)?o.model:'small';
+    const m=MODELS[model];
+    if(!info[m.flag]) await ensureModel(m.file,m.flag,`Downloading the ${m.label.toLowerCase()} speech model (one time, ${m.size})`);
     const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
     const fmt=['srt','txt','vtt'].includes(o.fmt)?o.fmt:'srt';
-    const b=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt},'out.'+fmt,'Listening and writing (a long recording takes a while)');
+    const b=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt,model},'out.'+fmt,'Listening and writing (a long recording takes a while)');
     if(fmt==='txt') showText((await b.text()).trim(),base(f.name)+'.txt');
     else showResult(b,base(f.name)+'.'+fmt,{note:fmt==='srt'?'Pairs perfectly with “Burn In Subtitles”.':''}); }});
 add({cat:'video',kinds:['video','audio'],rec:1,custom:f=>captionStudio(f),nm:'Caption Studio',ds:'Auto-caption a video, then fix the words and timing',kw:'captions subtitles srt vtt whisper auto generate edit editor transcribe burn tiktok reels shorts timing sync',
@@ -1325,6 +1343,50 @@ function renderText(t,prefill=''){ const color=CATS[t.cat].color; openStage();
   p.append(el('div',{className:'runrow'},[go]));
 }
 
+/* Manage storage — list installed downloadable AI models and let the user delete them to reclaim disk. */
+const MODEL_LABELS={
+  'ggml-base.bin':'Subtitles model — base (fast, good enough)',
+  'ggml-small.bin':'Subtitles model — small (more accurate)',
+  'ggml-medium.bin':'Subtitles model — medium (most accurate)',
+  'UVR-MDX-NET-Voc_FT.onnx':'Split song into stems (vocals model)',
+  'vits-piper-en_US-amy-medium':'Text-to-speech voice (Amy, en-US)',
+};
+async function renderStorage(){ openStage();
+  const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.dev.color); $('#output').innerHTML=''; clearStatus();
+  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Manage storage'}),el('span',{className:'badge',textContent:'Storage'})]));
+  p.append(el('div',{className:'ds',textContent:'Downloadable AI models live on your computer. Delete any you don’t use to free up disk.'}));
+  const list=el('div',{className:'opts'}); p.append(list);
+  const load=async()=>{
+    list.innerHTML='';
+    let j; try{ j=await (await fetch('/api/models')).json(); }
+    catch{ list.append(el('div',{className:'ds',textContent:'This only works in the Junk Drawer desktop app — a plain browser tab has no models to manage.'})); return; }
+    const models=j.models||[]; let totalMB=0;
+    for(const m of models){
+      const label=MODEL_LABELS[m.name]||m.name;
+      const size=(m.sizeMB>=1000?(m.sizeMB/1000).toFixed(2)+' GB':m.sizeMB+' MB');
+      if(m.ready) totalMB+=m.sizeMB;
+      const status=el('span',{style:'font:11px var(--mono); opacity:.75',
+        textContent:m.ready?('Installed · '+size):('Not installed · '+size+' if downloaded')});
+      const kids=[el('div',{style:'flex:1 1 auto'},[el('div',{style:'font-weight:bold',textContent:label}),status])];
+      if(m.ready){
+        const del=el('button',{className:'btn ghost',textContent:'Delete'});
+        del.onclick=async()=>{ if(!confirm('Delete "'+label+'"? You can re-download it later.')) return;
+          del.disabled=true; del.textContent='Deleting…';
+          try{ const r=await fetch('/api/delete-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:m.name})});
+            if(!(await r.json()).ok) throw 0; toast('Deleted — disk freed'); }
+          catch{ toast('Couldn’t delete that one'); }
+          _nativeInfo=null; await load(); };
+        kids.push(del);
+      }
+      list.append(el('div',{style:'display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--sh2)'},kids));
+    }
+    const totStr=(totalMB>=1000?(totalMB/1000).toFixed(2)+' GB':totalMB+' MB');
+    list.append(el('div',{style:'margin-top:10px; font-weight:bold',textContent:'Total installed: '+(totalMB?totStr:'nothing yet')}));
+  };
+  await load();
+}
+$('#manageStorage').onclick=(e)=>{ e.preventDefault(); renderStorage(); };
+
 /* link-download panel (YouTube / Spotify, via the local server) */
 let backend={ ok:{ytdlp:false,spotdl:false,ffmpeg:false}, up:false };
 fetch('/api/check').then(r=>r.ok?r.json():null).then(j=>{ if(j){ backend.ok=j; backend.up=true; } }).catch(()=>{});
@@ -1406,7 +1468,7 @@ async function postDownload(url,mode){
 }
 
 function openStage(){ $('#stage').style.display='block'; $('#stage').scrollIntoView({behavior:'smooth',block:'start'}); }
-function resetStage(){ if(_dlCtl){ try{ _dlCtl.abort(); }catch{} _dlCtl=null; } $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; freeResUrls(); }
+function resetStage(){ if(_dlCtl){ try{ _dlCtl.abort(); }catch{} _dlCtl=null; } if(_jobCtl){ try{ _jobCtl.abort(); }catch{} _jobCtl=null; } $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; freeResUrls(); }
 
 /* receipt after a file is dropped */
 function showReceipt(file){
@@ -1575,6 +1637,7 @@ function jdParseSrt(str){ const cues=[]; const blocks=String(str).replace(/\r/g,
   return cues; }
 function jdSrtOf(cues){ return cues.map((c,i)=>(i+1)+'\n'+jdFmtTs(c.start,',')+' --> '+jdFmtTs(c.end,',')+'\n'+(c.text||'')).join('\n\n')+'\n'; }
 function jdVttOf(cues){ return 'WEBVTT\n\n'+cues.map(c=>jdFmtTs(c.start,'.')+' --> '+jdFmtTs(c.end,'.')+'\n'+(c.text||'')).join('\n\n')+'\n'; }
+function jdCapStyle(size,pos){ const fs=/^\d+$/.test(String(size))?size:'28'; return 'FontName=Arial,FontSize='+fs+',Outline=1'+(pos==='top'?',Alignment=8':''); }
 
 async function captionStudio(file){
   openStage();
@@ -1657,14 +1720,19 @@ async function captionStudio(file){
     dlSrt.onclick=()=>showResult(new Blob([jdSrtOf(cues)],{type:'text/plain'}),base(file.name)+'.srt',{note:'Edited captions — pairs with Burn In Subtitles too.'});
     const dlVtt=el('button',{className:'btn ghost',textContent:'Download .vtt'});
     dlVtt.onclick=()=>showResult(new Blob([jdVttOf(cues)],{type:'text/plain'}),base(file.name)+'.vtt');
+    const capSize=el('select'); [['18','Small'],['28','Medium'],['40','Large']].forEach(([v,l])=>capSize.append(el('option',{value:v,textContent:l}))); capSize.value='28';
+    const capPos=el('select'); [['bottom','Bottom'],['top','Top']].forEach(([v,l])=>capPos.append(el('option',{value:v,textContent:l})));
+    const capOpts=el('div',{style:'display:flex;gap:8px;align-items:center'},[el('label',{},['size ',capSize]),el('label',{},['position ',capPos])]);
+    if(!isVideo) capOpts.style.display='none';
     const burn=el('button',{className:'btn',textContent:'Burn into video'});
     if(!isVideo) burn.style.display='none';
     burn.onclick=async()=>{ burn.disabled=true;
       try{ const srt=new Blob([jdSrtOf(cues)],{type:'text/plain'});
-        const out=await runFF(file,'out.mp4',(i,o)=>['-i',i,'-vf',"subtitles=subs.srt:force_style='FontName=Arial,FontSize=20,Outline=1'",'-c:v','libx264','-pix_fmt','yuv420p','-crf','21','-preset','veryfast','-c:a','aac','-b:a','192k','-movflags','+faststart',o],'Burning in captions',{name:'subs.srt',data:srt});
+        const fstyle=jdCapStyle(capSize.value,capPos.value);
+        const out=await runFF(file,'out.mp4',(i,o)=>['-i',i,'-vf',`subtitles=subs.srt:force_style='${fstyle}'`,'-c:v','libx264','-pix_fmt','yuv420p','-crf','21','-preset','veryfast','-c:a','aac','-b:a','192k','-movflags','+faststart',o],'Burning in captions',{name:'subs.srt',data:srt});
         showResult(out,base(file.name)+'-captioned.mp4',{note:'Captions burned onto the video.'});
       }catch(e){ fail(e); } finally{ burn.disabled=false; } };
-    wrap.append(el('div',{className:'runrow'},[dlSrt,dlVtt,burn,addBtn,regen]));
+    wrap.append(el('div',{className:'runrow'},[dlSrt,dlVtt,capOpts,burn,addBtn,regen]));
     p.append(wrap);
   }
 

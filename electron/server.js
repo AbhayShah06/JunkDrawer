@@ -201,8 +201,12 @@ function handleFFmpeg(req, res, binDir) {
         ffExtras.delete(id); cleanup(path.dirname(e.path));
       }
     }
-    const child = spawn(ffmpeg, args, { cwd: tmp });
+    // detached → child leads its own process group, so we can kill ffmpeg (and any children) as a tree
+    const child = spawn(ffmpeg, args, { cwd: tmp, detached: true });
     let err = '', durSec = 0;
+    const killTree = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch {} } };
+    // If the client goes away mid-job (tool switch / reset), kill the tree so ffmpeg isn't left orphaned.
+    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(); if (id) ffProgress.delete(id); cleanup(tmp); } });
     const hms = s => { const m = /(\d+):(\d\d):(\d\d(?:\.\d+)?)/.exec(s); return m ? (+m[1] * 3600 + +m[2] * 60 + +m[3]) : 0; };
     child.stderr.on('data', d => {
       const s = String(d); err += s; if (err.length > 20000) err = err.slice(-20000);
@@ -211,8 +215,9 @@ function handleFFmpeg(req, res, binDir) {
       const tm = /time=\s*(\d+:\d\d:\d\d(?:\.\d+)?)/.exec(s);
       if (id && durSec && tm) ffProgress.set(id, Math.min(0.999, hms(tm[1]) / durSec));
     });
-    child.on('error', e => { if (id) ffProgress.delete(id); cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
+    child.on('error', e => { if (aborted) return; if (id) ffProgress.delete(id); cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
     child.on('close', code => {
+      if (aborted) return;
       if (code !== 0 || !fs.existsSync(outPath)) { if (id) ffProgress.delete(id); const d = err.slice(-2500); cleanup(tmp); return sendJSON(res, { error: 'tool-failed', detail: d || ('ffmpeg exit ' + code) }, 500); }
       let stat; try { stat = fs.statSync(outPath); } catch { if (id) ffProgress.delete(id); cleanup(tmp); return sendJSON(res, { error: 'read-failed' }, 500); }
       // Stream the result straight off disk instead of buffering the whole file in memory.
@@ -390,6 +395,34 @@ function handleFetchModel(req, res, modelsDir) {
     });
   });
 }
+function handleModels(res, modelsDir) { // list installed/downloadable models for the "Manage storage" panel
+  const out = Object.keys(MODELS).map(name => ({
+    name, ready: modelReady(modelsDir, name),
+    sizeMB: Math.round(MODELS[name].size / 1e6),
+    path: MODELS[name].ready ? path.join(modelsDir, MODELS[name].ready) : modelPath(modelsDir, name),
+  }));
+  return sendJSON(res, { models: out });
+}
+function handleDeleteModel(req, res, modelsDir) { // remove a model file (+ .part, + extracted dir) to reclaim disk
+  let chunks = [];
+  req.on('error', () => {});
+  req.on('data', c => { chunks.push(c); if (Buffer.concat(chunks).length > 4096) req.destroy(); });
+  req.on('end', () => {
+    let j; try { j = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return sendJSON(res, { error: 'bad body' }, 400); }
+    const name = j.name, m = MODELS[name];
+    if (!m) return sendJSON(res, { error: 'unknown-model' }, 400);
+    const dest = modelPath(modelsDir, name);
+    try { fs.rmSync(dest + '.part', { force: true }); } catch {}
+    if (m.archive) { // archive models extract into a directory alongside the .tar.bz2 bundle
+      const dir = m.ready ? path.join(modelsDir, path.dirname(m.ready)) : dest;
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+      try { fs.rmSync(dest, { force: true }); } catch {}
+    } else {
+      try { fs.rmSync(dest, { force: true }); } catch {}
+    }
+    return sendJSON(res, { ok: true });
+  });
+}
 function handleTool(req, res, binDir, modelsDir) {
   const reject = (obj, code) => { try { req.resume(); } catch {} return sendJSON(res, obj, code); };
   req.on('error', () => {});
@@ -494,8 +527,12 @@ function handleTool(req, res, binDir, modelsDir) {
   ws.on('finish', () => {
     if (aborted) return;
     if (late) { const bad = late(inPath); if (bad) { cleanup(tmp); return sendJSON(res, { error: bad }, 400); } }
-    let err = '';
+    let err = '', curChild = null;
+    const killTree = () => { if (!curChild) return; try { process.kill(-curChild.pid, 'SIGKILL'); } catch { try { curChild.kill('SIGKILL'); } catch {} } };
+    // If the client goes away mid-job (tool switch / reset), kill the running step so whisper/tts/stems/upscale/raw aren't left orphaned.
+    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(); if (id) ffProgress.delete(id); cleanup(tmp); } });
     const runStep = k => {
+      if (aborted) return;
       if (k >= plan.length) {
         if (id) ffProgress.delete(id);
         let stat; try { stat = fs.statSync(outPath); } catch { cleanup(tmp); return sendJSON(res, { error: 'tool-failed', detail: err.slice(-2500) }, 500); }
@@ -508,12 +545,15 @@ function handleTool(req, res, binDir, modelsDir) {
         return rs.pipe(res);
       }
       const { bin, args, prog, stdout } = plan[k];
-      const child = spawn(bin, args, { cwd: tmp });
+      // detached → child leads its own process group, so a cancelled job can be killed as a tree
+      const child = spawn(bin, args, { cwd: tmp, detached: true });
+      curChild = child;
       if (stdout) child.stdout.pipe(fs.createWriteStream(path.join(tmp, stdout)));
       child.stderr.on('data', d => { const s = String(d); err += s; if (err.length > 20000) err = err.slice(-20000);
         if (id && prog) { const p = prog(s); if (p != null) ffProgress.set(id, Math.min(0.999, (k + Math.max(0, p)) / plan.length)); } });
-      child.on('error', e => { if (id) ffProgress.delete(id); cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
+      child.on('error', e => { if (aborted) return; if (id) ffProgress.delete(id); cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
       child.on('close', code => {
+        if (aborted) return;
         if (code !== 0) { if (id) ffProgress.delete(id); const d = err.slice(-2500); cleanup(tmp); return sendJSON(res, { error: 'tool-failed', detail: d || (path.basename(bin) + ' exit ' + code) }, 500); }
         runStep(k + 1);
       });
@@ -621,6 +661,8 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
       if (url === '/api/ffmpeg-extra' && req.method === 'POST') return handleFFmpegExtra(req, res);
       if (url === '/api/tool' && req.method === 'POST') return handleTool(req, res, binDir, modelsDir);
       if (url === '/api/fetch-model' && req.method === 'POST') return handleFetchModel(req, res, modelsDir);
+      if (url === '/api/models') return handleModels(res, modelsDir);
+      if (url === '/api/delete-model' && req.method === 'POST') return handleDeleteModel(req, res, modelsDir);
       if (url === '/api/cards') return sendJSON(res, { cards: listCards() });
       if (url === '/api/import-card' && req.method === 'POST') return handleImportCard(req, res);
       // A file the user opened from the OS ("Open with → Junk Drawer"). main.js queues its
