@@ -110,6 +110,35 @@ function cleanup(d) { try { fs.rmSync(d, { recursive: true, force: true }); } ca
 // and polled by the renderer via /api/ffmpeg-progress so the bar moves during long encodes.
 const ffProgress = new Map();
 
+// Small companion files for an ffmpeg job (e.g. the .srt for subtitle burn-in). The renderer
+// uploads them here first, keyed by the job id, and handleFFmpeg copies them into the job's
+// temp dir. Same name rules as the main file; capped small since these are text-sized.
+const ffExtras = new Map(); // id -> {path, name}
+const okJobName = n => typeof n === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(n) && !n.includes('..');
+function handleFFmpegExtra(req, res) {
+  const sp = new URLSearchParams(req.url.split('?')[1] || '');
+  const id = (sp.get('id') || '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 64);
+  const name = sp.get('name') || '';
+  if (!id || !okJobName(name)) { try { req.resume(); } catch {} return sendJSON(res, { error: 'bad-extra' }, 400); }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-extra-'));
+  const p = path.join(dir, name);
+  const ws = fs.createWriteStream(p);
+  let size = 0, dead = false;
+  const die = (obj, code) => { if (dead) return; dead = true; try { req.destroy(); } catch {} try { ws.destroy(); } catch {} cleanup(dir); sendJSON(res, obj, code); };
+  req.on('data', c => { size += c.length; if (size > 20 * 1048576) die({ error: 'too-big' }, 413); });
+  req.on('error', () => die({ error: 'upload-failed' }, 400));
+  ws.on('error', () => die({ error: 'write-failed' }, 500));
+  req.pipe(ws);
+  ws.on('finish', () => {
+    if (dead) return;
+    const old = ffExtras.get(id); if (old) cleanup(path.dirname(old.path));
+    ffExtras.set(id, { path: p, name });
+    const t = setTimeout(() => { const e = ffExtras.get(id); if (e && e.path === p) { ffExtras.delete(id); cleanup(dir); } }, 10 * 60 * 1000);
+    if (t.unref) t.unref();
+    sendJSON(res, { ok: true });
+  });
+}
+
 // Run the bundled NATIVE ffmpeg on a user file (≈10× faster than the in-browser
 // wasm core). The renderer streams the raw file as the body and passes the ffmpeg
 // argv + the in/out filenames as a JSON `meta` query param. We rebuild nothing from
@@ -153,6 +182,14 @@ function handleFFmpeg(req, res, binDir) {
   req.pipe(ws);
   ws.on('finish', () => {
     if (aborted) return;
+    // pull in any companion file uploaded for this job (e.g. subtitles for burn-in)
+    if (meta.extraName && okJobName(meta.extraName)) {
+      const e = ffExtras.get(id);
+      if (e && e.name === meta.extraName) {
+        try { fs.copyFileSync(e.path, path.join(tmp, e.name)); } catch {}
+        ffExtras.delete(id); cleanup(path.dirname(e.path));
+      }
+    }
     const child = spawn(ffmpeg, args, { cwd: tmp });
     let err = '', durSec = 0;
     const hms = s => { const m = /(\d+):(\d\d):(\d\d(?:\.\d+)?)/.exec(s); return m ? (+m[1] * 3600 + +m[2] * 60 + +m[3]) : 0; };
@@ -298,6 +335,7 @@ function startServer(appRoot, binDir, updater, opener) {
       if (url === '/api/ffmpeg-progress')
         return sendJSON(res, { percent: ffProgress.get(new URLSearchParams(req.url.split('?')[1] || '').get('id') || '') || 0 });
       if (url === '/api/ffmpeg' && req.method === 'POST') return handleFFmpeg(req, res, binDir);
+      if (url === '/api/ffmpeg-extra' && req.method === 'POST') return handleFFmpegExtra(req, res);
       // A file the user opened from the OS ("Open with → Junk Drawer"). main.js queues its
       // absolute path; we read it once and hand the renderer the bytes for the viewer. The
       // path is set only by main.js from OS open events — never from client input.

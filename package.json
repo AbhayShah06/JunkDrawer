@@ -28,18 +28,36 @@
     "heic2any": "^0.0.4",
     "js-yaml": "^4.1.0",
     "jsqr": "^1.4.0",
+    "libarchive.js": "^2.0.2",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.0.379",
-    "qrcode": "^1.5.3"
+    "qrcode": "^1.5.3",
+    "tesseract.js": "^7.0.0"
   },
   "build": {
     "appId": "vc.axl.junkdrawer",
     "productName": "Junk Drawer",
     "fileAssociations": [
-      { "ext": "pdf", "name": "PDF Document", "role": "Viewer" },
-      { "ext": "md", "name": "Markdown Document", "role": "Viewer" },
-      { "ext": "markdown", "name": "Markdown Document", "role": "Viewer" },
-      { "ext": "txt", "name": "Text Document", "role": "Viewer" }
+      {
+        "ext": "pdf",
+        "name": "PDF Document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "md",
+        "name": "Markdown Document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "markdown",
+        "name": "Markdown Document",
+        "role": "Viewer"
+      },
+      {
+        "ext": "txt",
+        "name": "Text Document",
+        "role": "Viewer"
+      }
     ],
     "files": [
       "index.html",

@@ -360,7 +360,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const base = n => n.replace(/\.[^.]+$/,'');
 const toast = m => { const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1700); };
 
-const IMG=['png','jpg','jpeg','webp','gif','bmp','heic','heif','avif','tif','tiff','ico'];
+const IMG=['png','jpg','jpeg','webp','gif','bmp','heic','heif','avif','jxl','tif','tiff','ico'];
 const VID=['mp4','mov','mkv','webm','avi','flv','wmv','m4v','3gp','mpeg','mpg','ts','m2ts','ogv'];
 const AUD=['mp3','wav','aac','m4a','flac','ogg','opus','wma','aiff','aif'];
 const DAT=['csv','tsv','json','xml','yaml','yml','toml','xlsx','xls','ods'];
@@ -372,6 +372,28 @@ function kind(f){ const e=ext(f.name);
   if(DOC.includes(e))return'doc'; return'other'; }
 
 /* ---------------- lazy heavy deps ---------------- */
+// OCR: tesseract.js, fully vendored (worker + wasm core + English model)
+async function ocrImage(f,onP){
+  const {createWorker}=await import('./vendor/tesseract/tesseract.mjs');
+  const w=await createWorker('eng',1,{
+    workerPath:'./vendor/tesseract/worker.min.js',
+    corePath:'./vendor/tesseract',
+    langPath:'./vendor/tesseract/lang',
+    logger:m=>{ if(onP&&typeof m.progress==='number'&&m.status==='recognizing text')onP(.15+.8*m.progress); }});
+  try{ const {data}=await w.recognize(f); return data.text||''; }
+  finally{ w.terminate(); }
+}
+// Archives beyond zip (rar/7z/tar…): libarchive.js wasm, extracted entirely in memory
+async function extractArchive(f){
+  const {Archive}=await import('./vendor/libarchive/libarchive.mjs');
+  Archive.init({workerUrl:'./vendor/libarchive/worker-bundle.js'});
+  const a=await Archive.open(f);
+  if(await a.hasEncryptedData()) throw new Error('That archive is password-protected. Unlock it in the app that made it, or ask the sender for an unprotected copy.');
+  const tree=await a.extractFiles();
+  const out=[]; const walk=(node,prefix)=>{ for(const k in node){ const v=node[k];
+    if(v instanceof File) out.push({name:prefix+k,file:v}); else if(v&&typeof v==='object') walk(v,prefix+k+'/'); } };
+  walk(tree,''); return out;
+}
 let _bg=null, _bgGpu=null;  // _bgGpu: null=untried, true=GPU works, false=fell back to CPU
 async function bgRemove(blob,onP){ if(!_bg) _bg=(await import("./vendor/imgly/background-removal.mjs")).removeBackground;
   // imgly can't decode HEIC, so an iPhone photo would fail outright — convert it to PNG first.
@@ -408,25 +430,29 @@ async function nativeFFAvailable(){
   try{ const r=await fetch('/api/check'); _nativeFF=!!(await r.json()).ffmpeg; }catch{ _nativeFF=false; }
   return _nativeFF;
 }
-async function runFF(file,outName,argsFn,label){
+async function runFF(file,outName,argsFn,label,extra){ // extra:{name,data:Blob} — a small companion file (e.g. subtitles)
   if(file.size>500*1048576) throw new Error(`This video is ${Math.round(file.size/1048576)} MB, past the roughly 500 MB the app can handle in memory. Trim it to a shorter clip first, or export a smaller version from your phone or editor.`);
   const inName='in.'+ext(file.name);
   const args=argsFn(inName,outName);
   // Desktop app: run the bundled NATIVE ffmpeg (≈10× faster than wasm) through the
   // local server. Plain browser / dev server (no /api backend) falls back to the
   // in-browser wasm core below.
-  if(await nativeFFAvailable()) return runFFNative(file,inName,outName,args,label);
+  if(await nativeFFAvailable()) return runFFNative(file,inName,outName,args,label,extra);
   const onP=progress(label); const ff=await getFF(onP); const { fetchFile }=await ffutil();
   await ff.writeFile(inName, await fetchFile(file));
+  if(extra) await ff.writeFile(extra.name, await fetchFile(extra.data));
   await ff.exec(args);
   const data=await ff.readFile(outName);
   ff.deleteFile(inName).catch(()=>{}); ff.deleteFile(outName).catch(()=>{});
+  if(extra) ff.deleteFile(extra.name).catch(()=>{});
   return new Blob([data.buffer],{type:mimeOf(outName)});
 }
-async function runFFNative(file,inName,outName,args,label){
+async function runFFNative(file,inName,outName,args,label,extra){
   const onP=progress(label); onP(.04);
-  const meta=encodeURIComponent(JSON.stringify({inName,outName,args}));
+  const meta=encodeURIComponent(JSON.stringify({inName,outName,args,extraName:extra?extra.name:undefined}));
   const id=(((self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'-'+Math.random()))+'').replace(/[^a-z0-9-]/gi,'').slice(0,64);
+  if(extra){ const r=await fetch('/api/ffmpeg-extra?id='+id+'&name='+encodeURIComponent(extra.name),{method:'POST',body:extra.data});
+    if(!r.ok) throw new Error('Could not read the extra file'); }
   // Poll the server for ffmpeg's real encode progress so the bar advances during long jobs.
   const poll=setInterval(async()=>{ try{ const r=await fetch('/api/ffmpeg-progress?id='+id); const j=await r.json();
     if(j&&typeof j.percent==='number') onP(.04+0.9*Math.min(1,Math.max(0,j.percent))); }catch{} },600);
@@ -438,6 +464,7 @@ async function runFFNative(file,inName,outName,args,label){
   } finally { clearInterval(poll); }
 }
 const mimeOf = n => ({gif:'image/gif',mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',png:'image/png',
+  avif:'image/avif',jxl:'image/jxl',srt:'text/plain',vtt:'text/vtt',tif:'image/tiff',tiff:'image/tiff',
   jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',mp3:'audio/mpeg',wav:'audio/wav',m4a:'audio/mp4',
   aac:'audio/aac',ogg:'audio/ogg',flac:'audio/flac',pdf:'application/pdf',json:'application/json',
   csv:'text/csv',zip:'application/zip',txt:'text/plain'}[ext(n)]||'application/octet-stream');
@@ -464,8 +491,8 @@ const blobOf=(c,t,q)=>new Promise(r=>c.toBlob(r,t,q));
 // 8-bit sRGB surface and the browser JPEG encoder forces 4:2:0 chroma. ffmpeg keeps the
 // ICC profile, bakes in EXIF rotation, and encodes JPEG at 4:4:4 with a real quantizer.
 // (WebP via ffmpeg drops the ICC profile — same as the canvas did, so no regression.)
-const FF_IMG_IN=['jpg','jpeg','png','webp','bmp','tif','tiff'];
-const FF_IMG_OUT={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'};
+const FF_IMG_IN=['jpg','jpeg','png','webp','bmp','tif','tiff','avif','jxl','gif'];
+const FF_IMG_OUT={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/avif':'avif','image/jxl':'jxl'};
 async function imgFFOk(file,type){ return FF_IMG_IN.includes(ext(file.name)) && FF_IMG_OUT[type] && await nativeFFAvailable(); }
 function imgFFArgs({type,quality=.92,maxDim=0,scaleF=0,strip=false,sub=false}){
   return (i,out)=>{ const a=['-i',i,'-frames:v','1','-update','1'];
@@ -474,6 +501,8 @@ function imgFFArgs({type,quality=.92,maxDim=0,scaleF=0,strip=false,sub=false}){
     else if(scaleF&&scaleF<1) a.push('-vf',`scale=trunc(iw*${scaleF}):-1:flags=lanczos`);
     if(type==='image/jpeg') a.push('-c:v','mjpeg','-q:v',String(Math.max(2,Math.min(31,Math.round((1-quality)*31)))),'-pix_fmt',sub?'yuvj420p':'yuvj444p');
     else if(type==='image/webp') a.push('-c:v','libwebp','-quality',String(Math.round(quality*100)));
+    else if(type==='image/avif') a.push('-c:v','libaom-av1','-crf',String(Math.max(10,Math.min(50,Math.round(50-quality*32)))),'-still-picture','1');
+    else if(type==='image/jxl') a.push('-c:v','libjxl');
     a.push(out); return a; };
 }
 async function imgConvert(file,{type='image/png',quality=.92,maxDim=0,strip=false}={}){
@@ -481,6 +510,8 @@ async function imgConvert(file,{type='image/png',quality=.92,maxDim=0,strip=fals
     try{ return await runFF(file,'out.'+FF_IMG_OUT[type],imgFFArgs({type,quality,maxDim,strip}),'Converting image'); }
     catch{} // fall through to the canvas route
   }
+  if(type==='image/avif'||type==='image/jxl') // canvas can't encode these — only the desktop app's ffmpeg can
+    throw new Error('Saving as this format needs the Junk Drawer desktop app. In a plain browser, pick PNG, JPG, or WEBP instead.');
   const {img,url}=await toImage(file); const c=canvasOf(img,maxDim);
   const b=await blobOf(c,type,quality); URL.revokeObjectURL(url); return b; }
 async function compressTo(file,target,type='image/jpeg'){
@@ -628,13 +659,12 @@ add({cat:'image',kinds:['image'],rec:1,nm:'Remove Background',ds:'Cut out the su
   more:'Cuts the subject out of a photo and gives you a see-through PNG. Great for product shots, profile pics, and stickers. The first run loads a small model from the app, then it works right away.',
   run:async f=>{ const onP=progress('Removing background (first run loads the model — a few seconds)'); const b=await bgRemove(f,onP);
     showResult(b,base(f.name)+'-nobg.png'); }});
-add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'Switch between PNG, JPG, and WEBP',kw:'convert format png jpg jpeg webp heic',
-  more:'Change an image to PNG, JPG, or WEBP. Use JPG for photos, PNG when you need a clear background, and WEBP for websites.',
-  opts:oSel('to',[['image/png','PNG'],['image/jpeg','JPG'],['image/webp','WEBP']],'type'),
-  check:(f,o)=>{ const cur=ext(f.name), tgt={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[o.type];
+add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'Switch between PNG, JPG, WEBP, AVIF, and more',kw:'convert format png jpg jpeg webp heic avif jxl jpegxl modern',
+  more:'Change an image to another type. JPG for photos, PNG for a clear background, WEBP for websites, AVIF for the smallest files, JPEG-XL for photographers who want top quality.',
+  opts:oSel('to',[['image/png','PNG'],['image/jpeg','JPG'],['image/webp','WEBP'],['image/avif','AVIF — smallest'],['image/jxl','JPEG-XL — top quality']],'type'),
+  check:(f,o)=>{ const cur=ext(f.name), tgt=FF_IMG_OUT[o.type];
     return (cur===tgt||(cur==='jpeg'&&tgt==='jpg')) ? {msg:`This picture is already a ${tgt.toUpperCase()}, so there’s nothing to change. Pick a different type — JPG for photos, PNG for a clear background, WEBP for websites.`} : null; },
-  run:async (f,o)=>{ const e={'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[o.type];
-    showResult(await imgConvert(f,{type:o.type}),base(f.name)+'.'+e); }});
+  run:async (f,o)=>{ showResult(await imgConvert(f,{type:o.type}),base(f.name)+'.'+FF_IMG_OUT[o.type]); }});
 add({cat:'image',kinds:['image'],rec:1,nm:'Shrink File Size',ds:'Squeeze an image under a size you pick',kw:'compress smaller reduce size optimize',
   more:'Make an image fit a size limit you set, like under 8 MB. It keeps the picture as big and sharp as it can while hitting your target.',
   opts:oNum('target','8','MB','mb',{min:.2,step:.5}),
@@ -712,6 +742,19 @@ function readExif(buf){
     if(la!=null&&lo!=null) out.GPS=((/^s/i.test(gp[1]||'')?-1:1)*la).toFixed(6)+', '+((/^w/i.test(gp[3]||'')?-1:1)*lo).toFixed(6); }
   return Object.keys(out).length?out:null;
 }
+add({cat:'image',kinds:['image'],nm:'Grab Text from a Picture',ds:'Copy the words out of a screenshot or scan',kw:'ocr text extract screenshot scan read words copy grab recognize',
+  more:'Reads the words in a screenshot, photo, or scan and hands you the text to copy or save. English works best. Runs entirely on your computer.',
+  run:async f=>{ const onP=progress('Reading the picture (the first run loads the reader)'); onP(.05);
+    const txt=(await ocrImage(f,onP)).trim();
+    if(!txt) return showGuide({title:'No words found',msg:'Couldn’t make out any text in that picture. A sharper, straighter, better-lit shot usually does the trick.'});
+    showText(txt,base(f.name)+'.txt'); }});
+add({cat:'arc',kinds:['archive'],rec:1,nm:'Open Any Archive',ds:'Unpack a RAR, 7z, ZIP, or TAR',kw:'unzip extract rar 7z zip tar gz archive open unpack attachment',
+  more:'Unpacks almost any archive — RAR, 7z, ZIP, TAR, and friends — and gives you the files inside as a plain ZIP your computer opens natively. Nothing gets uploaded.',
+  run:async f=>{ const onP=progress('Unpacking'); onP(.2);
+    const entries=await extractArchive(f); onP(.7);
+    if(!entries.length) return showGuide({title:'Empty archive',msg:'That archive unpacked fine, but there was nothing inside it.'});
+    const files=[]; for(const e of entries) files.push({name:e.name,data:new Uint8Array(await e.file.arrayBuffer())});
+    showMulti(files,base(f.name)+'-contents.zip',`${files.length} file${files.length>1?'s':''} unpacked, saved as a regular ZIP.`); }});
 add({cat:'image',kinds:['image','pdf'],rec:1,nm:'See Hidden Info',ds:'Read the GPS, camera, and date tags',kw:'metadata exif gps location camera date read see info hidden pdf author show',
   more:'Shows the hidden tags inside a photo (where and when it was taken, the camera) or a PDF (title, author, dates). It only reads them and never changes your file. Nothing leaves your computer.',
   run:async f=>{ const onP=progress('Reading metadata'); onP(.4); const lines=[]; const row=(k,v)=>{ if(v!=null&&v!=='')lines.push(String(k).padEnd(12)+' '+v); };
@@ -783,6 +826,17 @@ add({cat:'video',kinds:['video'],nm:'Trim a Video',ds:'Keep just one part of the
   opts:()=>{ const a=el('input',{type:'text',value:'00:00',placeholder:'mm:ss'}); const b=el('input',{type:'text',value:'00:10',placeholder:'mm:ss'});
     return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Clipping'),base(f.name)+'-clip.mp4'); }});
+add({cat:'video',kinds:['video'],nm:'Fix Phone Video for Editing',ds:'Stop audio drifting out of sync in editors',kw:'vfr cfr variable frame rate fix editing premiere resolve final cut sync audio drift constant',
+  more:'Phone videos use a variable frame rate that makes sound slowly drift out of sync in Premiere, Resolve, or Final Cut. This re-saves the clip at the steady frame rate editors expect.',
+  opts:oSel('frame rate',[['30','30 fps'],['60','60 fps'],['24','24 fps (film)']],'r'),
+  run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-vf','fps='+(o.r||'30'),'-fps_mode','cfr','-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Steadying frame rate'),base(f.name)+'-cfr.mp4'); }});
+add({cat:'video',kinds:['video'],nm:'Burn In Subtitles',ds:'Print captions right onto the video',kw:'subtitles captions srt vtt burn hardcode hardsub tiktok reels muted',
+  more:'Prints a subtitle file permanently onto the picture, so captions show even where subtitles aren’t supported. Most social video is watched on mute — captions keep people watching.',
+  opts:()=>{ const inp=el('input',{type:'file',accept:'.srt,.vtt,.ass'});
+    return {node:el('label',{},['subtitle file ',inp]),get:()=>({sub:inp.files&&inp.files[0]})}; },
+  check:(f,o)=>!o.sub?{msg:'Pick the subtitle file (.srt or .vtt) that goes with this video. You can export one from a captions app, or write one in any text editor.'}:null,
+  run:async (f,o)=>{ const se=ext(o.sub.name); const sn='sub.'+(['srt','vtt','ass'].includes(se)?se:'srt');
+    showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-vf',`subtitles=${sn}:force_style='FontName=Arial,FontSize=20,Outline=1'`,'-c:v','libx264','-pix_fmt','yuv420p','-crf','19','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Burning in captions',{name:sn,data:o.sub}),base(f.name)+'-captioned.mp4'); }});
 add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'mute remove audio silence',
   more:'Removes the sound and keeps the picture. Good for hiding background noise before you share.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
@@ -800,6 +854,12 @@ add({cat:'audio',kinds:['audio'],rec:1,nm:'Convert Audio',ds:'Switch between MP3
 add({cat:'audio',kinds:['audio'],nm:'Even Out Volume',ds:'Make quiet and loud parts match',kw:'normalize volume loudness level',
   more:'Levels out the loudness so soft and loud parts sound about the same. Good for voice memos and recordings.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-af','loudnorm','-acodec','libmp3lame','-q:a','2',out],'Normalizing'),base(f.name)+'-leveled.mp3'); }});
+add({cat:'audio',kinds:['audio','video'],nm:'Podcast Loudness Fix',ds:'Match the volume podcast apps expect',kw:'loudnorm lufs podcast loudness normalize level broadcast -16 episode',
+  more:'Levels a recording to standard podcast loudness (-16 LUFS), so your episode isn’t quieter or louder than everyone else’s. Works on a video too — you get the leveled sound as an MP3.',
+  run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-af','loudnorm=I=-16:TP=-1.5:LRA=11','-acodec','libmp3lame','-q:a','2',out],'Leveling loudness'),base(f.name)+'-podcast.mp3'); }});
+add({cat:'audio',kinds:['audio','video'],nm:'Cut Out Silence',ds:'Trim dead air from a recording',kw:'silence remove dead air trim gaps pauses tighten podcast voice memo',
+  more:'Snips long silent stretches out of a recording — dead air at the start, the end, and gaps in the middle — while keeping a natural little pause. Great for voice memos and podcast takes.',
+  run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-af','silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.2:stop_periods=-1:stop_threshold=-45dB:stop_duration=0.8:stop_silence=0.25','-acodec','libmp3lame','-q:a','2',out],'Removing silence'),base(f.name)+'-tight.mp3'); }});
 add({cat:'audio',kinds:['audio'],nm:'Trim Audio',ds:'Keep only the part you want',kw:'trim cut audio',
   more:'Set a start and end time and keep just that stretch of sound. The rest gets cut away.',
   opts:()=>{ const a=el('input',{type:'text',value:'00:00'}); const b=el('input',{type:'text',value:'00:30'});
