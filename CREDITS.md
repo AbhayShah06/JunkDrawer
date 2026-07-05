@@ -15,6 +15,11 @@ Junk Drawer stands on a lot of excellent open-source work. Every engine runs loc
 | [heic2any](https://github.com/alexcorvi/heic2any) | Converting iPhone HEIC photos to JPG | MIT |
 | [fflate](https://github.com/101arrowz/fflate) | Zipping and unzipping | MIT |
 | [js-yaml](https://github.com/nodeca/js-yaml) | JSON ⇄ YAML conversion | MIT |
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Transcribing speech into text and subtitles (bundled CLI; the model downloads once on first use from the [whisper.cpp model repo](https://huggingface.co/ggerganov/whisper.cpp)) | MIT (model: MIT, from OpenAI Whisper) |
+| [LibRaw](https://www.libraw.org/) (`dcraw_emu`) | Developing camera RAW files (CR2/CR3, NEF, ARW, RAF, DNG…) into JPG/PNG | LGPL-2.1 / CDDL-1.0 (bundled as a separate program) |
+| [Real-ESRGAN ncnn-vulkan](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan) | 4× image upscaling on the GPU (photo + anime models) | MIT (models BSD-3-Clause, from [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)) |
+| [tesseract.js](https://github.com/naptha/tesseract.js) / [Tesseract](https://github.com/tesseract-ocr/tesseract) | Reading the words out of images (OCR), with the [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast) English model | Apache-2.0 |
+| [libarchive.js](https://github.com/nika-begiashvili/libarchivejs) / [libarchive](https://github.com/libarchive/libarchive) | Opening RAR, 7z, TAR, and other archives | MIT (libarchive: BSD) |
 | [Electron](https://github.com/electron/electron) | The desktop app shell | MIT |
 | [electron-builder](https://github.com/electron-userland/electron-builder) | Packaging the app | MIT |
 | [esbuild](https://github.com/evanw/esbuild) | Bundling the above into the app at build time | MIT |

@@ -208,15 +208,15 @@
   footer a{color:var(--ink); font-weight:bold; text-decoration:none} footer a:hover{text-decoration:underline}
   footer .cr{font:10.5px var(--mono); max-width:440px; text-align:right; line-height:1.5}
   /* update notifier bar */
-  #updateBar[hidden]{display:none}
-  #updateBar{display:flex; align-items:center; justify-content:center; gap:12px;
+  #updateBar[hidden], #cardBar[hidden]{display:none}
+  #updateBar, #cardBar{display:flex; align-items:center; justify-content:center; gap:12px;
     background:var(--faceD); border-bottom:2px solid var(--sh2); box-shadow:0 1px 0 var(--hi) inset;
     padding:6px 14px; font:12px var(--sans); color:var(--ink)}
-  #updateBar .ub-get{font-weight:bold; color:var(--ink); text-decoration:none; background:var(--face);
+  #updateBar .ub-get, #cardBar .ub-get{font-weight:bold; color:var(--ink); text-decoration:none; background:var(--face);
     border:2px solid; border-color:var(--hi) var(--sh2) var(--sh2) var(--hi); padding:3px 12px}
-  #updateBar .ub-get:active{border-color:var(--sh2) var(--hi) var(--hi) var(--sh2)}
-  #updateBar .ub-x{color:var(--ink2); text-decoration:none; font-weight:bold; padding:0 4px}
-  #updateBar .ub-x:hover{color:var(--ink)}
+  #updateBar .ub-get:active, #cardBar .ub-get:active{border-color:var(--sh2) var(--hi) var(--hi) var(--sh2)}
+  #updateBar .ub-x, #cardBar .ub-x{color:var(--ink2); text-decoration:none; font-weight:bold; padding:0 4px}
+  #updateBar .ub-x:hover, #cardBar .ub-x:hover{color:var(--ink)}
   /* PDF Sign & Fill editor */
   .pdfedit-toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0}
   .pdfedit-hint{font:11px var(--sans); color:var(--ink2); margin-left:auto}
@@ -283,6 +283,7 @@
   <a href="#" class="ub-get" target="_blank" rel="noopener">Download update</a>
   <a href="#" class="ub-x" title="Dismiss until the next version">✕</a>
 </div>
+<div id="cardBar" hidden></div>
 
 <main>
   <section class="hero">
@@ -333,7 +334,12 @@
       <a href="https://github.com/cozmo/jsQR" target="_blank" rel="noopener">jsQR</a>,
       <a href="https://github.com/alexcorvi/heic2any" target="_blank" rel="noopener">heic2any</a>,
       <a href="https://github.com/101arrowz/fflate" target="_blank" rel="noopener">fflate</a>,
-      <a href="https://github.com/nodeca/js-yaml" target="_blank" rel="noopener">js-yaml</a>, and
+      <a href="https://github.com/nodeca/js-yaml" target="_blank" rel="noopener">js-yaml</a>,
+      <a href="https://github.com/ggml-org/whisper.cpp" target="_blank" rel="noopener">whisper.cpp</a>,
+      <a href="https://www.libraw.org/" target="_blank" rel="noopener">LibRaw</a>,
+      <a href="https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan" target="_blank" rel="noopener">Real-ESRGAN</a>,
+      <a href="https://github.com/naptha/tesseract.js" target="_blank" rel="noopener">tesseract.js</a>,
+      <a href="https://github.com/nika-begiashvili/libarchivejs" target="_blank" rel="noopener">libarchive.js</a>, and
       <a href="https://github.com/electron/electron" target="_blank" rel="noopener">Electron</a>.
       Full list and licenses in CREDITS.md.
     </details>
@@ -365,9 +371,11 @@ const VID=['mp4','mov','mkv','webm','avi','flv','wmv','m4v','3gp','mpeg','mpg','
 const AUD=['mp3','wav','aac','m4a','flac','ogg','opus','wma','aiff','aif'];
 const DAT=['csv','tsv','json','xml','yaml','yml','toml','xlsx','xls','ods'];
 const ARC=['zip','7z','rar','tar','gz','tgz','bz2','xz'];
+const RAW=['cr2','cr3','nef','nrw','arw','raf','dng','orf','rw2','pef','srw'];
 const DOC=['md','markdown','mdown','mkd','mdx','txt','text','log'];
 function kind(f){ const e=ext(f.name);
   if(IMG.includes(e))return'image'; if(VID.includes(e))return'video'; if(AUD.includes(e))return'audio';
+  if(RAW.includes(e))return'raw';
   if(e==='pdf')return'pdf'; if(DAT.includes(e))return'data'; if(ARC.includes(e))return'archive';
   if(DOC.includes(e))return'doc'; return'other'; }
 
@@ -463,6 +471,40 @@ async function runFFNative(file,inName,outName,args,label,extra){
     return new Blob([buf],{type:mimeOf(outName)});
   } finally { clearInterval(poll); }
 }
+/* Native helper tools beyond ffmpeg (whisper / RAW / upscale) — desktop app only.
+   The server builds the argv; we just name the tool, simple options, and stream the file. */
+let _nativeInfo=null;
+async function nativeInfo(){ if(_nativeInfo) return _nativeInfo;
+  try{ const r=await fetch('/api/check'); _nativeInfo=await r.json(); }catch{ _nativeInfo={}; }
+  return _nativeInfo; }
+async function runTool(file,tool,opts,outName,label){
+  const inName='in.'+ext(file.name);
+  const onP=progress(label); onP(.03);
+  const id=(((self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'-'+Math.random()))+'').replace(/[^a-z0-9-]/gi,'').slice(0,64);
+  const meta=encodeURIComponent(JSON.stringify({tool,inName,opts}));
+  const poll=setInterval(async()=>{ try{ const r=await fetch('/api/ffmpeg-progress?id='+id); const j=await r.json();
+    if(j&&typeof j.percent==='number') onP(.03+.94*Math.min(1,Math.max(0,j.percent))); }catch{} },600);
+  try{
+    const res=await fetch('/api/tool?meta='+meta+'&id='+id,{method:'POST',body:file});
+    if(!res.ok){ let m=''; try{ const j=await res.json(); m=j.detail||j.error||''; }catch{} throw new Error(m||('tool failed ('+res.status+')')); }
+    const buf=await res.arrayBuffer(); onP(1);
+    return new Blob([buf],{type:mimeOf(outName)});
+  } finally { clearInterval(poll); }
+}
+async function ensureModel(name,label){
+  const info=await nativeInfo();
+  if(name==='ggml-base.bin'&&info.whisperModel) return;
+  const onP=progress(label); onP(.02);
+  const poll=setInterval(async()=>{ try{ const r=await fetch('/api/ffmpeg-progress?id=model-'+name); const j=await r.json();
+    if(j&&typeof j.percent==='number') onP(Math.max(.02,j.percent)); }catch{} },700);
+  try{
+    const r=await fetch('/api/fetch-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+    if(!r.ok) throw new Error('Couldn’t download the speech model. Check your internet connection and try again — it only has to work once.');
+    _nativeInfo=null; // it changed on disk; re-ask next time
+  } finally { clearInterval(poll); }
+}
+const needDesktop=what=>({title:'This one needs the desktop app',
+  msg:`${what} runs an engine bundled with the Junk Drawer desktop app, which isn’t reachable from a plain browser tab. Grab the app from the GitHub releases page and it’ll work offline.`});
 const mimeOf = n => ({gif:'image/gif',mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',png:'image/png',
   avif:'image/avif',jxl:'image/jxl',srt:'text/plain',vtt:'text/vtt',tif:'image/tiff',tiff:'image/tiff',
   jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',mp3:'audio/mpeg',wav:'audio/wav',m4a:'audio/mp4',
@@ -742,6 +784,30 @@ function readExif(buf){
     if(la!=null&&lo!=null) out.GPS=((/^s/i.test(gp[1]||'')?-1:1)*la).toFixed(6)+', '+((/^w/i.test(gp[3]||'')?-1:1)*lo).toFixed(6); }
   return Object.keys(out).length?out:null;
 }
+add({cat:'image',kinds:['raw'],multi:true,rec:1,nm:'Camera RAW to JPG',ds:'Develop RAW photos into ready-to-send JPGs',kw:'raw cr2 cr3 nef arw raf dng orf rw2 convert develop batch camera canon nikon sony fuji',
+  more:'Turns camera RAW files (Canon CR2/CR3, Nikon NEF, Sony ARW, Fuji RAF, DNG and more) into JPGs with the camera’s own white balance. Great for sending a shoot to a client fast. It’s a clean, neutral develop — not a Lightroom edit.',
+  opts:oSel('save as',[['jpg','JPG'],['png','PNG']],'to'),
+  run:async (fs,o)=>{ const info=await nativeInfo(); if(!info.raw) return showGuide(needDesktop('Developing RAW photos'));
+    const to=o.to==='png'?'png':'jpg'; const out=[];
+    for(let i=0;i<fs.length;i++){
+      const b=await runTool(fs[i],'raw',{to},'out.'+to,`Developing photo ${i+1} of ${fs.length}`);
+      out.push({name:base(fs[i].name)+'.'+to,data:new Uint8Array(await b.arrayBuffer())});
+    }
+    if(out.length===1) showResult(new Blob([out[0].data],{type:mimeOf(out[0].name)}),out[0].name);
+    else showMulti(out,'developed-photos.zip',`${out.length} photos developed with camera white balance.`); }});
+add({cat:'image',kinds:['image'],nm:'Upscale an Image (4×)',ds:'Make a small picture big and sharp',kw:'upscale enlarge enhance 4x ai bigger resolution old photo scan restore blurry',
+  more:'Blows a picture up to four times its size using a local AI model — great for old scans, small logos, and photos that are too tiny to print. Uses your graphics chip; most computers made in the last decade have one that works.',
+  opts:oSel('style',[['photo','Photo'],['anime','Art / anime']],'model'),
+  run:async (f,o)=>{ const info=await nativeInfo(); if(!info.upscale) return showGuide(needDesktop('Upscaling'));
+    let src=f; if(!['jpg','jpeg','png','webp'].includes(ext(f.name)))
+      src=new File([await imgConvert(f,{type:'image/png'})],'in.png',{type:'image/png'});
+    try{
+      const b=await runTool(src,'upscale',{model:o.model==='anime'?'anime':'photo'},'out.png','Upscaling (a big photo can take a minute)');
+      showResult(b,base(f.name)+'-4x.png');
+    }catch(e){
+      if(/vulkan|vk[A-Z]|gpu|device|instance/i.test(e.message||'')) return showGuide({title:'No compatible graphics chip',
+        msg:'Upscaling needs a graphics chip with Vulkan support and this computer’s doesn’t seem to have one. The rest of the app works fine without it.'});
+      throw e; } }});
 add({cat:'image',kinds:['image'],nm:'Grab Text from a Picture',ds:'Copy the words out of a screenshot or scan',kw:'ocr text extract screenshot scan read words copy grab recognize',
   more:'Reads the words in a screenshot, photo, or scan and hands you the text to copy or save. English works best. Runs entirely on your computer.',
   run:async f=>{ const onP=progress('Reading the picture (the first run loads the reader)'); onP(.05);
@@ -854,6 +920,16 @@ add({cat:'audio',kinds:['audio'],rec:1,nm:'Convert Audio',ds:'Switch between MP3
 add({cat:'audio',kinds:['audio'],nm:'Even Out Volume',ds:'Make quiet and loud parts match',kw:'normalize volume loudness level',
   more:'Levels out the loudness so soft and loud parts sound about the same. Good for voice memos and recordings.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-af','loudnorm','-acodec','libmp3lame','-q:a','2',out],'Normalizing'),base(f.name)+'-leveled.mp3'); }});
+add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitles',ds:'Turn speech into text or an SRT caption file',kw:'transcribe transcription speech to text subtitles captions srt vtt whisper voice memo interview lecture auto',
+  more:'Listens to a recording or video and writes out what was said — as plain text, or as an SRT subtitle file you can burn in with the captions tool. The first run downloads the speech model once (~140 MB); after that it works fully offline. Handles most languages.',
+  opts:oSel('give me',[['srt','Subtitles (SRT)'],['txt','Plain text'],['vtt','Web captions (VTT)']],'fmt'),
+  run:async (f,o)=>{ const info=await nativeInfo(); if(!info.whisper) return showGuide(needDesktop('Transcribing'));
+    if(!info.whisperModel) await ensureModel('ggml-base.bin','Downloading the speech model (one time, ~140 MB)');
+    const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
+    const fmt=['srt','txt','vtt'].includes(o.fmt)?o.fmt:'srt';
+    const b=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt},'out.'+fmt,'Listening and writing (a long recording takes a while)');
+    if(fmt==='txt') showText((await b.text()).trim(),base(f.name)+'.txt');
+    else showResult(b,base(f.name)+'.'+fmt,{note:fmt==='srt'?'Pairs perfectly with “Burn In Subtitles”.':''}); }});
 add({cat:'audio',kinds:['audio','video'],nm:'Podcast Loudness Fix',ds:'Match the volume podcast apps expect',kw:'loudnorm lufs podcast loudness normalize level broadcast -16 episode',
   more:'Levels a recording to standard podcast loudness (-16 LUFS), so your episode isn’t quieter or louder than everyone else’s. Works on a video too — you get the leveled sound as an MP3.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-af','loudnorm=I=-16:TP=-1.5:LRA=11','-acodec','libmp3lame','-q:a','2',out],'Leveling loudness'),base(f.name)+'-podcast.mp3'); }});
@@ -1757,6 +1833,34 @@ function svg(path){ const ns='http://www.w3.org/2000/svg'; const s=document.crea
 buildDrawers();
 buildTopbar();
 renderQuick();
+
+// Photographer nicety: if a memory card (any volume with a DCIM folder — card readers,
+// cameras in mass-storage mode) shows up, offer a one-click import into ~/Pictures.
+async function pollCards(){
+  const info=await nativeInfo(); if(!info.ffmpeg) return; // desktop app only
+  let cards; try{ cards=(await (await fetch('/api/cards')).json()).cards; }catch{ return; }
+  const bar=$('#cardBar');
+  if(!cards||!cards.length){ bar.hidden=true; delete bar.dataset.root; return; }
+  const c=cards[0];
+  if(bar.dataset.dismissed===c.root) return;      // user said no to this card
+  if(bar.dataset.root===c.root && !bar.hidden) return;
+  bar.dataset.root=c.root; bar.innerHTML='';
+  bar.append(el('span',{className:'ub-txt',textContent:`Memory card detected (${c.label}) — bring the photos over?`}));
+  const go=el('a',{href:'#',className:'ub-get',textContent:'Import to Pictures'});
+  go.onclick=async e=>{ e.preventDefault(); if(go.dataset.busy)return; go.dataset.busy='1'; go.textContent='Importing…';
+    try{
+      const r=await fetch('/api/import-card',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({root:c.root})});
+      const j=await r.json();
+      if(j.ok){ bar.hidden=true; bar.dataset.dismissed=c.root;
+        toast(`${j.copied} file${j.copied===1?'':'s'} copied — the folder just opened.`); }
+      else throw 0;
+    }catch{ delete go.dataset.busy; go.textContent='Import to Pictures';
+      toast('Import didn’t work. Is the card still plugged in?'); } };
+  const x=el('a',{href:'#',className:'ub-x',title:'Not now',textContent:'✕'});
+  x.onclick=e=>{ e.preventDefault(); bar.hidden=true; bar.dataset.dismissed=c.root; };
+  bar.append(go,x); bar.hidden=false;
+}
+pollCards(); setInterval(pollCards,8000);
 $('#allToggle').onclick=()=>{ const open=$('#cabinet').classList.toggle('open'); $('#drawerwrap').hidden=!open; };
 // Always-available reset: the brand logo and the "↺ Reset" nav link both clear everything
 // and return to the start screen, from anywhere in the app.

@@ -300,7 +300,190 @@ function localOnly(req, expectedHost) {
   return true;
 }
 
-function startServer(appRoot, binDir, updater, opener) {
+/* ---- native helper tools: whisper (speech→text), LibRaw (camera RAW), Real-ESRGAN (upscale).
+   Unlike /api/ffmpeg (free-form argv), these build their argv entirely server-side from a
+   tiny whitelisted option set — the renderer only names a tool and picks simple options.
+   Same containment: throwaway temp cwd, basename-only filenames. */
+function toolBin(binDir, sub, name) {
+  const f = path.join(binDir || '', sub, process.platform === 'win32' ? name + '.exe' : name);
+  try { if (fs.existsSync(f)) return f; } catch {}
+  return null;
+}
+const MODELS = { // downloadable-on-first-use model files, pinned by URL + expected size
+  'ggml-base.bin': { url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin', size: 147951465 },
+};
+function modelPath(modelsDir, name) { return path.join(modelsDir, name); }
+function modelReady(modelsDir, name) {
+  const m = MODELS[name]; if (!m) return false;
+  try { return fs.statSync(modelPath(modelsDir, name)).size === m.size; } catch { return false; }
+}
+function fetchWithRedirects(url, depth, cb) {
+  if (depth > 5) return cb(new Error('too many redirects'));
+  https.get(url, r => {
+    if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location) { r.resume(); return fetchWithRedirects(r.headers.location, depth + 1, cb); }
+    if (r.statusCode !== 200) { r.resume(); return cb(new Error('http ' + r.statusCode)); }
+    cb(null, r);
+  }).on('error', cb);
+}
+function handleFetchModel(req, res, modelsDir) {
+  let chunks = [];
+  req.on('data', c => { chunks.push(c); if (Buffer.concat(chunks).length > 4096) req.destroy(); });
+  req.on('end', () => {
+    let j; try { j = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return sendJSON(res, { error: 'bad body' }, 400); }
+    const name = j.name, m = MODELS[name];
+    if (!m) return sendJSON(res, { error: 'unknown-model' }, 400);
+    if (modelReady(modelsDir, name)) return sendJSON(res, { ok: true, ready: true });
+    try { fs.mkdirSync(modelsDir, { recursive: true }); } catch {}
+    const dest = modelPath(modelsDir, name), part = dest + '.part';
+    fetchWithRedirects(m.url, 0, (err, r) => {
+      if (err) return sendJSON(res, { error: 'download-failed', detail: String(err.message || err) }, 502);
+      const ws = fs.createWriteStream(part);
+      let got = 0; const total = +r.headers['content-length'] || m.size;
+      r.on('data', c => { got += c.length; ffProgress.set('model-' + name, Math.min(0.999, got / total)); });
+      r.pipe(ws);
+      ws.on('finish', () => {
+        ffProgress.delete('model-' + name);
+        let ok = false; try { ok = fs.statSync(part).size === m.size; } catch {}
+        if (!ok) { try { fs.rmSync(part); } catch {} return sendJSON(res, { error: 'download-corrupt' }, 502); }
+        try { fs.renameSync(part, dest); } catch { return sendJSON(res, { error: 'write-failed' }, 500); }
+        sendJSON(res, { ok: true });
+      });
+      ws.on('error', () => { ffProgress.delete('model-' + name); try { fs.rmSync(part); } catch {} sendJSON(res, { error: 'write-failed' }, 500); });
+      r.on('error', () => { ffProgress.delete('model-' + name); try { ws.destroy(); fs.rmSync(part); } catch {} try { sendJSON(res, { error: 'download-failed' }, 502); } catch {} });
+    });
+  });
+}
+function handleTool(req, res, binDir, modelsDir) {
+  const reject = (obj, code) => { try { req.resume(); } catch {} return sendJSON(res, obj, code); };
+  req.on('error', () => {});
+  let meta;
+  try { meta = JSON.parse(new URLSearchParams(req.url.split('?')[1] || '').get('meta') || ''); }
+  catch { return reject({ error: 'bad-meta' }, 400); }
+  const id = (new URLSearchParams(req.url.split('?')[1] || '').get('id') || '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 64);
+  const { tool, inName } = meta || {}; const opts = (meta && meta.opts) || {};
+  if (!okJobName(inName)) return reject({ error: 'bad-names' }, 400);
+
+  // resolve the plan for the requested tool: [ [bin, argv, progressParser], ... ] + output name
+  let plan = null, outName = null;
+  if (tool === 'whisper') {
+    const bin = toolBin(binDir, 'whisper', 'whisper-cli');
+    if (!bin) return reject({ error: 'tool-missing' }, 501);
+    if (!modelReady(modelsDir, 'ggml-base.bin')) return reject({ error: 'model-missing' }, 409);
+    const fmt = opts.fmt === 'txt' ? 'txt' : opts.fmt === 'vtt' ? 'vtt' : 'srt';
+    outName = 'out.' + fmt;
+    plan = [[bin, ['-m', modelPath(modelsDir, 'ggml-base.bin'), '-f', inName, '-o' + fmt, '-of', 'out', '--print-progress'],
+      s => { const m = /progress\s*=\s*(\d+)%/.exec(s); return m ? +m[1] / 100 : null; }]];
+  } else if (tool === 'raw') {
+    const dcraw = toolBin(binDir, 'libraw', 'dcraw_emu'), ffmpeg = findBin('ffmpeg', binDir);
+    if (!dcraw || !ffmpeg) return reject({ error: 'tool-missing' }, 501);
+    const png = opts.to === 'png';
+    outName = png ? 'out.png' : 'out.jpg';
+    plan = [
+      [dcraw, ['-w', '-q', '3', '-T', '-Z', 'mid.tiff', inName], () => 0.45],
+      [path.resolve(ffmpeg), ['-hide_banner', '-y', '-i', 'mid.tiff', '-frames:v', '1', '-update', '1',
+        ...(png ? [] : ['-c:v', 'mjpeg', '-q:v', '2', '-pix_fmt', 'yuvj444p']), outName], () => 0.9],
+    ];
+  } else if (tool === 'upscale') {
+    const bin = toolBin(binDir, 'esrgan', 'realesrgan-ncnn-vulkan');
+    if (!bin) return reject({ error: 'tool-missing' }, 501);
+    outName = 'out.png';
+    plan = [[bin, ['-i', inName, '-o', outName, '-n', opts.model === 'anime' ? 'realesrgan-x4plus-anime' : 'realesrgan-x4plus'],
+      s => { const m = /(\d+(?:\.\d+)?)%/.exec(s); return m ? +m[1] / 100 : null; }]];
+  } else return reject({ error: 'unknown-tool' }, 400);
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-tool-'));
+  const inPath = path.join(tmp, inName), outPath = path.join(tmp, outName);
+  const ws = fs.createWriteStream(inPath);
+  let size = 0, aborted = false;
+  const die = (obj, code) => { if (aborted) return; aborted = true; try { req.destroy(); } catch {} try { ws.destroy(); } catch {} cleanup(tmp); sendJSON(res, obj, code); };
+  req.on('data', c => { size += c.length; if (size > 500 * 1048576) die({ error: 'too-big' }, 413); });
+  req.on('error', () => die({ error: 'upload-failed' }, 400));
+  ws.on('error', () => die({ error: 'write-failed' }, 500));
+  req.pipe(ws);
+  ws.on('finish', () => {
+    if (aborted) return;
+    let err = '';
+    const runStep = k => {
+      if (k >= plan.length) {
+        if (id) ffProgress.delete(id);
+        let stat; try { stat = fs.statSync(outPath); } catch { cleanup(tmp); return sendJSON(res, { error: 'tool-failed', detail: err.slice(-2500) }, 500); }
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Length', stat.size);
+        const rs = fs.createReadStream(outPath);
+        rs.on('error', () => { try { res.destroy(); } catch {} cleanup(tmp); });
+        rs.on('close', () => cleanup(tmp));
+        return rs.pipe(res);
+      }
+      const [bin, args, prog] = plan[k];
+      const child = spawn(bin, args, { cwd: tmp });
+      child.stderr.on('data', d => { const s = String(d); err += s; if (err.length > 20000) err = err.slice(-20000);
+        if (id && prog) { const p = prog(s); if (p != null) ffProgress.set(id, Math.min(0.999, (k + Math.max(0, p)) / plan.length)); } });
+      child.on('error', e => { if (id) ffProgress.delete(id); cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
+      child.on('close', code => {
+        if (code !== 0) { if (id) ffProgress.delete(id); const d = err.slice(-2500); cleanup(tmp); return sendJSON(res, { error: 'tool-failed', detail: d || (path.basename(bin) + ' exit ' + code) }, 500); }
+        runStep(k + 1);
+      });
+    };
+    runStep(0);
+  });
+}
+
+/* ---- memory-card detection: any mounted volume with a DCIM folder (card readers,
+   cameras in mass-storage mode). Import copies photos/videos into ~/Pictures. ---- */
+const CARD_MEDIA = /\.(jpe?g|png|heic|heif|webp|gif|tiff?|bmp|cr2|cr3|nef|arw|raf|dng|orf|rw2|pef|srw|mp4|mov|avi|mts|m2ts|3gp|wav|mp3)$/i;
+function listCards() {
+  const out = [];
+  if (process.platform === 'win32') {
+    for (let i = 68; i <= 90; i++) { // D..Z
+      const root = String.fromCharCode(i) + ':\\';
+      try { if (fs.existsSync(path.join(root, 'DCIM'))) out.push({ root, label: String.fromCharCode(i) + ':' }); } catch {}
+    }
+  } else {
+    try { for (const v of fs.readdirSync('/Volumes')) {
+      const root = path.join('/Volumes', v);
+      try { if (fs.existsSync(path.join(root, 'DCIM'))) out.push({ root, label: v }); } catch {}
+    } } catch {}
+  }
+  return out;
+}
+function walkDcim(dir, acc) {
+  let ents = []; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of ents) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walkDcim(p, acc);
+    else if (e.isFile() && CARD_MEDIA.test(e.name)) acc.push(p);
+  }
+}
+function handleImportCard(req, res) {
+  let chunks = [];
+  req.on('data', c => { chunks.push(c); if (Buffer.concat(chunks).length > 4096) req.destroy(); });
+  req.on('end', () => {
+    let j; try { j = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return sendJSON(res, { error: 'bad body' }, 400); }
+    // only roots we ourselves detect are importable — the client can't name arbitrary paths
+    const card = listCards().find(c => c.root === j.root);
+    if (!card) return sendJSON(res, { error: 'card-gone' }, 404);
+    const files = []; walkDcim(path.join(card.root, 'DCIM'), files);
+    if (!files.length) return sendJSON(res, { error: 'empty' }, 404);
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '.');
+    const dest = path.join(os.homedir(), 'Pictures', 'Junk Drawer Import ' + stamp);
+    try { fs.mkdirSync(dest, { recursive: true }); } catch { return sendJSON(res, { error: 'write-failed' }, 500); }
+    let done = 0, copied = 0, failed = 0;
+    for (const f of files) {
+      let name = path.basename(f), target = path.join(dest, name), n = 1;
+      while (fs.existsSync(target)) target = path.join(dest, path.basename(name, path.extname(name)) + '-' + (n++) + path.extname(name));
+      try { fs.copyFileSync(f, target); copied++; } catch { failed++; }
+      done++; ffProgress.set('card-import', Math.min(0.999, done / files.length));
+    }
+    ffProgress.delete('card-import');
+    // pop the folder open so the user sees exactly where everything went
+    try { spawn(process.platform === 'win32' ? 'explorer' : 'open', [dest], { detached: true, stdio: 'ignore' }).unref(); } catch {}
+    sendJSON(res, { ok: true, copied, failed, dest });
+  });
+}
+
+function startServer(appRoot, binDir, updater, opener, modelsDir) {
+  modelsDir = modelsDir || path.join(os.homedir(), '.junkdrawer', 'models');
   return new Promise(resolve => {
     let expectedHost = null;  // set once the ephemeral port is known (below)
     const rootResolved = path.resolve(appRoot);
@@ -318,7 +501,9 @@ function startServer(appRoot, binDir, updater, opener) {
       const url = decodeURIComponent(req.url.split('?')[0]);
       if (url.startsWith('/api/') && !localOnly(req, expectedHost)) { res.statusCode = 403; return res.end('forbidden'); }
       if (url === '/api/check')
-        return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir) });
+        return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir),
+          whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), whisperModel: modelReady(modelsDir, 'ggml-base.bin'),
+          raw: !!toolBin(binDir, 'libraw', 'dcraw_emu'), upscale: !!toolBin(binDir, 'esrgan', 'realesrgan-ncnn-vulkan') });
       if (url === '/api/update-check')
         return handleUpdateCheck(res, updater);
       if (url === '/api/update-state')
@@ -336,6 +521,10 @@ function startServer(appRoot, binDir, updater, opener) {
         return sendJSON(res, { percent: ffProgress.get(new URLSearchParams(req.url.split('?')[1] || '').get('id') || '') || 0 });
       if (url === '/api/ffmpeg' && req.method === 'POST') return handleFFmpeg(req, res, binDir);
       if (url === '/api/ffmpeg-extra' && req.method === 'POST') return handleFFmpegExtra(req, res);
+      if (url === '/api/tool' && req.method === 'POST') return handleTool(req, res, binDir, modelsDir);
+      if (url === '/api/fetch-model' && req.method === 'POST') return handleFetchModel(req, res, modelsDir);
+      if (url === '/api/cards') return sendJSON(res, { cards: listCards() });
+      if (url === '/api/import-card' && req.method === 'POST') return handleImportCard(req, res);
       // A file the user opened from the OS ("Open with → Junk Drawer"). main.js queues its
       // absolute path; we read it once and hand the renderer the bytes for the viewer. The
       // path is set only by main.js from OS open events — never from client input.

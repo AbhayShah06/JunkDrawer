@@ -107,7 +107,61 @@ async function main() {
   console.log('  -> resources/bin/win/ffmpeg.exe');
 
   fs.rmSync(tmp, { recursive: true, force: true });
-  console.log('\nDone. resources/bin/win/ now has yt-dlp.exe and ffmpeg.exe.');
+
+  // 3) the native helper engines: whisper.cpp (speech→text), LibRaw (camera RAW),
+  //    Real-ESRGAN ncnn-vulkan (upscaling). Each lives in its own subfolder of bin/.
+  const zipGrab = async (label, url, picks) => {
+    // picks: [zipEntrySuffix, destRelPath][] — extract the whole zip, copy what we need.
+    const t = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-bins-'));
+    const zp = path.join(t, 'a.zip');
+    console.log(`Downloading ${label} ...`);
+    await download(url, zp);
+    const x = spawnSync('tar', ['-xf', zp, '-C', t], { encoding: 'utf8' });
+    if (x.status !== 0) { console.error(`tar failed on ${label}:`, x.stderr || x.error); process.exit(1); }
+    for (const [suffix, rel] of picks) {
+      const hit = findFile(t, path.basename(suffix));
+      if (!hit || !hit.replace(/\\/g, '/').endsWith(suffix)) { console.error(`missing ${suffix} in ${label}`); process.exit(1); }
+      const dest = path.join(OUT_DIR, rel);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(hit, dest);
+    }
+    fs.rmSync(t, { recursive: true, force: true });
+    console.log(`  -> resources/bin/win/${picks[0][1].split(/[\\/]/)[0]}/`);
+  };
+
+  // whisper.cpp: the CLI + every dll beside it (they're all required)
+  {
+    const t = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-bins-'));
+    const zp = path.join(t, 'w.zip');
+    console.log('Downloading whisper.cpp (win x64) ...');
+    await download('https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-x64.zip', zp);
+    const x = spawnSync('tar', ['-xf', zp, '-C', t], { encoding: 'utf8' });
+    if (x.status !== 0) { console.error('tar failed on whisper:', x.stderr || x.error); process.exit(1); }
+    const rel = path.join(t, 'Release');
+    fs.mkdirSync(path.join(OUT_DIR, 'whisper'), { recursive: true });
+    for (const f of fs.readdirSync(rel))
+      if (f === 'whisper-cli.exe' || f.endsWith('.dll'))
+        fs.copyFileSync(path.join(rel, f), path.join(OUT_DIR, 'whisper', f));
+    fs.rmSync(t, { recursive: true, force: true });
+    console.log('  -> resources/bin/win/whisper/');
+  }
+
+  await zipGrab('LibRaw 0.22.1 (win64)', 'https://www.libraw.org/data/LibRaw-0.22.1-Win64.zip', [
+    ['bin/dcraw_emu.exe', 'libraw/dcraw_emu.exe'],
+    ['bin/libraw.dll',    'libraw/libraw.dll'],
+  ]);
+
+  await zipGrab('Real-ESRGAN ncnn-vulkan (windows)',
+    'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-windows.zip', [
+    ['realesrgan-ncnn-vulkan.exe',        'esrgan/realesrgan-ncnn-vulkan.exe'],
+    ['vcomp140.dll',                      'esrgan/vcomp140.dll'],
+    ['models/realesrgan-x4plus.bin',      'esrgan/models/realesrgan-x4plus.bin'],
+    ['models/realesrgan-x4plus.param',    'esrgan/models/realesrgan-x4plus.param'],
+    ['models/realesrgan-x4plus-anime.bin',   'esrgan/models/realesrgan-x4plus-anime.bin'],
+    ['models/realesrgan-x4plus-anime.param', 'esrgan/models/realesrgan-x4plus-anime.param'],
+  ]);
+
+  console.log('\nDone. resources/bin/win/ now has yt-dlp, ffmpeg, whisper/, libraw/, esrgan/.');
   console.log('Next: npm run dist:win');
 }
 

@@ -71,7 +71,7 @@
         "dmg"
       ],
       "category": "public.app-category.utilities",
-      "x64ArchFiles": "**/bin/*",
+      "x64ArchFiles": "**/bin/**/*",
       "extraResources": [
         {
           "from": "resources/bin/mac",

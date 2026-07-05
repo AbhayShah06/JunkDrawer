@@ -110,7 +110,8 @@ async function create() {
   // Don't nag about updates while developing (npm start) — only the packaged app checks.
   process.env.JD_DEV = app.isPackaged ? '' : '1';
   updater.enabled = app.isPackaged && process.platform === 'win32';
-  const { port, server } = await startServer(appRoot(), binDir(), updater, opener);
+  const { port, server } = await startServer(appRoot(), binDir(), updater, opener,
+    path.join(app.getPath('userData'), 'models')); // download-on-first-use models (whisper) live outside the app dir so updates don't re-download them
   srv = server;
   // Launched by opening a file? Queue it so the renderer picks it up on first load.
   if (!pendingOpenPath) { const initial = argvOpenPath(process.argv); if (initial) pendingOpenPath = initial; }
