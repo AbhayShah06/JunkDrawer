@@ -32,7 +32,7 @@
   /* ---- title bar ---- */
   header{background:var(--face); border-bottom:2px solid var(--sh2); box-shadow:0 1px 0 var(--hi) inset;
     background-image:repeating-linear-gradient(0deg,#0000000d 0 1px,transparent 1px 3px)}
-  .topbar{max-width:1020px; margin:0 auto; display:flex; align-items:center; gap:12px; padding:7px 14px}
+  .topbar{max-width:min(1200px,100%); margin:0 auto; display:flex; align-items:center; gap:12px; padding:7px 14px; flex-wrap:wrap}
   .brand{font:bold 15px var(--sans); display:flex; align-items:center; gap:8px}
   .brand .mk{display:inline-grid; place-items:center; width:22px; height:22px; background:var(--face);
     border:2px solid; border-color:var(--rb); border-radius:3px; font-size:13px}
@@ -61,7 +61,7 @@
   .toolsdd .lib-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:7px}
   .modewrap{margin-left:6px; font:11px var(--sans); color:var(--ink2); display:flex; align-items:center; gap:5px}
   .modewrap select{font:12px var(--sans); background:var(--well); color:var(--ink); border:2px solid; border-color:var(--sb); padding:2px 4px}
-  main{max-width:1020px; margin:14px auto; padding:0 14px}
+  main{max-width:min(1200px,100%); margin:14px auto; padding:0 14px}
   /* ---- panels ---- */
   .hero,.receipt,.panel{background:var(--face); border:2px solid; border-color:var(--rb)}
   .hero{padding:16px 16px 14px; margin-bottom:14px}
@@ -183,7 +183,7 @@
   .toast.show{opacity:1}
   /* status-bar footer */
   footer{background:var(--face); border-top:2px solid var(--hi); box-shadow:0 -1px 0 var(--sh2) inset}
-  footer .wrap{max-width:1020px; margin:0 auto; padding:5px 14px; display:flex; justify-content:space-between; gap:12px;
+  footer .wrap{max-width:min(1200px,100%); margin:0 auto; padding:5px 14px; display:flex; justify-content:space-between; gap:12px;
     flex-wrap:wrap; align-items:center; font-size:11px; color:var(--ink2)}
   footer a{color:var(--ink); font-weight:bold; text-decoration:none} footer a:hover{text-decoration:underline}
   footer .cr{font:10.5px var(--mono); max-width:440px; text-align:right; line-height:1.5}
@@ -632,6 +632,11 @@ function showResult(blob,filename,{note}={}){
   if(isImg){ const im=el('img',{className:'preview',src:url,title:filename}); row.append(im); }
   const right=el('div',{style:'flex:1;min-width:210px'});
   const actions=el('div',{className:'actions'},[el('a',{className:'btn',href:url,download:filename,textContent:'Download'})]);
+  // "Edit this" — feed the result straight back in as if you'd just uploaded it, so you can
+  // chain tools (e.g. burn captions, then edit the captioned video again).
+  const ed=el('button',{className:'btn ghost',textContent:'Edit this'});
+  ed.onclick=()=>{ try{ intake([new File([blob],filename,{type:blob.type||''})]); }catch{ toast('Couldn’t reopen that result'); } };
+  actions.append(ed);
   if(isImg){ const cp=el('button',{className:'btn ghost',textContent:'Copy'});
     cp.onclick=async()=>{ try{
         // The Async Clipboard API only accepts image/png — re-encode JPG/WEBP/etc. to PNG first.
@@ -1262,7 +1267,9 @@ function buildTopbar(){
 }
 
 function toolCard(t,color){ const c=el('div',{className:'tool'}); c.style.setProperty('--c',color);
-  c.append(el('span',{className:'dot'}), el('div',{},[el('div',{className:'nm',textContent:t.nm}),el('div',{className:'ds',textContent:t.ds})]));
+  const nm=el('div',{className:'nm',textContent:t.nm});
+  if(t.input==='url') nm.append(el('span',{className:'wifi',title:'Needs an internet connection',textContent:' 🛜'}));
+  c.append(el('span',{className:'dot'}), el('div',{},[nm,el('div',{className:'ds',textContent:t.ds})]));
   bindTip(c, t.more||t.ds); c.onclick=()=>openTool(t); return c; }
 
 /* open a tool */
@@ -1354,10 +1361,12 @@ function installPanel(p,needs){
   p.append(box);
   p.append(el('div',{className:'runrow'},[ (()=>{ const b=el('button',{className:'btn ghost',textContent:'Close'}); b.onclick=resetStage; return b; })() ]));
 }
-function renderUrl(t){ const color=CATS[t.cat].color; openStage();
+function renderUrl(t){ if(_dlCtl){ try{ _dlCtl.abort(); }catch{} _dlCtl=null; }  // cancel a download from a previous panel
+  const color=CATS[t.cat].color; openStage();
   const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',color);
   p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:t.nm}),el('span',{className:'badge',textContent:CATS[t.cat].label})]));
   p.append(el('div',{className:'ds',textContent:t.more||t.ds}));
+  p.append(el('div',{className:'note',style:'margin:2px 0 6px'},'🛜 Needs an internet connection.'));
   if(!backend.up){ p.append(el('div',{className:'opts'},[el('div',{},'The link tools need the app’s local server. Open Junk Drawer itself (not the HTML in a browser), then reload.')]));
     p.append(el('div',{className:'runrow'},[ (()=>{ const b=el('button',{className:'btn ghost',textContent:'Close'}); b.onclick=resetStage; return b; })() ])); return; }
   if(t.needs && !backend.ok[t.needs]){ return installPanel(p,t.needs); }
@@ -1367,14 +1376,21 @@ function renderUrl(t){ const color=CATS[t.cat].color; openStage();
   p.append(el('div',{className:'opts'},[el('label',{},['link ',inp])]));
   const go=el('button',{className:'btn',textContent:'Download'});
   go.onclick=async()=>{ const url=inp.value.trim(); if(!/^https?:/i.test(url)){ toast('Paste a full https:// link'); return; }
+    if(!navigator.onLine){ toast('You appear to be offline — connect to Wi-Fi first'); return; }
     go.disabled=true; clearStatus(); $('#output').innerHTML=''; state.ctx={t,f:null};
     try{ await postDownload(url,t.mode); }catch(e){ fail(e); } finally{ go.disabled=false; } };
   p.append(el('div',{className:'runrow'},[go]));
   setTimeout(()=>inp.focus(),0);
 }
+let _dlCtl=null;  // in-flight download; aborted when the user switches tools / starts another
 async function postDownload(url,mode){
+  if(_dlCtl){ try{ _dlCtl.abort(); }catch{} }        // cancel any previous download (e.g. MP3 → MP4 switch)
+  const ctl=new AbortController(); _dlCtl=ctl;
   progress('Fetching from the web (this can take a while for video)');
-  const r=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,mode})});
+  let r;
+  try{ r=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,mode}),signal:ctl.signal}); }
+  catch(e){ if(e&&e.name==='AbortError') return; throw e; }
+  if(ctl.signal.aborted) return;
   if(!r.ok){ let msg; try{ const j=await r.json();
       if(j.error==='ytdlp-missing') msg='yt-dlp isn’t available. Reinstall Junk Drawer to restore it.';
       else if(j.error==='ffmpeg-missing') msg='Couldn’t find the MP3 converter (ffmpeg). Restart the app and try again.';
@@ -1383,12 +1399,14 @@ async function postDownload(url,mode){
       else msg=j.error||('HTTP '+r.status);
     }catch{ msg='HTTP '+r.status; } throw new Error(msg); }
   const blob=await r.blob();
+  if(ctl.signal.aborted) return;
+  if(_dlCtl===ctl) _dlCtl=null;
   const fn=decodeURIComponent(r.headers.get('X-Filename')||('download.'+(mode==='video'?'mp4':mode==='spotify'?'zip':'mp3')));
   showResult(blob, fn);
 }
 
 function openStage(){ $('#stage').style.display='block'; $('#stage').scrollIntoView({behavior:'smooth',block:'start'}); }
-function resetStage(){ $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; freeResUrls(); }
+function resetStage(){ if(_dlCtl){ try{ _dlCtl.abort(); }catch{} _dlCtl=null; } $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; freeResUrls(); }
 
 /* receipt after a file is dropped */
 function showReceipt(file){

@@ -68,7 +68,10 @@ function handleDownload(req, res, binDir) {
         if (!ffmpegOk) return sendJSON(res, { error: 'ffmpeg-missing' }, 501);
         args = [...base,'-x','--audio-format','mp3','--',url];
       } else
-        args = ffmpegOk ? [...base,'-f','bestvideo*+bestaudio/best','--merge-output-format','mp4','--',url]
+        // Prefer already-mp4 video + m4a audio so the merge is a fast remux (no re-encode).
+        // Falling back to bestvideo+bestaudio (often VP9/AV1 + opus) forces a slow re-encode,
+        // which is why plain "best" MP4s felt so slow. Cap at 1080p for a sane size/speed.
+        args = ffmpegOk ? [...base,'-f','bv*[ext=mp4][height<=1080]+ba[ext=m4a]/b[ext=mp4][height<=1080]/bv*[height<=1080]+ba/b','--merge-output-format','mp4','--',url]
                         : [...base,'-f','best[ext=mp4]/best','--',url];
     }
 
@@ -76,10 +79,14 @@ function handleDownload(req, res, binDir) {
     const env = Object.assign({}, process.env);
     if (ffmpeg) env.PATH = path.dirname(ffmpeg) + path.delimiter + (env.PATH || ''); // bundled ffmpeg findable by yt-dlp
     const child = spawn(bin, args, { cwd: tmp, env });
-    let err = '';
+    let err = '', aborted = false;
+    // If the client goes away mid-download (e.g. the user switches from MP3 to MP4), kill the
+    // yt-dlp process and clean up — otherwise it keeps running, orphaned, and piles up.
+    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; try { child.kill('SIGKILL'); } catch {} cleanup(tmp); } });
     child.stderr.on('data', d => { err += d; });
-    child.on('error', e => { cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
+    child.on('error', e => { if (aborted) return; cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
     child.on('close', code => {
+      if (aborted) return;
       if (code !== 0) { const d = err.slice(-2500); cleanup(tmp); return sendJSON(res, { error: 'tool-failed', detail: d }, 500); }
       let files = [];
       try { files = fs.readdirSync(tmp).map(f => path.join(tmp, f)).filter(f => fs.statSync(f).isFile()); } catch {}
