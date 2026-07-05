@@ -983,6 +983,8 @@ add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitl
     const b=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt},'out.'+fmt,'Listening and writing (a long recording takes a while)');
     if(fmt==='txt') showText((await b.text()).trim(),base(f.name)+'.txt');
     else showResult(b,base(f.name)+'.'+fmt,{note:fmt==='srt'?'Pairs perfectly with “Burn In Subtitles”.':''}); }});
+add({cat:'video',kinds:['video','audio'],rec:1,custom:f=>captionStudio(f),nm:'Caption Studio',ds:'Auto-caption a video, then fix the words and timing',kw:'captions subtitles srt vtt whisper auto generate edit editor transcribe burn tiktok reels shorts timing sync',
+  more:'Listens to your video and writes captions automatically, then opens an editor: play the video, fix any words whisper got wrong, nudge the timing, add or delete lines. Export a clean SRT/VTT or burn the captions straight onto the video. The speech model runs on your machine — nothing is uploaded.'});
 add({cat:'audio',kinds:['audio','video'],nm:'Podcast Loudness Fix',ds:'Match the volume podcast apps expect',kw:'loudnorm lufs podcast loudness normalize level broadcast -16 episode',
   more:'Levels a recording to standard podcast loudness (-16 LUFS), so your episode isn’t quieter or louder than everyone else’s. Works on a video too — you get the leveled sound as an MP3.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-af','loudnorm=I=-16:TP=-1.5:LRA=11','-acodec','libmp3lame','-q:a','2',out],'Leveling loudness'),base(f.name)+'-podcast.mp3'); }});
@@ -1199,7 +1201,7 @@ const MODES={
     'Sign & Fill PDF','Combine PDFs','Open Any Archive','Remove Background']},
   photo:  {label:'Photographer', tools:['Camera RAW to JPG','Upscale an Image (4×)','Change Image Type','Resize Image',
     'Shrink File Size','Strip Location Only','Fix Photo Dates','Rename Photos by Date Taken','Remove Background','Picture to SVG']},
-  creator:{label:'Content Creator', tools:['Transcribe to Text or Subtitles','Burn In Subtitles','Make a Voiceover',
+  creator:{label:'Content Creator', tools:['Caption Studio','Transcribe to Text or Subtitles','Burn In Subtitles','Make a Voiceover',
     'Fix Phone Video for Editing','Shrink a Video','Trim a Video','Video to GIF','Save a Photo from a Video']},
   music:  {label:'Musician / DJ', tools:['Split a Song into Vocals & Instrumental','Find the BPM','Convert Audio',
     'Cut Out Silence','Podcast Loudness Fix','Even Out Volume','Trim Audio','Save the Audio as MP3']},
@@ -1541,6 +1543,95 @@ async function openViewer(file){
   }catch(err){ fail(err); }
 }
 /* ===== PDF Sign & Fill (interactive editor) ===== */
+/* ===== Caption Studio — auto-generate subtitles, edit words + timing, export or burn in ===== */
+function jdParseTs(str){ const parts=String(str).trim().split(':'); if(!parts.length) return null;
+  let s=0; for(const p of parts){ const n=parseFloat(p); if(isNaN(n)) return null; s=s*60+n; } return s; }
+function jdFmtTs(sec,sep){ sec=Math.max(0,sec||0); const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=Math.floor(sec%60), ms=Math.round((sec-Math.floor(sec))*1000);
+  const p=(n,w)=>String(n).padStart(w||2,'0'); return p(h)+':'+p(m)+':'+p(s)+sep+p(ms,3); }
+function jdParseSrt(str){ const cues=[]; const blocks=String(str).replace(/\r/g,'').trim().split(/\n\n+/);
+  for(const b of blocks){ const lines=b.split('\n'); if(lines.length<2) continue;
+    let i=0; if(/^\d+$/.test(lines[0].trim())) i=1;
+    const m=(lines[i]||'').match(/(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)/); if(!m) continue;
+    const t=(h,mi,s,ms)=>(+h)*3600+(+mi)*60+(+s)+(+ms)/1000;
+    cues.push({start:t(m[1],m[2],m[3],m[4]), end:t(m[5],m[6],m[7],m[8]), text:lines.slice(i+1).join('\n').trim()}); }
+  return cues; }
+function jdSrtOf(cues){ return cues.map((c,i)=>(i+1)+'\n'+jdFmtTs(c.start,',')+' --> '+jdFmtTs(c.end,',')+'\n'+(c.text||'')).join('\n\n')+'\n'; }
+function jdVttOf(cues){ return 'WEBVTT\n\n'+cues.map(c=>jdFmtTs(c.start,'.')+' --> '+jdFmtTs(c.end,'.')+'\n'+(c.text||'')).join('\n\n')+'\n'; }
+
+async function captionStudio(file){
+  openStage();
+  const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.video.color); $('#output').innerHTML=''; clearStatus();
+  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Caption Studio'}),el('span',{className:'badge',textContent:'Video'})]));
+  p.append(el('div',{className:'ds',textContent:'Auto-generate captions, fix the words and timing, then export an SRT/VTT or burn them onto the video. Nothing leaves your machine.'}));
+
+  const info=await nativeInfo();
+  if(!info.whisper){ showGuide(needDesktop('Captions')); return; }
+  if(!info.whisperModel){ try{ await ensureModel('ggml-base.bin','whisperModel','Downloading the speech model (one time, ~140 MB)'); }catch(e){ fail(e); return; } }
+
+  let cues=[];
+  try{
+    const wav=await runFF(file,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
+    const srtBlob=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt:'srt'},'out.srt','Listening and writing captions (a long clip takes a while)');
+    cues=jdParseSrt(await srtBlob.text());
+  }catch(e){ fail(e); return; }
+  clearStatus();
+  if(!cues.length) cues=[{start:0,end:2,text:''}];
+
+  const isVideo=kind(file)==='video';
+  const mediaUrl=URL.createObjectURL(file);
+  const media=el(isVideo?'video':'audio',{src:mediaUrl,controls:true,
+    style:isVideo?'display:block;max-width:100%;max-height:320px;margin:8px auto;background:#000;border:2px solid;border-color:var(--sb)'
+                 :'display:block;width:100%;margin:8px 0'});
+  p.append(media);
+
+  const list=el('div',{style:'max-height:340px;overflow:auto;border:2px solid;border-color:var(--sb);background:var(--well);padding:6px;margin:8px 0'});
+  p.append(list);
+  const rows=[];
+
+  function render(){
+    list.innerHTML=''; rows.length=0;
+    cues.forEach(c=>{
+      const row=el('div',{style:'display:flex;gap:6px;align-items:flex-start;padding:5px 4px;border-bottom:1px solid var(--line)'});
+      const jump=el('button',{className:'btn ghost',textContent:'▶',title:'Jump here',style:'padding:2px 8px;flex:0 0 auto'});
+      jump.onclick=()=>{ media.currentTime=c.start; if(media.play) media.play(); };
+      const times=el('div',{style:'flex:0 0 100px;display:flex;flex-direction:column;gap:3px'});
+      const st=el('input',{value:jdFmtTs(c.start,'.'),title:'start',style:'width:100px;font:11px var(--mono);padding:2px'});
+      const en=el('input',{value:jdFmtTs(c.end,'.'),title:'end',style:'width:100px;font:11px var(--mono);padding:2px'});
+      st.onchange=()=>{ const v=jdParseTs(st.value); if(v==null){ st.value=jdFmtTs(c.start,'.'); return; } c.start=v; };
+      en.onchange=()=>{ const v=jdParseTs(en.value); if(v==null){ en.value=jdFmtTs(c.end,'.'); return; } c.end=v; };
+      times.append(st,en);
+      const ta=el('textarea',{value:c.text,rows:2,style:'flex:1;min-width:0;resize:vertical;font:13px var(--sans);padding:4px;background:#fff;color:#111;border:1px solid var(--line)'});
+      ta.oninput=()=>{ c.text=ta.value; };
+      const del=el('button',{className:'btn ghost',textContent:'✕',title:'Delete line',style:'padding:2px 8px;flex:0 0 auto'});
+      del.onclick=()=>{ const k=cues.indexOf(c); if(k>=0) cues.splice(k,1); render(); };
+      row.append(jump,times,ta,del);
+      list.append(row); rows.push({cue:c,node:row});
+    });
+  }
+  render();
+
+  media.addEventListener('timeupdate',()=>{ const t=media.currentTime;
+    rows.forEach(r=>{ const on=t>=r.cue.start&&t<r.cue.end; r.node.style.background=on?'color-mix(in srgb, var(--c) 22%, transparent)':''; }); });
+
+  const addBtn=el('button',{className:'btn ghost',textContent:'+ Add line'});
+  addBtn.onclick=()=>{ const at=media.currentTime||0; cues.push({start:at,end:at+2,text:''}); cues.sort((a,b)=>a.start-b.start); render(); };
+  const regen=el('button',{className:'btn ghost',textContent:'Regenerate'});
+  regen.onclick=()=>captionStudio(file);
+  const dlSrt=el('button',{className:'btn',textContent:'Download .srt'});
+  dlSrt.onclick=()=>showResult(new Blob([jdSrtOf(cues)],{type:'text/plain'}),base(file.name)+'.srt',{note:'Edited captions — pairs with Burn In Subtitles too.'});
+  const dlVtt=el('button',{className:'btn ghost',textContent:'Download .vtt'});
+  dlVtt.onclick=()=>showResult(new Blob([jdVttOf(cues)],{type:'text/plain'}),base(file.name)+'.vtt');
+  const burn=el('button',{className:'btn',textContent:'Burn into video'});
+  if(!isVideo) burn.style.display='none';
+  burn.onclick=async()=>{ burn.disabled=true;
+    try{ const srt=new Blob([jdSrtOf(cues)],{type:'text/plain'});
+      const out=await runFF(file,'out.mp4',(i,o)=>['-i',i,'-vf',"subtitles=subs.srt:force_style='FontName=Arial,FontSize=20,Outline=1'",'-c:v','libx264','-pix_fmt','yuv420p','-crf','19','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',o],'Burning in captions',{name:'subs.srt',data:srt});
+      showResult(out,base(file.name)+'-captioned.mp4',{note:'Captions burned onto the video.'});
+    }catch(e){ fail(e); } finally{ burn.disabled=false; } };
+
+  p.append(el('div',{className:'runrow'},[dlSrt,dlVtt,burn,addBtn,regen]));
+}
+
 async function pdfSignFill(file){
   openStage();
   const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.pdf.color); $('#output').innerHTML=''; clearStatus();
