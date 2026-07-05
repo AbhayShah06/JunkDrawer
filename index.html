@@ -41,22 +41,29 @@
   nav a{color:var(--ink); text-decoration:none; font-size:12px; padding:3px 10px; border:2px solid transparent; border-radius:3px}
   nav a:hover{border-color:var(--rb); background:var(--face)}
   nav a:active{border-color:var(--sb)}
-  /* Win95 menu bar: every tool one click from the top */
-  .menubar{max-width:1020px; margin:0 auto; display:flex; flex-wrap:wrap; gap:1px; padding:1px 10px 2px; border-top:1px solid var(--sh)}
-  .menu{position:relative}
-  .menu>button{font:12px var(--sans); background:none; color:var(--ink); border:2px solid transparent; padding:3px 10px; cursor:pointer}
-  .menu>button:hover{border-color:var(--rb)}
-  .menu.open>button{background:var(--title1); color:#fff; border-color:var(--sb)}
-  .menu .dd{display:none; position:absolute; left:0; top:100%; z-index:80; background:var(--face); border:2px solid; border-color:var(--rb); box-shadow:3px 3px 0 rgba(0,0,0,.35); min-width:220px; padding:3px; max-height:70vh; overflow:auto}
-  .menu.open .dd{display:block}
-  .dd .mi{display:flex; align-items:center; gap:7px; width:100%; text-align:left; font:12px var(--sans); padding:5px 10px; background:none; border:0; cursor:pointer; color:var(--ink); white-space:nowrap}
-  .dd .mi:hover{background:var(--title1); color:#fff}
-  .dd .mi .dot{width:8px; height:8px; background:var(--c); border:1px solid var(--sh2); flex:none}
+  /* The Tools dropdown: press to open the category list, press a category for its
+     library, press anywhere outside to close. The default screen stays clean. */
+  .toolsdd{position:relative}
+  .toolsbtn{font:bold 12px var(--sans); background:var(--face); color:var(--ink); border:2px solid; border-color:var(--rb); padding:4px 14px; cursor:pointer}
+  .toolsbtn:active, .toolsdd.open .toolsbtn{border-color:var(--sb)}
+  .toolsdd .dd{position:absolute; left:0; top:calc(100% + 4px); z-index:80; background:var(--face); border:2px solid; border-color:var(--rb); box-shadow:3px 3px 0 rgba(0,0,0,.35); min-width:260px; padding:4px; max-height:72vh; overflow:auto}
+  .toolsdd .dd[hidden]{display:none}
+  .toolsdd .mi{display:flex; align-items:center; gap:8px; width:100%; text-align:left; font:12px var(--sans); padding:7px 10px; background:none; border:0; cursor:pointer; color:var(--ink); white-space:nowrap}
+  .toolsdd .mi:hover{background:var(--title1); color:#fff}
+  .toolsdd .mi .dot{width:8px; height:8px; background:var(--c); border:1px solid var(--sh2); flex:none}
+  .toolsdd .mi .cnt{margin-left:auto; font-size:11px; opacity:.7}
+  .toolsdd .toolslib{width:min(580px,92vw)}
+  .toolsdd .lib-head{display:flex; align-items:center; gap:9px; padding:3px 3px 7px; border-bottom:1px solid var(--line); margin-bottom:7px}
+  .toolsdd .lib-head b{font:bold 12px var(--sans)}
+  .toolsdd .lib-head .cnt{margin-left:auto; font:11px var(--mono); color:var(--ink2)}
+  .toolsdd .lib-back{font:11px var(--sans); background:var(--face); color:var(--ink); border:2px solid; border-color:var(--rb); cursor:pointer; padding:2px 9px}
+  .toolsdd .lib-back:active{border-color:var(--sb)}
+  .toolsdd .lib-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:7px}
   .modewrap{margin-left:6px; font:11px var(--sans); color:var(--ink2); display:flex; align-items:center; gap:5px}
   .modewrap select{font:12px var(--sans); background:var(--well); color:var(--ink); border:2px solid; border-color:var(--sb); padding:2px 4px}
   main{max-width:1020px; margin:14px auto; padding:0 14px}
   /* ---- panels ---- */
-  .hero,.cabinet,.receipt,.panel{background:var(--face); border:2px solid; border-color:var(--rb)}
+  .hero,.receipt,.panel{background:var(--face); border:2px solid; border-color:var(--rb)}
   .hero{padding:16px 16px 14px; margin-bottom:14px}
   .hero h1{font:bold 21px var(--sans); margin:0 0 6px; text-align:center}
   .hero p{color:var(--ink2); margin:0 auto 14px; max-width:70ch; font-size:12.5px; text-align:center}
@@ -106,39 +113,12 @@
   .clearbtn{font:11px var(--mono); background:var(--face); border:2px solid; border-color:var(--rb); color:var(--ink);
     padding:3px 9px; cursor:pointer; border-radius:2px}
   .clearbtn:active{border-color:var(--sb)}
-  /* ---- cabinet / drawers ---- */
-  .cabinet{padding:14px 16px; margin-bottom:14px}
-  .cabinet h2{font:bold 11px var(--mono); letter-spacing:1px; text-transform:uppercase; color:var(--ink2);
-    margin:0 0 12px; border-bottom:1px solid var(--line); padding-bottom:6px}
-  .drawer{margin-bottom:7px; border:2px solid; border-color:var(--rb); background:var(--faceD)}
-  .drawer-tab{display:flex; align-items:center; gap:11px; width:100%; text-align:left; cursor:pointer; background:transparent;
-    border:none; padding:9px 11px; font:inherit; color:var(--ink)}
-  .drawer-tab:hover{background:#0000000a}
-  .drawer-tab .label{font:bold 10px var(--mono); letter-spacing:1px; text-transform:uppercase; color:#fff;
-    background:var(--c); padding:3px 8px; border-radius:2px}
-  .drawer-tab .ico{color:var(--c); display:flex}
-  .drawer-tab .ttl{font-weight:bold; font-size:12.5px}
-  .drawer-tab .cnt{color:var(--ink2); font:11px var(--mono)}
-  .drawer-tab .chev{margin-left:auto; color:var(--ink2); font-size:12px; transition:.15s}
-  .drawer.open .chev{transform:rotate(90deg)}
-  .drawer-body{display:none; padding:4px 11px 12px; background:var(--face); border-top:1px solid var(--line)}
-  .drawer.open .drawer-body{display:block}
-  .tools{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:7px; margin-top:8px}
-  /* quick-access rows (popular / recent) */
+  /* quick-access rows (mode set / recent) */
   .quick{margin-top:16px}
   .qrow{margin:12px 0 0}
   .qrow[hidden]{display:none}
   .qlabel{display:block; font:bold 10.5px var(--sans); letter-spacing:.07em; text-transform:uppercase; color:var(--ink2); margin:0 0 7px 1px}
   .qtools{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px}
-  /* "browse all tools" toggle + collapsed cabinet */
-  .cabinet .alltoggle{display:inline-flex; align-items:center; gap:8px; background:var(--face);
-    border:2px solid; border-color:var(--hi) var(--sh2) var(--sh2) var(--hi); padding:8px 16px;
-    font:bold 12px var(--sans); color:var(--ink); cursor:pointer}
-  .cabinet .alltoggle:active{border-color:var(--sh2) var(--hi) var(--hi) var(--sh2)}
-  .cabinet .alltoggle .chev{transition:transform .12s}
-  .cabinet.open .alltoggle .chev{transform:rotate(90deg)}
-  #drawerwrap[hidden]{display:none}
-  #drawerwrap{margin-top:12px}
   .tool{display:flex; gap:9px; align-items:flex-start; background:var(--well); border:2px solid; border-color:var(--rb);
     padding:9px 10px; cursor:pointer}
   .tool:hover{background:var(--hover)}
@@ -267,16 +247,20 @@
 <header><div class="topbar">
   <div class="brand" id="brandHome" title="Start over" style="cursor:pointer"><span class="mk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16"/><path d="M3 12h18M9.5 8h5M9.5 16h5"/></svg></span>Junk&nbsp;Drawer
     <small>It just works</small></div>
+  <div class="toolsdd" id="toolsDD">
+    <button class="toolsbtn" id="toolsBtn">Tools ▾</button>
+    <div class="dd" id="toolsMenu" hidden></div>
+    <div class="dd toolslib" id="toolsLib" hidden></div>
+  </div>
   <nav>
     <a href="#" id="resetBtn" title="Clear everything and start over">↺ Reset</a>
     <a href="#" id="themeToggle">Theme</a>
     <a href="#" id="navPrivacy">Privacy</a>
     <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">About</a>
   </nav>
-  <label class="modewrap" title="Pick what you're here to do — the app remembers">mode
+  <label class="modewrap" title="Pick who you are — the home screen shows your set">I'm here as
     <select id="modeSel"></select></label>
-</div>
-<div class="menubar" id="menubar"></div></header>
+</div></header>
 
 <div id="updateBar" hidden>
   <span class="ub-txt"></span>
@@ -312,10 +296,6 @@
   <section id="receipt"></section>
   <section id="stage"><div class="panel" id="panel"></div><div id="status"></div><div id="output"></div></section>
 
-  <section class="cabinet" id="cabinet">
-    <button class="alltoggle" id="allToggle"><span class="chev">▸</span> <span id="allLabel">Browse all tools</span></button>
-    <div id="drawerwrap" hidden><div id="drawers"></div></div>
-  </section>
 </main>
 
 <footer><div class="wrap">
@@ -1138,80 +1118,77 @@ function bindTip(node,text){ if(!text)return;
   node.addEventListener('mousemove',e=>{ tipEl.style.left=Math.min(e.clientX+14,innerWidth-296)+'px'; tipEl.style.top=(e.clientY+18)+'px'; });
   node.addEventListener('mouseleave',()=>{ tipEl.style.display='none'; }); }
 
-/* drawers */
-/* modes: what the home screen leads with. Search always spans every tool; the current
-   mode's tools just rank first. The pick is remembered between sessions. */
+/* modes: who is using the app. The home screen shows only that person's hand-picked set —
+   nothing else — and search ranks their tools first (while still covering everything).
+   Remembered between sessions. Everything else lives behind the Tools dropdown. */
 const MODES={
-  basics:{label:'Basics',      cats:null},
-  photos:{label:'Photos',      cats:['image']},
-  video: {label:'Video',       cats:['video']},
-  music: {label:'Music',       cats:['audio']},
-  paper: {label:'Paperwork',   cats:['pdf','data','doc']},
-  odds:  {label:'Odds & Ends', cats:['dev','weird','web','arc']},
+  basics: {label:'Junk Drawer Basics', tools:['iPhone Photo to JPG','Shrink File Size','Shrink a Video','Make It an MP4',
+    'Sign & Fill PDF','Combine PDFs','Open Any Archive','Remove Background']},
+  photo:  {label:'Photographer', tools:['Camera RAW to JPG','Upscale an Image (4×)','Change Image Type','Resize Image',
+    'Shrink File Size','Remove Hidden Info','See Hidden Info','Remove Background','Rename Photos by Date Taken','Fix Photo Dates']},
+  creator:{label:'Content Creator', tools:['Transcribe to Text or Subtitles','Burn In Subtitles','Fix Phone Video for Editing',
+    'Shrink a Video','Trim a Video','Video to GIF','Save a Photo from a Video','Save the Audio as MP3']},
+  music:  {label:'Musician / DJ', tools:['Convert Audio','Find the BPM','Cut Out Silence','Podcast Loudness Fix',
+    'Even Out Volume','Trim Audio','Shrink Audio File','Save the Audio as MP3']},
+  paper:  {label:'Paperwork', tools:['Sign & Fill PDF','Combine PDFs','Shrink a PDF','PDF to Pictures',
+    'Split into Single Pages','Delete Pages','Add Page Numbers','Grab Text from a Picture']},
+  dev:    {label:'Developer', tools:['Tidy Up JSON','Switch JSON/YAML','CSV to JSON','JSON to CSV',
+    'Make a QR Code','Make a Text Fingerprint','Scramble Text to Base64','Look Inside a File']},
 };
-const BASICS=['iPhone Photo to JPG','Shrink File Size','Shrink a Video','Make It an MP4',
-  'Sign & Fill PDF','Combine PDFs','Remove Background','Save the Audio as MP3'];
-let MODE=(()=>{ try{ const m=localStorage.getItem('jd-mode'); return MODES[m]?m:'basics'; }catch{ return 'basics'; } })();
+const MODE_MIGRATE={photos:'photo',video:'creator',odds:'dev'}; // pre-persona stored values
+let MODE=(()=>{ try{ let m=localStorage.getItem('jd-mode'); m=MODE_MIGRATE[m]||m; return MODES[m]?m:'basics'; }catch{ return 'basics'; } })();
 function setMode(m){ MODE=MODES[m]?m:'basics'; try{ localStorage.setItem('jd-mode',MODE); }catch{} renderQuick(); }
-function modeTools(){
-  if(!MODES[MODE].cats) return BASICS.map(nm=>T.find(t=>t.nm===nm)).filter(Boolean);
-  const ts=T.filter(t=>MODES[MODE].cats.includes(t.cat));
-  return [...ts.filter(t=>t.rec),...ts.filter(t=>!t.rec)].slice(0,8);
-}
+function modeTools(){ return MODES[MODE].tools.map(nm=>T.find(t=>t.nm===nm)).filter(Boolean); }
 /* recent quick-access tools (no forced setup — recents fill in as you go) */
 function recentList(){ try{ return JSON.parse(localStorage.getItem('jd-recent')||'[]'); }catch{ return []; } }
 function pushRecent(nm){ let r=recentList().filter(x=>x!==nm); r.unshift(nm); try{ localStorage.setItem('jd-recent',JSON.stringify(r.slice(0,5))); }catch{} }
 function renderQuick(){
   const fill=(host,tools)=>{ if(!host)return 0; host.innerHTML=''; let n=0;
     tools.forEach(t=>{ if(t){ host.append(toolCard(t,CATS[t.cat].color)); n++; } }); return n; };
-  const lbl=$('#modeLabel'); if(lbl)lbl.textContent=MODES[MODE].cats?MODES[MODE].label:'Basics';
+  const lbl=$('#modeLabel'); if(lbl)lbl.textContent=MODES[MODE].label;
   fill($('#starTools'),modeTools());
   const rr=$('#recentRow'), n=fill($('#recentTools'),recentList().map(nm=>T.find(x=>x.nm===nm))); if(rr) rr.hidden=!n;
 }
-/* Win95 menu bar + the mode picker (top right) */
-function closeMenus(){ document.querySelectorAll('.menu.open').forEach(x=>x.classList.remove('open')); }
+/* The Tools dropdown (top bar): press → category list; press a category → its library;
+   press outside or Esc → closed. Plus the mode picker on the right. */
 function buildTopbar(){
   const sel=$('#modeSel'); if(sel){ sel.innerHTML='';
     for(const k in MODES) sel.append(el('option',{value:k,textContent:MODES[k].label}));
     sel.value=MODE; sel.onchange=()=>setMode(sel.value); }
-  const mb=$('#menubar'); if(!mb)return; mb.innerHTML='';
-  for(const id in CATS){ const c=CATS[id]; const tools=T.filter(t=>t.cat===id); if(!tools.length)continue;
-    const m=el('div',{className:'menu'}); const b=el('button',{textContent:c.label});
-    const dd=el('div',{className:'dd'}); dd.style.setProperty('--c',c.color);
-    tools.forEach(t=>{ const mi=el('button',{className:'mi'},[el('span',{className:'dot'}),el('span',{textContent:t.nm})]);
-      bindTip(mi,t.more||t.ds); mi.onclick=()=>{ closeMenus(); openTool(t); }; dd.append(mi); });
-    b.onclick=e=>{ e.stopPropagation(); const was=m.classList.contains('open'); closeMenus(); if(!was)m.classList.add('open'); };
-    // classic menu-bar behavior: once one menu is open, hovering slides between them
-    b.onmouseenter=()=>{ if(document.querySelector('.menu.open')&&!m.classList.contains('open')){ closeMenus(); m.classList.add('open'); } };
-    m.append(b,dd); mb.append(m);
+  const dd=$('#toolsDD'), btn=$('#toolsBtn'), menu=$('#toolsMenu'), lib=$('#toolsLib');
+  if(!dd) return;
+  const close=()=>{ dd.classList.remove('open'); menu.hidden=true; lib.hidden=true; };
+  const openMenu=()=>{ dd.classList.add('open'); lib.hidden=true; menu.hidden=false; };
+  function showLib(id){
+    const c=CATS[id], tools=T.filter(t=>t.cat===id);
+    lib.innerHTML=''; lib.style.setProperty('--c',c.color);
+    const back=el('button',{className:'lib-back',textContent:'◂ categories'});
+    back.onclick=e=>{ e.stopPropagation(); openMenu(); };
+    lib.append(el('div',{className:'lib-head'},[back,el('b',{textContent:c.label}),
+      el('span',{className:'cnt',textContent:tools.length+' tools'})]));
+    const grid=el('div',{className:'lib-grid'});
+    tools.forEach(t=>{ const card=toolCard(t,c.color); const open=card.onclick;
+      card.onclick=()=>{ close(); open(); }; grid.append(card); });
+    lib.append(grid);
+    dd.classList.add('open'); menu.hidden=true; lib.hidden=false;
   }
-  document.addEventListener('click',closeMenus);
-  document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeMenus(); });
+  menu.innerHTML='';
+  for(const id in CATS){ const c=CATS[id]; const n=T.filter(t=>t.cat===id).length; if(!n)continue;
+    const mi=el('button',{className:'mi'},[el('span',{className:'dot'}),el('span',{textContent:c.label}),
+      el('span',{className:'cnt',textContent:n+' ▸'})]);
+    mi.style.setProperty('--c',c.color); bindTip(mi,c.blurb);
+    mi.onclick=e=>{ e.stopPropagation(); showLib(id); };
+    menu.append(mi);
+  }
+  btn.onclick=e=>{ e.stopPropagation(); (menu.hidden&&lib.hidden)?openMenu():close(); };
+  document.addEventListener('click',e=>{ if(!e.target.closest('#toolsDD'))close(); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape')close(); });
+  window.openToolLib=id=>{ if(CATS[id])showLib(id); }; // receipt can point people at a library
 }
 
-function buildDrawers(){
-  const host=$('#drawers');
-  for(const id in CATS){ const c=CATS[id]; const tools=T.filter(t=>t.cat===id);
-    if(!tools.length) continue;  // skip categories with no tools (archive/open were removed)
-    const d=el('div',{className:'drawer'}); d.style.setProperty('--c',c.color);
-    const tab=el('button',{className:'drawer-tab'},[
-      el('span',{className:'ico'},[svg(c.icon)]),
-      el('span',{className:'label',textContent:c.label}),
-      el('span',{className:'ttl',textContent:c.blurb}),
-      el('span',{className:'cnt',textContent:tools.length+' tools'}),
-      el('span',{className:'chev',textContent:'▸'}) ]);
-    const body=el('div',{className:'drawer-body'});
-    const grid=el('div',{className:'tools'});
-    tools.forEach(t=>grid.append(toolCard(t,c.color)));
-    body.append(grid); tab.onclick=()=>d.classList.toggle('open');
-    d.append(tab,body); d.dataset.cat=id; host.append(d);
-  }
-  $('#allLabel').textContent=`Browse all ${T.length} tools`;
-}
 function toolCard(t,color){ const c=el('div',{className:'tool'}); c.style.setProperty('--c',color);
   c.append(el('span',{className:'dot'}), el('div',{},[el('div',{className:'nm',textContent:t.nm}),el('div',{className:'ds',textContent:t.ds})]));
   bindTip(c, t.more||t.ds); c.onclick=()=>openTool(t); return c; }
-function openDrawer(id){ document.querySelectorAll('.drawer').forEach(d=>d.classList.toggle('open',d.dataset.cat===id)); }
 
 /* open a tool */
 function openTool(t){
@@ -1352,8 +1329,7 @@ function showReceipt(file){
     const recos=T.filter(t=>t.rec && (t.kinds&&(t.kinds.includes(k)||t.kinds.includes('any'))));
     if(recos.length){ card.append(el('div',{className:'want',textContent:'What you can do'}));
       const rr=el('div',{className:'qtools'}); recos.slice(0,8).forEach(t=>rr.append(toolCard(t,CATS[t.cat].color))); card.append(rr); }
-    openDrawer(k);
-    // Scroll only AFTER the async meta + recommendations + drawer have expanded the receipt,
+    // Scroll only AFTER the async meta + recommendations have expanded the receipt,
     // and on the next frame so layout has settled — otherwise (e.g. right after a tool result
     // collapsed #stage) the smooth-scroll targets stale geometry and the new receipt lands
     // off-screen, making a fresh drop look like it did nothing.
@@ -1741,7 +1717,7 @@ function search(input){ const raw=input.trim(); const str=raw.toLowerCase(); if(
 }
 function scoreTool(t,str){ const hay=(t.nm+' '+t.ds+' '+(t.kw||'')+' '+CATS[t.cat].label).toLowerCase(); let s=0;
   str.split(/\s+/).forEach(w=>{ if(!w)return; if(t.nm.toLowerCase().includes(w))s+=3; else if(hay.includes(w))s+=1; });
-  if(s>0&&MODES[MODE].cats&&MODES[MODE].cats.includes(t.cat))s+=2; // current mode's tools first
+  if(s>0&&MODES[MODE].tools.includes(t.nm))s+=2; // the current persona's tools rank first
   return s; }
 q.addEventListener('input',e=>search(e.target.value));
 q.addEventListener('keydown',e=>{ if(!pal.classList.contains('show'))return;
@@ -1830,7 +1806,6 @@ function svg(path){ const ns='http://www.w3.org/2000/svg'; const s=document.crea
   s.setAttribute('stroke-linecap','round'); s.setAttribute('stroke-linejoin','round');
   const p=document.createElementNS(ns,'path'); p.setAttribute('d',path); s.append(p); return s; }
 
-buildDrawers();
 buildTopbar();
 renderQuick();
 
@@ -1861,7 +1836,6 @@ async function pollCards(){
   bar.append(go,x); bar.hidden=false;
 }
 pollCards(); setInterval(pollCards,8000);
-$('#allToggle').onclick=()=>{ const open=$('#cabinet').classList.toggle('open'); $('#drawerwrap').hidden=!open; };
 // Always-available reset: the brand logo and the "↺ Reset" nav link both clear everything
 // and return to the start screen, from anywhere in the app.
 const goHome=e=>{ if(e)e.preventDefault(); clearAll(); window.scrollTo(0,0); };
