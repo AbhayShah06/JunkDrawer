@@ -39,6 +39,18 @@ Type a URL or any text to get a QR image you can download, copy, or drag straigh
 
 ## A couple of notes
 
-The video tools, background remover, and QR tools fetch a small engine the first time you run each one, then keep it on hand. Stay online for that first use.
+The video tools, background remover, and QR tools fetch a small engine the first time you run each one, then keep it on hand. Stay online for that first use. The transcriber, voiceover, and song-splitter each download their model once on first use (~64–140 MB) and are fully offline after that.
+
+## Building the macOS `.dmg`
+
+On the Mac build machine, after `git pull`:
+
+```
+npm install
+bash scripts/fetch-bins-mac.sh   # fetches/builds the bundled engines into resources/bin/mac/
+npm run dist:mac
+```
+
+The fetch script needs `cmake` (for whisper-cli) and the Xcode command-line tools; everything else downloads official prebuilt binaries. `ffmpeg` and `yt-dlp` are assumed to already be in `resources/bin/mac/` from previous builds. The Windows equivalent is documented in `BUILD-WINDOWS.md`.
 
 Built by Abhay Shah. If you find it useful, connect on [LinkedIn](https://www.linkedin.com/in/abhay-shah1/) or follow on [X](https://x.com/AbhayShahCA).
