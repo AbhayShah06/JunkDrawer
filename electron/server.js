@@ -319,6 +319,8 @@ const MODELS = { // downloadable-on-first-use models, pinned by URL + expected d
   // `archive` entries are .tar.bz2 bundles extracted into modelsDir; `ready` is the file
   // whose presence proves the extraction completed.
   'ggml-base.bin': { url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin', size: 147951465 },
+  'ggml-small.bin': { url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin', size: 487601967 },
+  'ggml-medium.bin': { url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin', size: 1533763059 },
   'UVR-MDX-NET-Voc_FT.onnx': { url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/source-separation-models/UVR-MDX-NET-Voc_FT.onnx', size: 66762795 },
   'vits-piper-en_US-amy-medium': { url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-medium.tar.bz2', size: 67223746,
     archive: true, ready: path.join('vits-piper-en_US-amy-medium', 'en_US-amy-medium.onnx') },
@@ -396,10 +398,16 @@ function handleTool(req, res, binDir, modelsDir) {
   if (tool === 'whisper') {
     const bin = toolBin(binDir, 'whisper', 'whisper-cli');
     if (!bin) return reject({ error: 'tool-missing' }, 501);
-    if (!modelReady(modelsDir, 'ggml-base.bin')) return reject({ error: 'model-missing' }, 409);
+    // Bigger models miss far fewer lines (esp. over music), at the cost of speed. The renderer
+    // picks; default stays 'base' so existing callers are unchanged.
+    const modelFile = { base: 'ggml-base.bin', small: 'ggml-small.bin', medium: 'ggml-medium.bin' }[opts.model] || 'ggml-base.bin';
+    if (!modelReady(modelsDir, modelFile)) return reject({ error: 'model-missing', model: modelFile }, 409);
     const fmt = opts.fmt === 'txt' ? 'txt' : opts.fmt === 'vtt' ? 'vtt' : 'srt';
     outName = 'out.' + fmt;
-    plan = [{ bin, args: ['-m', modelPath(modelsDir, 'ggml-base.bin'), '-f', inName, '-o' + fmt, '-of', 'out', '--print-progress'],
+    // For subtitles, cap segment length and split on word boundaries so cues stay short and
+    // don't merge across pauses/speaker turns (plain text wants whole paragraphs, so skip there).
+    const seg = fmt === 'txt' ? [] : ['-ml', '60', '-sow'];
+    plan = [{ bin, args: ['-m', modelPath(modelsDir, modelFile), '-f', inName, '-o' + fmt, '-of', 'out', ...seg, '--print-progress'],
       prog: s => { const m = /progress\s*=\s*(\d+)%/.exec(s); return m ? +m[1] / 100 : null; } }];
   } else if (tool === 'raw') {
     const dcraw = toolBin(binDir, 'libraw', 'dcraw_emu'), ffmpeg = findBin('ffmpeg', binDir);
@@ -578,6 +586,7 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
       if (url === '/api/check')
         return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir),
           whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), whisperModel: modelReady(modelsDir, 'ggml-base.bin'),
+          whisperSmall: modelReady(modelsDir, 'ggml-small.bin'), whisperMedium: modelReady(modelsDir, 'ggml-medium.bin'),
           raw: !!toolBin(binDir, 'libraw', 'dcraw_emu'), upscale: !!toolBin(binDir, 'esrgan', 'realesrgan-ncnn-vulkan'),
           exif: !!toolBin(binDir, 'exiftool', 'exiftool'), vtracer: !!toolBin(binDir, 'vtracer', 'vtracer'),
           tts: !!toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-tts'), ttsModel: modelReady(modelsDir, 'vits-piper-en_US-amy-medium'),

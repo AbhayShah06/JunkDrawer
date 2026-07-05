@@ -923,7 +923,7 @@ add({cat:'video',kinds:['video'],nm:'Burn In Subtitles',ds:'Print captions right
     return {node:el('label',{},['subtitle file ',inp]),get:()=>({sub:inp.files&&inp.files[0]})}; },
   check:(f,o)=>!o.sub?{msg:'Pick the subtitle file (.srt or .vtt) that goes with this video. You can export one from a captions app, or write one in any text editor.'}:null,
   run:async (f,o)=>{ const se=ext(o.sub.name); const sn='sub.'+(['srt','vtt','ass'].includes(se)?se:'srt');
-    showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-vf',`subtitles=${sn}:force_style='FontName=Arial,FontSize=20,Outline=1'`,'-c:v','libx264','-pix_fmt','yuv420p','-crf','19','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Burning in captions',{name:sn,data:o.sub}),base(f.name)+'-captioned.mp4'); }});
+    showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-vf',`subtitles=${sn}:force_style='FontName=Arial,FontSize=20,Outline=1'`,'-c:v','libx264','-pix_fmt','yuv420p','-crf','21','-preset','veryfast','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Burning in captions',{name:sn,data:o.sub}),base(f.name)+'-captioned.mp4'); }});
 add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'mute remove audio silence',
   more:'Removes the sound and keeps the picture. Good for hiding background noise before you share.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
@@ -1564,72 +1564,93 @@ async function captionStudio(file){
   p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Caption Studio'}),el('span',{className:'badge',textContent:'Video'})]));
   p.append(el('div',{className:'ds',textContent:'Auto-generate captions, fix the words and timing, then export an SRT/VTT or burn them onto the video. Nothing leaves your machine.'}));
 
-  const info=await nativeInfo();
+  let info=await nativeInfo();
   if(!info.whisper){ showGuide(needDesktop('Captions')); return; }
-  if(!info.whisperModel){ try{ await ensureModel('ggml-base.bin','whisperModel','Downloading the speech model (one time, ~140 MB)'); }catch(e){ fail(e); return; } }
-
-  let cues=[];
-  try{
-    const wav=await runFF(file,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
-    const srtBlob=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt:'srt'},'out.srt','Listening and writing captions (a long clip takes a while)');
-    cues=jdParseSrt(await srtBlob.text());
-  }catch(e){ fail(e); return; }
-  clearStatus();
-  if(!cues.length) cues=[{start:0,end:2,text:''}];
-
   const isVideo=kind(file)==='video';
-  const mediaUrl=URL.createObjectURL(file);
-  const media=el(isVideo?'video':'audio',{src:mediaUrl,controls:true,
-    style:isVideo?'display:block;max-width:100%;max-height:320px;margin:8px auto;background:#000;border:2px solid;border-color:var(--sb)'
-                 :'display:block;width:100%;margin:8px 0'});
-  p.append(media);
+  const MODELS=[
+    {id:'base',   file:'ggml-base.bin',   flag:'whisperModel', label:'Fast',     size:'~140 MB', note:'quickest — fine for clear speech'},
+    {id:'small',  file:'ggml-small.bin',  flag:'whisperSmall', label:'Balanced', size:'~465 MB', note:'much better — recommended'},
+    {id:'medium', file:'ggml-medium.bin', flag:'whisperMedium',label:'Accurate', size:'~1.5 GB', note:'best — slow, but catches the hard parts (music, overlaps)'},
+  ];
 
-  const list=el('div',{style:'max-height:340px;overflow:auto;border:2px solid;border-color:var(--sb);background:var(--well);padding:6px;margin:8px 0'});
-  p.append(list);
-  const rows=[];
-
-  function render(){
-    list.innerHTML=''; rows.length=0;
-    cues.forEach(c=>{
-      const row=el('div',{style:'display:flex;gap:6px;align-items:flex-start;padding:5px 4px;border-bottom:1px solid var(--line)'});
-      const jump=el('button',{className:'btn ghost',textContent:'▶',title:'Jump here',style:'padding:2px 8px;flex:0 0 auto'});
-      jump.onclick=()=>{ media.currentTime=c.start; if(media.play) media.play(); };
-      const times=el('div',{style:'flex:0 0 100px;display:flex;flex-direction:column;gap:3px'});
-      const st=el('input',{value:jdFmtTs(c.start,'.'),title:'start',style:'width:100px;font:11px var(--mono);padding:2px'});
-      const en=el('input',{value:jdFmtTs(c.end,'.'),title:'end',style:'width:100px;font:11px var(--mono);padding:2px'});
-      st.onchange=()=>{ const v=jdParseTs(st.value); if(v==null){ st.value=jdFmtTs(c.start,'.'); return; } c.start=v; };
-      en.onchange=()=>{ const v=jdParseTs(en.value); if(v==null){ en.value=jdFmtTs(c.end,'.'); return; } c.end=v; };
-      times.append(st,en);
-      const ta=el('textarea',{value:c.text,rows:2,style:'flex:1;min-width:0;resize:vertical;font:13px var(--sans);padding:4px;background:#fff;color:#111;border:1px solid var(--line)'});
-      ta.oninput=()=>{ c.text=ta.value; };
-      const del=el('button',{className:'btn ghost',textContent:'✕',title:'Delete line',style:'padding:2px 8px;flex:0 0 auto'});
-      del.onclick=()=>{ const k=cues.indexOf(c); if(k>=0) cues.splice(k,1); render(); };
-      row.append(jump,times,ta,del);
-      list.append(row); rows.push({cue:c,node:row});
-    });
+  function picker(){
+    p.querySelectorAll('.jd-cap').forEach(n=>n.remove());
+    const box=el('div',{className:'jd-cap',style:'border:2px solid;border-color:var(--sb);background:var(--well);padding:12px;margin:8px 0'});
+    box.append(el('div',{className:'want',textContent:'caption quality'}));
+    const sel=el('select',{style:'font:13px var(--sans);padding:4px;margin:4px 0;max-width:100%'});
+    MODELS.forEach(m=>sel.append(el('option',{value:m.id,textContent:`${m.label} (${m.size}) — ${m.note}${info[m.flag]?'  ✓ ready':''}`})));
+    sel.value='small';
+    const go=el('button',{className:'btn',textContent:'Generate captions'});
+    go.onclick=()=>{ const m=MODELS.find(x=>x.id===sel.value); go.disabled=true; generate(m); };
+    box.append(el('div',{},[sel]),go,
+      el('div',{className:'note',style:'margin-top:6px',textContent:'A bigger model is slower but misses fewer lines, especially over music. It downloads once, then works offline.'}));
+    p.append(box);
   }
-  render();
 
-  media.addEventListener('timeupdate',()=>{ const t=media.currentTime;
-    rows.forEach(r=>{ const on=t>=r.cue.start&&t<r.cue.end; r.node.style.background=on?'color-mix(in srgb, var(--c) 22%, transparent)':''; }); });
+  async function generate(m){
+    let cues=[];
+    try{
+      if(!info[m.flag]) await ensureModel(m.file,m.flag,`Downloading the ${m.label.toLowerCase()} speech model (one time, ${m.size})`);
+      info=await nativeInfo();
+      const wav=await runFF(file,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
+      const srtBlob=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt:'srt',model:m.id},'out.srt',`Listening and writing captions with the ${m.label.toLowerCase()} model (a long clip takes a while)`);
+      cues=jdParseSrt(await srtBlob.text());
+    }catch(e){ fail(e); return; }
+    clearStatus();
+    if(!cues.length) cues=[{start:0,end:2,text:''}];
+    editor(cues);
+  }
 
-  const addBtn=el('button',{className:'btn ghost',textContent:'+ Add line'});
-  addBtn.onclick=()=>{ const at=media.currentTime||0; cues.push({start:at,end:at+2,text:''}); cues.sort((a,b)=>a.start-b.start); render(); };
-  const regen=el('button',{className:'btn ghost',textContent:'Regenerate'});
-  regen.onclick=()=>captionStudio(file);
-  const dlSrt=el('button',{className:'btn',textContent:'Download .srt'});
-  dlSrt.onclick=()=>showResult(new Blob([jdSrtOf(cues)],{type:'text/plain'}),base(file.name)+'.srt',{note:'Edited captions — pairs with Burn In Subtitles too.'});
-  const dlVtt=el('button',{className:'btn ghost',textContent:'Download .vtt'});
-  dlVtt.onclick=()=>showResult(new Blob([jdVttOf(cues)],{type:'text/plain'}),base(file.name)+'.vtt');
-  const burn=el('button',{className:'btn',textContent:'Burn into video'});
-  if(!isVideo) burn.style.display='none';
-  burn.onclick=async()=>{ burn.disabled=true;
-    try{ const srt=new Blob([jdSrtOf(cues)],{type:'text/plain'});
-      const out=await runFF(file,'out.mp4',(i,o)=>['-i',i,'-vf',"subtitles=subs.srt:force_style='FontName=Arial,FontSize=20,Outline=1'",'-c:v','libx264','-pix_fmt','yuv420p','-crf','19','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',o],'Burning in captions',{name:'subs.srt',data:srt});
-      showResult(out,base(file.name)+'-captioned.mp4',{note:'Captions burned onto the video.'});
-    }catch(e){ fail(e); } finally{ burn.disabled=false; } };
+  function editor(cues){
+    p.querySelectorAll('.jd-cap').forEach(n=>n.remove());
+    const wrap=el('div',{className:'jd-cap'});
+    const mediaUrl=URL.createObjectURL(file);
+    const media=el(isVideo?'video':'audio',{src:mediaUrl,controls:true,
+      style:isVideo?'display:block;max-width:100%;max-height:320px;margin:8px auto;background:#000;border:2px solid;border-color:var(--sb)':'display:block;width:100%;margin:8px 0'});
+    wrap.append(media);
+    const list=el('div',{style:'max-height:340px;overflow:auto;border:2px solid;border-color:var(--sb);background:var(--well);padding:6px;margin:8px 0'});
+    wrap.append(list);
+    const rows=[];
+    function render(){ list.innerHTML=''; rows.length=0;
+      cues.forEach(c=>{
+        const row=el('div',{style:'display:flex;gap:6px;align-items:flex-start;padding:5px 4px;border-bottom:1px solid var(--line)'});
+        const jump=el('button',{className:'btn ghost',textContent:'▶',title:'Jump here',style:'padding:2px 8px;flex:0 0 auto'});
+        jump.onclick=()=>{ media.currentTime=c.start; if(media.play) media.play(); };
+        const times=el('div',{style:'flex:0 0 100px;display:flex;flex-direction:column;gap:3px'});
+        const st=el('input',{value:jdFmtTs(c.start,'.'),title:'start',style:'width:100px;font:11px var(--mono);padding:2px'});
+        const en=el('input',{value:jdFmtTs(c.end,'.'),title:'end',style:'width:100px;font:11px var(--mono);padding:2px'});
+        st.onchange=()=>{ const v=jdParseTs(st.value); if(v==null){ st.value=jdFmtTs(c.start,'.'); return; } c.start=v; };
+        en.onchange=()=>{ const v=jdParseTs(en.value); if(v==null){ en.value=jdFmtTs(c.end,'.'); return; } c.end=v; };
+        times.append(st,en);
+        const ta=el('textarea',{value:c.text,rows:2,style:'flex:1;min-width:0;resize:vertical;font:13px var(--sans);padding:4px;background:#fff;color:#111;border:1px solid var(--line)'});
+        ta.oninput=()=>{ c.text=ta.value; };
+        const del=el('button',{className:'btn ghost',textContent:'✕',title:'Delete line',style:'padding:2px 8px;flex:0 0 auto'});
+        del.onclick=()=>{ const k=cues.indexOf(c); if(k>=0) cues.splice(k,1); render(); };
+        row.append(jump,times,ta,del); list.append(row); rows.push({cue:c,node:row});
+      });
+    }
+    render();
+    media.addEventListener('timeupdate',()=>{ const t=media.currentTime; rows.forEach(r=>{ const on=t>=r.cue.start&&t<r.cue.end; r.node.style.background=on?'color-mix(in srgb, var(--c) 22%, transparent)':''; }); });
+    const addBtn=el('button',{className:'btn ghost',textContent:'+ Add line'});
+    addBtn.onclick=()=>{ const at=media.currentTime||0; cues.push({start:at,end:at+2,text:''}); cues.sort((a,b)=>a.start-b.start); render(); };
+    const regen=el('button',{className:'btn ghost',textContent:'Regenerate…'});
+    regen.onclick=()=>{ try{URL.revokeObjectURL(mediaUrl);}catch{} picker(); };
+    const dlSrt=el('button',{className:'btn',textContent:'Download .srt'});
+    dlSrt.onclick=()=>showResult(new Blob([jdSrtOf(cues)],{type:'text/plain'}),base(file.name)+'.srt',{note:'Edited captions — pairs with Burn In Subtitles too.'});
+    const dlVtt=el('button',{className:'btn ghost',textContent:'Download .vtt'});
+    dlVtt.onclick=()=>showResult(new Blob([jdVttOf(cues)],{type:'text/plain'}),base(file.name)+'.vtt');
+    const burn=el('button',{className:'btn',textContent:'Burn into video'});
+    if(!isVideo) burn.style.display='none';
+    burn.onclick=async()=>{ burn.disabled=true;
+      try{ const srt=new Blob([jdSrtOf(cues)],{type:'text/plain'});
+        const out=await runFF(file,'out.mp4',(i,o)=>['-i',i,'-vf',"subtitles=subs.srt:force_style='FontName=Arial,FontSize=20,Outline=1'",'-c:v','libx264','-pix_fmt','yuv420p','-crf','21','-preset','veryfast','-c:a','aac','-b:a','192k','-movflags','+faststart',o],'Burning in captions',{name:'subs.srt',data:srt});
+        showResult(out,base(file.name)+'-captioned.mp4',{note:'Captions burned onto the video.'});
+      }catch(e){ fail(e); } finally{ burn.disabled=false; } };
+    wrap.append(el('div',{className:'runrow'},[dlSrt,dlVtt,burn,addBtn,regen]));
+    p.append(wrap);
+  }
 
-  p.append(el('div',{className:'runrow'},[dlSrt,dlVtt,burn,addBtn,regen]));
+  picker();
 }
 
 async function pdfSignFill(file){
