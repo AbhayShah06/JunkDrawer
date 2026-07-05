@@ -78,11 +78,15 @@ function handleDownload(req, res, binDir) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-'));
     const env = Object.assign({}, process.env);
     if (ffmpeg) env.PATH = path.dirname(ffmpeg) + path.delimiter + (env.PATH || ''); // bundled ffmpeg findable by yt-dlp
-    const child = spawn(bin, args, { cwd: tmp, env });
-    let err = '', aborted = false;
+    // detached → the child leads its own process group, so we can kill yt-dlp AND the helper
+    // processes it spawns (fragment downloaders, ffmpeg) in one shot. Killing just the parent
+    // leaves those orphaned and running.
+    const child = spawn(bin, args, { cwd: tmp, env, detached: true });
+    let err = '';   // reuse the outer `aborted` (declared at the top of handleDownload)
+    const killTree = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch {} } };
     // If the client goes away mid-download (e.g. the user switches from MP3 to MP4), kill the
-    // yt-dlp process and clean up — otherwise it keeps running, orphaned, and piles up.
-    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; try { child.kill('SIGKILL'); } catch {} cleanup(tmp); } });
+    // whole download tree and clean up — otherwise it keeps running, orphaned, and piles up.
+    res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(); cleanup(tmp); } });
     child.stderr.on('data', d => { err += d; });
     child.on('error', e => { if (aborted) return; cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
     child.on('close', code => {
