@@ -41,6 +41,19 @@
   nav a{color:var(--ink); text-decoration:none; font-size:12px; padding:3px 10px; border:2px solid transparent; border-radius:3px}
   nav a:hover{border-color:var(--rb); background:var(--face)}
   nav a:active{border-color:var(--sb)}
+  /* Win95 menu bar: every tool one click from the top */
+  .menubar{max-width:1020px; margin:0 auto; display:flex; flex-wrap:wrap; gap:1px; padding:1px 10px 2px; border-top:1px solid var(--sh)}
+  .menu{position:relative}
+  .menu>button{font:12px var(--sans); background:none; color:var(--ink); border:2px solid transparent; padding:3px 10px; cursor:pointer}
+  .menu>button:hover{border-color:var(--rb)}
+  .menu.open>button{background:var(--title1); color:#fff; border-color:var(--sb)}
+  .menu .dd{display:none; position:absolute; left:0; top:100%; z-index:80; background:var(--face); border:2px solid; border-color:var(--rb); box-shadow:3px 3px 0 rgba(0,0,0,.35); min-width:220px; padding:3px; max-height:70vh; overflow:auto}
+  .menu.open .dd{display:block}
+  .dd .mi{display:flex; align-items:center; gap:7px; width:100%; text-align:left; font:12px var(--sans); padding:5px 10px; background:none; border:0; cursor:pointer; color:var(--ink); white-space:nowrap}
+  .dd .mi:hover{background:var(--title1); color:#fff}
+  .dd .mi .dot{width:8px; height:8px; background:var(--c); border:1px solid var(--sh2); flex:none}
+  .modewrap{margin-left:6px; font:11px var(--sans); color:var(--ink2); display:flex; align-items:center; gap:5px}
+  .modewrap select{font:12px var(--sans); background:var(--well); color:var(--ink); border:2px solid; border-color:var(--sb); padding:2px 4px}
   main{max-width:1020px; margin:14px auto; padding:0 14px}
   /* ---- panels ---- */
   .hero,.cabinet,.receipt,.panel{background:var(--face); border:2px solid; border-color:var(--rb)}
@@ -257,11 +270,13 @@
   <nav>
     <a href="#" id="resetBtn" title="Clear everything and start over">↺ Reset</a>
     <a href="#" id="themeToggle">Theme</a>
-    <a href="#cabinet">Tools</a>
     <a href="#" id="navPrivacy">Privacy</a>
     <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">About</a>
   </nav>
-</div></header>
+  <label class="modewrap" title="Pick what you're here to do — the app remembers">mode
+    <select id="modeSel"></select></label>
+</div>
+<div class="menubar" id="menubar"></div></header>
 
 <div id="updateBar" hidden>
   <span class="ub-txt"></span>
@@ -290,7 +305,7 @@
 
     <div class="quick qrow" id="recentRow" hidden><span class="qlabel">Recent</span><div class="qtools" id="recentTools"></div></div>
 
-    <div class="quick qrow"><span class="qlabel">Popular</span><div class="qtools" id="starTools"></div></div>
+    <div class="quick qrow"><span class="qlabel" id="modeLabel">Basics</span><div class="qtools" id="starTools"></div></div>
   </section>
 
   <section id="receipt"></section>
@@ -988,15 +1003,54 @@ function bindTip(node,text){ if(!text)return;
   node.addEventListener('mouseleave',()=>{ tipEl.style.display='none'; }); }
 
 /* drawers */
-/* starred + recent quick-access tools (no forced setup — recents fill in as you go) */
-const STARRED=['Remove Background','Shrink File Size','Shrink a Video','Sign & Fill PDF','iPhone Photo to JPG'];
+/* modes: what the home screen leads with. Search always spans every tool; the current
+   mode's tools just rank first. The pick is remembered between sessions. */
+const MODES={
+  basics:{label:'Basics',      cats:null},
+  photos:{label:'Photos',      cats:['image']},
+  video: {label:'Video',       cats:['video']},
+  music: {label:'Music',       cats:['audio']},
+  paper: {label:'Paperwork',   cats:['pdf','data','doc']},
+  odds:  {label:'Odds & Ends', cats:['dev','weird','web','arc']},
+};
+const BASICS=['iPhone Photo to JPG','Shrink File Size','Shrink a Video','Make It an MP4',
+  'Sign & Fill PDF','Combine PDFs','Remove Background','Save the Audio as MP3'];
+let MODE=(()=>{ try{ const m=localStorage.getItem('jd-mode'); return MODES[m]?m:'basics'; }catch{ return 'basics'; } })();
+function setMode(m){ MODE=MODES[m]?m:'basics'; try{ localStorage.setItem('jd-mode',MODE); }catch{} renderQuick(); }
+function modeTools(){
+  if(!MODES[MODE].cats) return BASICS.map(nm=>T.find(t=>t.nm===nm)).filter(Boolean);
+  const ts=T.filter(t=>MODES[MODE].cats.includes(t.cat));
+  return [...ts.filter(t=>t.rec),...ts.filter(t=>!t.rec)].slice(0,8);
+}
+/* recent quick-access tools (no forced setup — recents fill in as you go) */
 function recentList(){ try{ return JSON.parse(localStorage.getItem('jd-recent')||'[]'); }catch{ return []; } }
 function pushRecent(nm){ let r=recentList().filter(x=>x!==nm); r.unshift(nm); try{ localStorage.setItem('jd-recent',JSON.stringify(r.slice(0,5))); }catch{} }
 function renderQuick(){
-  const fill=(host,names)=>{ if(!host)return 0; host.innerHTML=''; let n=0;
-    names.forEach(nm=>{ const t=T.find(x=>x.nm===nm); if(t){ host.append(toolCard(t,CATS[t.cat].color)); n++; } }); return n; };
-  fill($('#starTools'),STARRED);
-  const rr=$('#recentRow'), n=fill($('#recentTools'),recentList()); if(rr) rr.hidden=!n;
+  const fill=(host,tools)=>{ if(!host)return 0; host.innerHTML=''; let n=0;
+    tools.forEach(t=>{ if(t){ host.append(toolCard(t,CATS[t.cat].color)); n++; } }); return n; };
+  const lbl=$('#modeLabel'); if(lbl)lbl.textContent=MODES[MODE].cats?MODES[MODE].label:'Basics';
+  fill($('#starTools'),modeTools());
+  const rr=$('#recentRow'), n=fill($('#recentTools'),recentList().map(nm=>T.find(x=>x.nm===nm))); if(rr) rr.hidden=!n;
+}
+/* Win95 menu bar + the mode picker (top right) */
+function closeMenus(){ document.querySelectorAll('.menu.open').forEach(x=>x.classList.remove('open')); }
+function buildTopbar(){
+  const sel=$('#modeSel'); if(sel){ sel.innerHTML='';
+    for(const k in MODES) sel.append(el('option',{value:k,textContent:MODES[k].label}));
+    sel.value=MODE; sel.onchange=()=>setMode(sel.value); }
+  const mb=$('#menubar'); if(!mb)return; mb.innerHTML='';
+  for(const id in CATS){ const c=CATS[id]; const tools=T.filter(t=>t.cat===id); if(!tools.length)continue;
+    const m=el('div',{className:'menu'}); const b=el('button',{textContent:c.label});
+    const dd=el('div',{className:'dd'}); dd.style.setProperty('--c',c.color);
+    tools.forEach(t=>{ const mi=el('button',{className:'mi'},[el('span',{className:'dot'}),el('span',{textContent:t.nm})]);
+      bindTip(mi,t.more||t.ds); mi.onclick=()=>{ closeMenus(); openTool(t); }; dd.append(mi); });
+    b.onclick=e=>{ e.stopPropagation(); const was=m.classList.contains('open'); closeMenus(); if(!was)m.classList.add('open'); };
+    // classic menu-bar behavior: once one menu is open, hovering slides between them
+    b.onmouseenter=()=>{ if(document.querySelector('.menu.open')&&!m.classList.contains('open')){ closeMenus(); m.classList.add('open'); } };
+    m.append(b,dd); mb.append(m);
+  }
+  document.addEventListener('click',closeMenus);
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeMenus(); });
 }
 
 function buildDrawers(){
@@ -1551,6 +1605,7 @@ function search(input){ const raw=input.trim(); const str=raw.toLowerCase(); if(
 }
 function scoreTool(t,str){ const hay=(t.nm+' '+t.ds+' '+(t.kw||'')+' '+CATS[t.cat].label).toLowerCase(); let s=0;
   str.split(/\s+/).forEach(w=>{ if(!w)return; if(t.nm.toLowerCase().includes(w))s+=3; else if(hay.includes(w))s+=1; });
+  if(s>0&&MODES[MODE].cats&&MODES[MODE].cats.includes(t.cat))s+=2; // current mode's tools first
   return s; }
 q.addEventListener('input',e=>search(e.target.value));
 q.addEventListener('keydown',e=>{ if(!pal.classList.contains('show'))return;
@@ -1640,6 +1695,7 @@ function svg(path){ const ns='http://www.w3.org/2000/svg'; const s=document.crea
   const p=document.createElementNS(ns,'path'); p.setAttribute('d',path); s.append(p); return s; }
 
 buildDrawers();
+buildTopbar();
 renderQuick();
 $('#allToggle').onclick=()=>{ const open=$('#cabinet').classList.toggle('open'); $('#drawerwrap').hidden=!open; };
 // Always-available reset: the brand logo and the "↺ Reset" nav link both clear everything
