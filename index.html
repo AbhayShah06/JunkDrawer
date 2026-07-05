@@ -454,10 +454,11 @@ async function runFFNative(file,inName,outName,args,label,extra){
   try{
     const res=await fetch('/api/ffmpeg?meta='+meta+'&id='+id,{method:'POST',body:file,signal:ctl.signal});
     if(!res.ok){ let m=''; try{ const j=await res.json(); m=j.detail||j.error||''; }catch{} throw new Error(m?('ffmpeg: '+m):('ffmpeg failed ('+res.status+')')); }
-    const buf=await res.arrayBuffer(); onP(1);
-    if(_jobCtl===ctl) _jobCtl=null;
+    const buf=await res.arrayBuffer();
+    if(ctl.signal.aborted) throw Object.assign(new Error('cancelled'),{jdAborted:true});  // a newer job superseded this one
+    onP(1); if(_jobCtl===ctl) _jobCtl=null;
     return new Blob([buf],{type:mimeOf(outName)});
-  } catch(e){ if(e&&e.name==='AbortError') return; throw e; }
+  } catch(e){ if(e&&e.name==='AbortError') throw Object.assign(new Error('cancelled'),{jdAborted:true}); throw e; }
   finally { clearInterval(poll); }
 }
 /* Native helper tools beyond ffmpeg (whisper / RAW / upscale) — desktop app only.
@@ -478,10 +479,11 @@ async function runTool(file,tool,opts,outName,label){
   try{
     const res=await fetch('/api/tool?meta='+meta+'&id='+id,{method:'POST',body:file,signal:ctl.signal});
     if(!res.ok){ let m=''; try{ const j=await res.json(); m=j.detail||j.error||''; }catch{} throw new Error(m||('tool failed ('+res.status+')')); }
-    const buf=await res.arrayBuffer(); onP(1);
-    if(_jobCtl===ctl) _jobCtl=null;
+    const buf=await res.arrayBuffer();
+    if(ctl.signal.aborted) throw Object.assign(new Error('cancelled'),{jdAborted:true});  // a newer job superseded this one
+    onP(1); if(_jobCtl===ctl) _jobCtl=null;
     return new Blob([buf],{type:mimeOf(outName)});
-  } catch(e){ if(e&&e.name==='AbortError') return; throw e; }
+  } catch(e){ if(e&&e.name==='AbortError') throw Object.assign(new Error('cancelled'),{jdAborted:true}); throw e; }
   finally { clearInterval(poll); }
 }
 async function ensureModel(name,readyFlag,label){
@@ -619,7 +621,7 @@ function showGuide(g){ clearStatus(); $('#output').innerHTML='';
   if(rt){ const b=el('button',{className:'btn',textContent:'Use “'+rt.nm+'” instead'}); b.onclick=()=>openTool(rt);
     box.append(el('div',{className:'g-act'},[b])); }
   $('#status').innerHTML=''; $('#status').append(box); }
-function fail(e){ const c=state.ctx||{}; showGuide(friendly(e,c.t,c.f)); }
+function fail(e){ if(e&&e.jdAborted) return; const c=state.ctx||{}; showGuide(friendly(e,c.t,c.f)); }  // a cancelled job isn't an error
 // misuse caught before running: wrong file kind (→ suggest the right tool), too-few files, or a tool's own check()
 function preCheck(t,fileOrFiles,opts){
   const multi=Array.isArray(fileOrFiles); const f=multi?fileOrFiles[0]:fileOrFiles;
@@ -1468,7 +1470,7 @@ async function postDownload(url,mode){
 }
 
 function openStage(){ $('#stage').style.display='block'; $('#stage').scrollIntoView({behavior:'smooth',block:'start'}); }
-function resetStage(){ if(_dlCtl){ try{ _dlCtl.abort(); }catch{} _dlCtl=null; } if(_jobCtl){ try{ _jobCtl.abort(); }catch{} _jobCtl=null; } $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; freeResUrls(); }
+function resetStage(){ if(_dlCtl){ try{ _dlCtl.abort(); }catch{} _dlCtl=null; } if(_jobCtl){ try{ _jobCtl.abort(); }catch{} _jobCtl=null; } jdFreeCap(); $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; freeResUrls(); }
 
 /* receipt after a file is dropped */
 function showReceipt(file){
@@ -1624,9 +1626,10 @@ async function openViewer(file){
 }
 /* ===== PDF Sign & Fill (interactive editor) ===== */
 /* ===== Caption Studio — auto-generate subtitles, edit words + timing, export or burn in ===== */
-function jdParseTs(str){ const parts=String(str).trim().split(':'); if(!parts.length) return null;
+function jdParseTs(str){ const parts=String(str).trim().replace(/,/g,'.').split(':'); if(!parts.length) return null;  // accept SRT-style comma decimals
   let s=0; for(const p of parts){ const n=parseFloat(p); if(isNaN(n)) return null; s=s*60+n; } return s; }
-function jdFmtTs(sec,sep){ sec=Math.max(0,sec||0); const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=Math.floor(sec%60), ms=Math.round((sec-Math.floor(sec))*1000);
+function jdFmtTs(sec,sep){ let t=Math.round(Math.max(0,sec||0)*1000);  // round to ms FIRST, then decompose, so ms can't overflow to 1000
+  const ms=t%1000; t=(t-ms)/1000; const s=t%60; t=(t-s)/60; const m=t%60; const h=(t-m)/60;
   const p=(n,w)=>String(n).padStart(w||2,'0'); return p(h)+':'+p(m)+':'+p(s)+sep+p(ms,3); }
 function jdParseSrt(str){ const cues=[]; const blocks=String(str).replace(/\r/g,'').trim().split(/\n\n+/);
   for(const b of blocks){ const lines=b.split('\n'); if(lines.length<2) continue;
@@ -1638,8 +1641,13 @@ function jdParseSrt(str){ const cues=[]; const blocks=String(str).replace(/\r/g,
 function jdSrtOf(cues){ return cues.map((c,i)=>(i+1)+'\n'+jdFmtTs(c.start,',')+' --> '+jdFmtTs(c.end,',')+'\n'+(c.text||'')).join('\n\n')+'\n'; }
 function jdVttOf(cues){ return 'WEBVTT\n\n'+cues.map(c=>jdFmtTs(c.start,'.')+' --> '+jdFmtTs(c.end,'.')+'\n'+(c.text||'')).join('\n\n')+'\n'; }
 function jdCapStyle(size,pos){ const fs=/^\d+$/.test(String(size))?size:'28'; return 'FontName=Arial,FontSize='+fs+',Outline=1'+(pos==='top'?',Alignment=8':''); }
+let _capUrl=null;  // Caption Studio's media object URL — tracked so we can revoke it (memory) on exit
+function jdFreeCap(){ if(_capUrl){ try{ URL.revokeObjectURL(_capUrl); }catch{} _capUrl=null; } }
 
 async function captionStudio(file){
+  if(_jobCtl){ try{ _jobCtl.abort(); }catch{} _jobCtl=null; }  // custom tools bypass resetStage — cancel any in-flight job so its late result can't scribble here
+  if(_dlCtl){ try{ _dlCtl.abort(); }catch{} _dlCtl=null; }
+  jdFreeCap();
   openStage();
   const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.video.color); $('#output').innerHTML=''; clearStatus();
   p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Caption Studio'}),el('span',{className:'badge',textContent:'Video'})]));
@@ -1685,7 +1693,7 @@ async function captionStudio(file){
   function editor(cues){
     p.querySelectorAll('.jd-cap').forEach(n=>n.remove());
     const wrap=el('div',{className:'jd-cap'});
-    const mediaUrl=URL.createObjectURL(file);
+    jdFreeCap(); const mediaUrl=_capUrl=URL.createObjectURL(file);
     const media=el(isVideo?'video':'audio',{src:mediaUrl,controls:true,
       style:isVideo?'display:block;max-width:100%;max-height:320px;margin:8px auto;background:#000;border:2px solid;border-color:var(--sb)':'display:block;width:100%;margin:8px 0'});
     wrap.append(media);
@@ -1715,7 +1723,7 @@ async function captionStudio(file){
     const addBtn=el('button',{className:'btn ghost',textContent:'+ Add line'});
     addBtn.onclick=()=>{ const at=media.currentTime||0; cues.push({start:at,end:at+2,text:''}); cues.sort((a,b)=>a.start-b.start); render(); };
     const regen=el('button',{className:'btn ghost',textContent:'Regenerate…'});
-    regen.onclick=()=>{ try{URL.revokeObjectURL(mediaUrl);}catch{} picker(); };
+    regen.onclick=()=>{ jdFreeCap(); picker(); };
     const dlSrt=el('button',{className:'btn',textContent:'Download .srt'});
     dlSrt.onclick=()=>showResult(new Blob([jdSrtOf(cues)],{type:'text/plain'}),base(file.name)+'.srt',{note:'Edited captions — pairs with Burn In Subtitles too.'});
     const dlVtt=el('button',{className:'btn ghost',textContent:'Download .vtt'});

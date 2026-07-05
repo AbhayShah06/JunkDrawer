@@ -178,7 +178,12 @@ function handleFFmpeg(req, res, binDir) {
     // backslashes are legal *inside* a filtergraph (e.g. scale=...min(720\,ih)), so we
     // don't ban them outright — we ban path-escape shapes: NUL, `..`, and any token that
     // STARTS like an absolute path, UNC share, or drive letter.
-    if (typeof a !== 'string' || a.length > 2000 || a.includes('\0') || a.includes('..') || /^([A-Za-z]:|\\\\|\/)/.test(a))
+    // Also block ROOTED paths anywhere in a token (not just at the start) and the file-reading
+    // filters we never use — otherwise `-vf movie=/etc/passwd` / `subtitles=/abs/path` read files
+    // outside the temp dir. A `/` after a delimiter (or `:/`, `C:/`) is path-like; `iw/2` (division,
+    // slash between alnums) stays allowed.
+    if (typeof a !== 'string' || a.length > 2000 || a.includes('\0') || a.includes('..') || /^([A-Za-z]:|\\\\|\/)/.test(a)
+        || /(^|[=:,;'"\s])[/\\]/.test(a) || /\ba?movie\s*=/i.test(a))
       return reject({ error: 'bad-args', detail: 'unsafe argument' }, 400);
   }
 
@@ -343,7 +348,8 @@ const MODELS = { // downloadable-on-first-use models, pinned by URL + expected d
 };
 function modelPath(modelsDir, name) { return path.join(modelsDir, name); }
 function modelReady(modelsDir, name) {
-  const m = MODELS[name]; if (!m) return false;
+  if (!Object.hasOwn(MODELS, name)) return false;   // own-key only — inherited proto keys aren't models
+  const m = MODELS[name];
   try {
     if (m.ready) return fs.existsSync(path.join(modelsDir, m.ready));
     return fs.statSync(modelPath(modelsDir, name)).size === m.size;
@@ -362,8 +368,9 @@ function handleFetchModel(req, res, modelsDir) {
   req.on('data', c => { chunks.push(c); if (Buffer.concat(chunks).length > 4096) req.destroy(); });
   req.on('end', () => {
     let j; try { j = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return sendJSON(res, { error: 'bad body' }, 400); }
-    const name = j.name, m = MODELS[name];
-    if (!m) return sendJSON(res, { error: 'unknown-model' }, 400);
+    const name = j.name;
+    if (!Object.hasOwn(MODELS, name)) return sendJSON(res, { error: 'unknown-model' }, 400);
+    const m = MODELS[name];
     if (modelReady(modelsDir, name)) return sendJSON(res, { ok: true, ready: true });
     try { fs.mkdirSync(modelsDir, { recursive: true }); } catch {}
     const dest = modelPath(modelsDir, name), part = dest + '.part';
@@ -399,8 +406,7 @@ function handleModels(res, modelsDir) { // list installed/downloadable models fo
   const out = Object.keys(MODELS).map(name => ({
     name, ready: modelReady(modelsDir, name),
     sizeMB: Math.round(MODELS[name].size / 1e6),
-    path: MODELS[name].ready ? path.join(modelsDir, MODELS[name].ready) : modelPath(modelsDir, name),
-  }));
+  }));  // note: no absolute path returned — it leaks the OS username to any local reader
   return sendJSON(res, { models: out });
 }
 function handleDeleteModel(req, res, modelsDir) { // remove a model file (+ .part, + extracted dir) to reclaim disk
@@ -409,8 +415,9 @@ function handleDeleteModel(req, res, modelsDir) { // remove a model file (+ .par
   req.on('data', c => { chunks.push(c); if (Buffer.concat(chunks).length > 4096) req.destroy(); });
   req.on('end', () => {
     let j; try { j = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return sendJSON(res, { error: 'bad body' }, 400); }
-    const name = j.name, m = MODELS[name];
-    if (!m) return sendJSON(res, { error: 'unknown-model' }, 400);
+    const name = j.name;
+    if (!Object.hasOwn(MODELS, name)) return sendJSON(res, { error: 'unknown-model' }, 400);
+    const m = MODELS[name];
     const dest = modelPath(modelsDir, name);
     try { fs.rmSync(dest + '.part', { force: true }); } catch {}
     if (m.archive) { // archive models extract into a directory alongside the .tar.bz2 bundle

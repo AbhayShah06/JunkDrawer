@@ -132,6 +132,9 @@ async function create() {
     },
   });
   win.once('ready-to-show', () => win.show());
+  // The app needs no web permissions (camera/mic/geolocation/notifications/etc.). Deny every
+  // permission request outright so untrusted file content can never prompt for or gain one.
+  win.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
   const appOrigin = `http://127.0.0.1:${port}`;
   win.loadURL(`${appOrigin}/index.html`);
   // Lock the main frame to our loopback origin — a stray in-page navigation (or a
