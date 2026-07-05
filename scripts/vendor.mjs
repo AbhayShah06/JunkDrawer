@@ -27,6 +27,7 @@ const bundles = [
   { out: 'imgly/background-removal.mjs', src: "export { removeBackground } from '@imgly/background-removal';" },
   { out: 'tesseract/tesseract.mjs',      src: "export { createWorker } from 'tesseract.js';" },
   { out: 'libarchive/libarchive.mjs',    src: "export { Archive } from 'libarchive.js';" },
+  { out: 'beat.mjs',                     src: "export { guess } from 'web-audio-beat-detector';" },
 ];
 for (const b of bundles)
   await build({ ...common, stdin: { contents: b.src, resolveDir: root, sourcefile: 'entry.mjs', loader: 'js' },

@@ -161,7 +161,49 @@ async function main() {
     ['models/realesrgan-x4plus-anime.param', 'esrgan/models/realesrgan-x4plus-anime.param'],
   ]);
 
-  console.log('\nDone. resources/bin/win/ now has yt-dlp, ffmpeg, whisper/, libraw/, esrgan/.');
+  // exiftool: full Windows package (perl runtime included); the exe is renamed to drop
+  // the "(-k)" suffix, which would otherwise make it pause for a keypress after every run.
+  {
+    const t = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-bins-'));
+    const zp = path.join(t, 'e.zip');
+    console.log('Downloading ExifTool 13.59 (win64) ...');
+    await download('https://master.dl.sourceforge.net/project/exiftool/exiftool-13.59_64.zip?viasf=1', zp);
+    const x = spawnSync('tar', ['-xf', zp, '-C', t], { encoding: 'utf8' });
+    if (x.status !== 0) { console.error('tar failed on exiftool:', x.stderr || x.error); process.exit(1); }
+    const src = fs.readdirSync(t).map(n => path.join(t, n)).find(p => fs.statSync(p).isDirectory());
+    const dst = path.join(OUT_DIR, 'exiftool');
+    fs.rmSync(dst, { recursive: true, force: true });
+    fs.cpSync(src, dst, { recursive: true });
+    fs.renameSync(path.join(dst, 'exiftool(-k).exe'), path.join(dst, 'exiftool.exe'));
+    fs.rmSync(t, { recursive: true, force: true });
+    console.log('  -> resources/bin/win/exiftool/');
+  }
+
+  // sherpa-onnx: text-to-speech + music source separation CLIs (one runtime, two exes)
+  {
+    const t = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-bins-'));
+    const tb = path.join(t, 's.tar.bz2');
+    console.log('Downloading sherpa-onnx v1.13.3 (win x64) ...');
+    await download('https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.3/sherpa-onnx-v1.13.3-win-x64-shared-MD-Release.tar.bz2', tb);
+    const x = spawnSync('tar', ['-xjf', tb, '-C', t], { encoding: 'utf8' });
+    if (x.status !== 0) { console.error('tar failed on sherpa:', x.stderr || x.error); process.exit(1); }
+    const bin = findFile(t, 'sherpa-onnx-offline-tts.exe');
+    if (!bin) { console.error('sherpa CLI not found in archive'); process.exit(1); }
+    const srcDir = path.dirname(bin);
+    fs.mkdirSync(path.join(OUT_DIR, 'sherpa'), { recursive: true });
+    for (const f of fs.readdirSync(srcDir))
+      if (f === 'sherpa-onnx-offline-tts.exe' || f === 'sherpa-onnx-offline-source-separation.exe' || f.endsWith('.dll'))
+        fs.copyFileSync(path.join(srcDir, f), path.join(OUT_DIR, 'sherpa', f));
+    fs.rmSync(t, { recursive: true, force: true });
+    console.log('  -> resources/bin/win/sherpa/');
+  }
+
+  await zipGrab('VTracer 0.6.4 (windows)',
+    'https://github.com/visioncortex/vtracer/releases/download/0.6.4/vtracer-x86_64-pc-windows-msvc.zip', [
+    ['vtracer.exe', 'vtracer/vtracer.exe'],
+  ]);
+
+  console.log('\nDone. resources/bin/win/ now has yt-dlp, ffmpeg, whisper/, libraw/, esrgan/, exiftool/, sherpa/, vtracer/.');
   console.log('Next: npm run dist:win');
 }
 

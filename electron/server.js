@@ -304,18 +304,32 @@ function localOnly(req, expectedHost) {
    Unlike /api/ffmpeg (free-form argv), these build their argv entirely server-side from a
    tiny whitelisted option set — the renderer only names a tool and picks simple options.
    Same containment: throwaway temp cwd, basename-only filenames. */
+// The OS bsdtar, by absolute path — a GNU tar earlier in PATH (e.g. Git Bash) can't write zip
+function bsdtar() {
+  return process.platform === 'win32'
+    ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe')
+    : '/usr/bin/tar';
+}
 function toolBin(binDir, sub, name) {
   const f = path.join(binDir || '', sub, process.platform === 'win32' ? name + '.exe' : name);
   try { if (fs.existsSync(f)) return f; } catch {}
   return null;
 }
-const MODELS = { // downloadable-on-first-use model files, pinned by URL + expected size
+const MODELS = { // downloadable-on-first-use models, pinned by URL + expected download size.
+  // `archive` entries are .tar.bz2 bundles extracted into modelsDir; `ready` is the file
+  // whose presence proves the extraction completed.
   'ggml-base.bin': { url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin', size: 147951465 },
+  'UVR-MDX-NET-Voc_FT.onnx': { url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/source-separation-models/UVR-MDX-NET-Voc_FT.onnx', size: 66762795 },
+  'vits-piper-en_US-amy-medium': { url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-medium.tar.bz2', size: 67223746,
+    archive: true, ready: path.join('vits-piper-en_US-amy-medium', 'en_US-amy-medium.onnx') },
 };
 function modelPath(modelsDir, name) { return path.join(modelsDir, name); }
 function modelReady(modelsDir, name) {
   const m = MODELS[name]; if (!m) return false;
-  try { return fs.statSync(modelPath(modelsDir, name)).size === m.size; } catch { return false; }
+  try {
+    if (m.ready) return fs.existsSync(path.join(modelsDir, m.ready));
+    return fs.statSync(modelPath(modelsDir, name)).size === m.size;
+  } catch { return false; }
 }
 function fetchWithRedirects(url, depth, cb) {
   if (depth > 5) return cb(new Error('too many redirects'));
@@ -345,6 +359,16 @@ function handleFetchModel(req, res, modelsDir) {
         ffProgress.delete('model-' + name);
         let ok = false; try { ok = fs.statSync(part).size === m.size; } catch {}
         if (!ok) { try { fs.rmSync(part); } catch {} return sendJSON(res, { error: 'download-corrupt' }, 502); }
+        if (m.archive) { // .tar.bz2 bundle — extract into modelsDir with the OS tar (bsdtar)
+          const x = spawn(bsdtar(), ['-xjf', part, '-C', modelsDir]);
+          x.on('error', () => { try { fs.rmSync(part); } catch {} sendJSON(res, { error: 'extract-failed' }, 500); });
+          x.on('close', code => {
+            try { fs.rmSync(part); } catch {}
+            if (code !== 0 || !modelReady(modelsDir, name)) return sendJSON(res, { error: 'extract-failed' }, 500);
+            sendJSON(res, { ok: true });
+          });
+          return;
+        }
         try { fs.renameSync(part, dest); } catch { return sendJSON(res, { error: 'write-failed' }, 500); }
         sendJSON(res, { ok: true });
       });
@@ -363,32 +387,80 @@ function handleTool(req, res, binDir, modelsDir) {
   const { tool, inName } = meta || {}; const opts = (meta && meta.opts) || {};
   if (!okJobName(inName)) return reject({ error: 'bad-names' }, 400);
 
-  // resolve the plan for the requested tool: [ [bin, argv, progressParser], ... ] + output name
-  let plan = null, outName = null;
+  // resolve the plan for the requested tool: steps of {bin, args, prog, stdout}. Args are
+  // fixed server-side; `late` marks argv slots filled after the upload lands (TTS text).
+  // `stdout` streams the step's stdout into that file (exiftool JSON). Everything runs in
+  // the throwaway temp dir.
+  let plan = null, outName = null, late = null;
+  const pct = s => { const m = /(\d+(?:\.\d+)?)%/.exec(s); return m ? +m[1] / 100 : null; };
   if (tool === 'whisper') {
     const bin = toolBin(binDir, 'whisper', 'whisper-cli');
     if (!bin) return reject({ error: 'tool-missing' }, 501);
     if (!modelReady(modelsDir, 'ggml-base.bin')) return reject({ error: 'model-missing' }, 409);
     const fmt = opts.fmt === 'txt' ? 'txt' : opts.fmt === 'vtt' ? 'vtt' : 'srt';
     outName = 'out.' + fmt;
-    plan = [[bin, ['-m', modelPath(modelsDir, 'ggml-base.bin'), '-f', inName, '-o' + fmt, '-of', 'out', '--print-progress'],
-      s => { const m = /progress\s*=\s*(\d+)%/.exec(s); return m ? +m[1] / 100 : null; }]];
+    plan = [{ bin, args: ['-m', modelPath(modelsDir, 'ggml-base.bin'), '-f', inName, '-o' + fmt, '-of', 'out', '--print-progress'],
+      prog: s => { const m = /progress\s*=\s*(\d+)%/.exec(s); return m ? +m[1] / 100 : null; } }];
   } else if (tool === 'raw') {
     const dcraw = toolBin(binDir, 'libraw', 'dcraw_emu'), ffmpeg = findBin('ffmpeg', binDir);
     if (!dcraw || !ffmpeg) return reject({ error: 'tool-missing' }, 501);
     const png = opts.to === 'png';
     outName = png ? 'out.png' : 'out.jpg';
     plan = [
-      [dcraw, ['-w', '-q', '3', '-T', '-Z', 'mid.tiff', inName], () => 0.45],
-      [path.resolve(ffmpeg), ['-hide_banner', '-y', '-i', 'mid.tiff', '-frames:v', '1', '-update', '1',
-        ...(png ? [] : ['-c:v', 'mjpeg', '-q:v', '2', '-pix_fmt', 'yuvj444p']), outName], () => 0.9],
+      { bin: dcraw, args: ['-w', '-q', '3', '-T', '-Z', 'mid.tiff', inName], prog: () => 0.45 },
+      { bin: path.resolve(ffmpeg), args: ['-hide_banner', '-y', '-i', 'mid.tiff', '-frames:v', '1', '-update', '1',
+        ...(png ? [] : ['-c:v', 'mjpeg', '-q:v', '2', '-pix_fmt', 'yuvj444p']), outName], prog: () => 0.9 },
     ];
   } else if (tool === 'upscale') {
     const bin = toolBin(binDir, 'esrgan', 'realesrgan-ncnn-vulkan');
     if (!bin) return reject({ error: 'tool-missing' }, 501);
     outName = 'out.png';
-    plan = [[bin, ['-i', inName, '-o', outName, '-n', opts.model === 'anime' ? 'realesrgan-x4plus-anime' : 'realesrgan-x4plus'],
-      s => { const m = /(\d+(?:\.\d+)?)%/.exec(s); return m ? +m[1] / 100 : null; }]];
+    plan = [{ bin, args: ['-i', inName, '-o', outName, '-n', opts.model === 'anime' ? 'realesrgan-x4plus-anime' : 'realesrgan-x4plus'], prog: pct }];
+  } else if (tool === 'exif') {
+    const bin = toolBin(binDir, 'exiftool', 'exiftool');
+    if (!bin) return reject({ error: 'tool-missing' }, 501);
+    const inExt = (inName.split('.').pop() || 'jpg').toLowerCase();
+    if (opts.op === 'strip-gps') {
+      outName = 'out.' + inExt;
+      plan = [{ bin, args: ['-gps:all=', '-o', outName, inName] }];
+    } else if (opts.op === 'set-date') {
+      if (!/^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}$/.test(opts.date || '')) return reject({ error: 'bad-date' }, 400);
+      outName = 'out.' + inExt;
+      plan = [{ bin, args: ['-AllDates=' + opts.date, '-o', outName, inName] }];
+    } else if (opts.op === 'read-dates') {
+      outName = 'out.json';
+      plan = [{ bin, args: ['-j', '-DateTimeOriginal', '-CreateDate', '-Model', inName], stdout: outName }];
+    } else return reject({ error: 'unknown-op' }, 400);
+  } else if (tool === 'tts') {
+    const bin = toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-tts');
+    if (!bin) return reject({ error: 'tool-missing' }, 501);
+    if (!modelReady(modelsDir, 'vits-piper-en_US-amy-medium')) return reject({ error: 'model-missing' }, 409);
+    const v = path.join(modelsDir, 'vits-piper-en_US-amy-medium');
+    outName = 'out.wav';
+    plan = [{ bin, args: ['--vits-model=' + path.join(v, 'en_US-amy-medium.onnx'), '--vits-tokens=' + path.join(v, 'tokens.txt'),
+      '--vits-data-dir=' + path.join(v, 'espeak-ng-data'), '--output-filename=' + outName, '@TEXT@'],
+      prog: s => { const m = /progress=([0-9.]+)/.exec(s); return m ? +m[1] : null; } }];
+    late = inPath => { // the uploaded file IS the text to speak
+      let t = ''; try { t = fs.readFileSync(inPath, 'utf8').slice(0, 5000).trim(); } catch {}
+      if (!t) return 'empty-text';
+      plan[0].args = plan[0].args.map(a => a === '@TEXT@' ? t : a);
+    };
+  } else if (tool === 'vtracer') {
+    const bin = toolBin(binDir, 'vtracer', 'vtracer');
+    if (!bin) return reject({ error: 'tool-missing' }, 501);
+    outName = 'out.svg';
+    plan = [{ bin, args: ['--input', inName, '--output', outName] }];
+  } else if (tool === 'stems') {
+    const bin = toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-source-separation');
+    if (!bin) return reject({ error: 'tool-missing' }, 501);
+    if (!modelReady(modelsDir, 'UVR-MDX-NET-Voc_FT.onnx')) return reject({ error: 'model-missing' }, 409);
+    outName = 'out.zip';
+    plan = [
+      { bin, args: ['--uvr-model=' + modelPath(modelsDir, 'UVR-MDX-NET-Voc_FT.onnx'), '--num-threads=4',
+        '--input-wav=' + inName, '--output-vocals-wav=vocals.wav', '--output-accompaniment-wav=instrumental.wav'], prog: () => 0.6 },
+      // bsdtar (ships with Win10+ and macOS) infers zip format from the extension
+      { bin: bsdtar(), args: ['-a', '-cf', outName, 'vocals.wav', 'instrumental.wav'], prog: () => 0.95 },
+    ];
   } else return reject({ error: 'unknown-tool' }, 400);
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-tool-'));
@@ -402,6 +474,7 @@ function handleTool(req, res, binDir, modelsDir) {
   req.pipe(ws);
   ws.on('finish', () => {
     if (aborted) return;
+    if (late) { const bad = late(inPath); if (bad) { cleanup(tmp); return sendJSON(res, { error: bad }, 400); } }
     let err = '';
     const runStep = k => {
       if (k >= plan.length) {
@@ -415,8 +488,9 @@ function handleTool(req, res, binDir, modelsDir) {
         rs.on('close', () => cleanup(tmp));
         return rs.pipe(res);
       }
-      const [bin, args, prog] = plan[k];
+      const { bin, args, prog, stdout } = plan[k];
       const child = spawn(bin, args, { cwd: tmp });
+      if (stdout) child.stdout.pipe(fs.createWriteStream(path.join(tmp, stdout)));
       child.stderr.on('data', d => { const s = String(d); err += s; if (err.length > 20000) err = err.slice(-20000);
         if (id && prog) { const p = prog(s); if (p != null) ffProgress.set(id, Math.min(0.999, (k + Math.max(0, p)) / plan.length)); } });
       child.on('error', e => { if (id) ffProgress.delete(id); cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
@@ -483,7 +557,8 @@ function handleImportCard(req, res) {
 }
 
 function startServer(appRoot, binDir, updater, opener, modelsDir) {
-  modelsDir = modelsDir || path.join(os.homedir(), '.junkdrawer', 'models');
+  // absolute: tool subprocesses run from throwaway temp cwds, so a relative path would break
+  modelsDir = path.resolve(modelsDir || path.join(os.homedir(), '.junkdrawer', 'models'));
   return new Promise(resolve => {
     let expectedHost = null;  // set once the ephemeral port is known (below)
     const rootResolved = path.resolve(appRoot);
@@ -503,7 +578,10 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
       if (url === '/api/check')
         return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir),
           whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), whisperModel: modelReady(modelsDir, 'ggml-base.bin'),
-          raw: !!toolBin(binDir, 'libraw', 'dcraw_emu'), upscale: !!toolBin(binDir, 'esrgan', 'realesrgan-ncnn-vulkan') });
+          raw: !!toolBin(binDir, 'libraw', 'dcraw_emu'), upscale: !!toolBin(binDir, 'esrgan', 'realesrgan-ncnn-vulkan'),
+          exif: !!toolBin(binDir, 'exiftool', 'exiftool'), vtracer: !!toolBin(binDir, 'vtracer', 'vtracer'),
+          tts: !!toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-tts'), ttsModel: modelReady(modelsDir, 'vits-piper-en_US-amy-medium'),
+          stems: !!toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-source-separation'), stemsModel: modelReady(modelsDir, 'UVR-MDX-NET-Voc_FT.onnx') });
       if (url === '/api/update-check')
         return handleUpdateCheck(res, updater);
       if (url === '/api/update-state')

@@ -20,6 +20,12 @@ Junk Drawer stands on a lot of excellent open-source work. Every engine runs loc
 | [Real-ESRGAN ncnn-vulkan](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan) | 4× image upscaling on the GPU (photo + anime models) | MIT (models BSD-3-Clause, from [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)) |
 | [tesseract.js](https://github.com/naptha/tesseract.js) / [Tesseract](https://github.com/tesseract-ocr/tesseract) | Reading the words out of images (OCR), with the [tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast) English model | Apache-2.0 |
 | [libarchive.js](https://github.com/nika-begiashvili/libarchivejs) / [libarchive](https://github.com/libarchive/libarchive) | Opening RAR, 7z, TAR, and other archives | MIT (libarchive: BSD) |
+| [ExifTool](https://exiftool.org/) by Phil Harvey | Reading and editing photo metadata (fix dates, strip GPS, rename by date taken) | Perl Artistic / GPL-1+ (bundled as a separate program) |
+| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | Text-to-speech voiceovers and song stem separation (CLI runtimes) | Apache-2.0 |
+| [Piper](https://github.com/rhasspy/piper) voice `en_US-amy-medium` | The voiceover voice (downloads once on first use) | MIT (voice trained on public-domain audio) |
+| [UVR MDX-Net](https://github.com/Anjok07/ultimatevocalremovergui) model `Voc_FT` | Splitting songs into vocals + instrumental (downloads once on first use) | MIT |
+| [VTracer](https://github.com/visioncortex/vtracer) | Tracing pictures into SVG vectors | MIT / Apache-2.0 |
+| [web-audio-beat-detector](https://github.com/chrisguttandin/web-audio-beat-detector) | Finding a track's BPM | MIT |
 | [Electron](https://github.com/electron/electron) | The desktop app shell | MIT |
 | [electron-builder](https://github.com/electron-userland/electron-builder) | Packaging the app | MIT |
 | [esbuild](https://github.com/evanw/esbuild) | Bundling the above into the app at build time | MIT |

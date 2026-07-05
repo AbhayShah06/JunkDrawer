@@ -319,7 +319,10 @@
       <a href="https://www.libraw.org/" target="_blank" rel="noopener">LibRaw</a>,
       <a href="https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan" target="_blank" rel="noopener">Real-ESRGAN</a>,
       <a href="https://github.com/naptha/tesseract.js" target="_blank" rel="noopener">tesseract.js</a>,
-      <a href="https://github.com/nika-begiashvili/libarchivejs" target="_blank" rel="noopener">libarchive.js</a>, and
+      <a href="https://github.com/nika-begiashvili/libarchivejs" target="_blank" rel="noopener">libarchive.js</a>,
+      <a href="https://exiftool.org/" target="_blank" rel="noopener">ExifTool</a>,
+      <a href="https://github.com/k2-fsa/sherpa-onnx" target="_blank" rel="noopener">sherpa-onnx</a>,
+      <a href="https://github.com/visioncortex/vtracer" target="_blank" rel="noopener">VTracer</a>, and
       <a href="https://github.com/electron/electron" target="_blank" rel="noopener">Electron</a>.
       Full list and licenses in CREDITS.md.
     </details>
@@ -471,15 +474,15 @@ async function runTool(file,tool,opts,outName,label){
     return new Blob([buf],{type:mimeOf(outName)});
   } finally { clearInterval(poll); }
 }
-async function ensureModel(name,label){
+async function ensureModel(name,readyFlag,label){
   const info=await nativeInfo();
-  if(name==='ggml-base.bin'&&info.whisperModel) return;
+  if(info[readyFlag]) return;
   const onP=progress(label); onP(.02);
   const poll=setInterval(async()=>{ try{ const r=await fetch('/api/ffmpeg-progress?id=model-'+name); const j=await r.json();
     if(j&&typeof j.percent==='number') onP(Math.max(.02,j.percent)); }catch{} },700);
   try{
     const r=await fetch('/api/fetch-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
-    if(!r.ok) throw new Error('Couldn’t download the speech model. Check your internet connection and try again — it only has to work once.');
+    if(!r.ok) throw new Error('Couldn’t download the model. Check your internet connection and try again — it only has to work once.');
     _nativeInfo=null; // it changed on disk; re-ask next time
   } finally { clearInterval(poll); }
 }
@@ -764,6 +767,44 @@ function readExif(buf){
     if(la!=null&&lo!=null) out.GPS=((/^s/i.test(gp[1]||'')?-1:1)*la).toFixed(6)+', '+((/^w/i.test(gp[3]||'')?-1:1)*lo).toFixed(6); }
   return Object.keys(out).length?out:null;
 }
+add({cat:'image',kinds:['image'],nm:'Strip Location Only',ds:'Remove GPS but keep camera info and dates',kw:'gps location remove strip privacy exif keep metadata coordinates',
+  more:'Deletes just the GPS coordinates from a photo — where it was taken — while keeping the camera settings and date info intact. Use “Remove Hidden Info” instead if you want everything gone.',
+  run:async f=>{ const info=await nativeInfo(); if(!info.exif) return showGuide(needDesktop('Editing photo tags'));
+    const oe=ext(f.name); showResult(await runTool(f,'exif',{op:'strip-gps'},'out.'+oe,'Removing location'),base(f.name)+'-nogps.'+oe,
+      {note:'GPS removed. Camera info and dates kept.'}); }});
+add({cat:'image',kinds:['image','raw'],multi:true,nm:'Fix Photo Dates',ds:'Set the date-taken so albums sort right',kw:'date taken fix exif change datetime sort slideshow whatsapp wrong order album',
+  more:'Sets the “date taken” on photos so slideshows and albums sort them correctly — the classic fix for pictures WhatsApp or email stripped. Pick the date the photos are really from.',
+  opts:()=>{ const d=el('input',{type:'datetime-local',value:new Date().toISOString().slice(0,16)});
+    return {node:el('label',{},['date taken ',d]),get:()=>({when:d.value})}; },
+  check:(f,o)=>!o.when?{msg:'Pick the date these photos were really taken.'}:null,
+  run:async (fs,o)=>{ const info=await nativeInfo(); if(!info.exif) return showGuide(needDesktop('Editing photo tags'));
+    const date=o.when.replace(/-/g,':').replace('T',' ')+(o.when.length===16?':00':'');
+    const out=[]; for(let i=0;i<fs.length;i++){
+      const oe=ext(fs[i].name);
+      const b=await runTool(fs[i],'exif',{op:'set-date',date},'out.'+oe,`Fixing date ${i+1} of ${fs.length}`);
+      out.push({name:base(fs[i].name)+'.'+oe,data:new Uint8Array(await b.arrayBuffer())}); }
+    if(out.length===1) showResult(new Blob([out[0].data],{type:mimeOf(out[0].name)}),out[0].name,{note:'Date taken set to '+date+'.'});
+    else showMulti(out,'dated-photos.zip',`${out.length} photos set to ${date}.`); }});
+add({cat:'image',kinds:['image','raw'],multi:true,nm:'Rename Photos by Date Taken',ds:'Filenames become the moment they were shot',kw:'rename date taken batch order sort img_0001 filename organize',
+  more:'Reads when each photo was really taken and renames the copies to that moment — “2024-06-14 18.03.22.jpg” instead of “IMG_4032.jpg” — so any folder sorts into the true timeline. The photos themselves aren’t touched.',
+  run:async fs=>{ const info=await nativeInfo(); if(!info.exif) return showGuide(needDesktop('Reading photo tags'));
+    const out=[], used={}; let missing=0;
+    for(let i=0;i<fs.length;i++){
+      const j=await runTool(fs[i],'exif',{op:'read-dates'},'out.json',`Reading date ${i+1} of ${fs.length}`);
+      let when=null; try{ const d=JSON.parse(await j.text())[0]||{}; when=d.DateTimeOriginal||d.CreateDate; }catch{}
+      let nm;
+      if(when&&/^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}/.test(when)){ // 2024:06:14 18:03:22 → 2024-06-14 18.03.22
+        nm=when.slice(0,10).replace(/:/g,'-')+' '+when.slice(11,19).replace(/:/g,'.');
+      } else { nm=base(fs[i].name); missing++; }
+      used[nm]=(used[nm]||0)+1; if(used[nm]>1) nm+=' ('+used[nm]+')';
+      out.push({name:nm+'.'+ext(fs[i].name),data:new Uint8Array(await fs[i].arrayBuffer())}); }
+    showMulti(out,'renamed-photos.zip',`${out.length} photos renamed by date taken${missing?` (${missing} had no date and kept their name)`:''}.`); }});
+add({cat:'image',kinds:['image'],nm:'Picture to SVG',ds:'Trace a logo or sketch into a crisp vector',kw:'svg vector trace vectorize logo sticker cricut laser sketch convert',
+  more:'Traces a picture into an SVG vector — edges stay crisp at any size. Great for logos, sketches, and sticker or Cricut work. Simple, high-contrast images trace best.',
+  run:async f=>{ const info=await nativeInfo(); if(!info.vtracer) return showGuide(needDesktop('Tracing'));
+    let src=f; if(!['jpg','jpeg','png'].includes(ext(f.name)))
+      src=new File([await imgConvert(f,{type:'image/png'})],'in.png',{type:'image/png'});
+    showResult(await runTool(src,'vtracer',{},'out.svg','Tracing'),base(f.name)+'.svg'); }});
 add({cat:'image',kinds:['raw'],multi:true,rec:1,nm:'Camera RAW to JPG',ds:'Develop RAW photos into ready-to-send JPGs',kw:'raw cr2 cr3 nef arw raf dng orf rw2 convert develop batch camera canon nikon sony fuji',
   more:'Turns camera RAW files (Canon CR2/CR3, Nikon NEF, Sony ARW, Fuji RAF, DNG and more) into JPGs with the camera’s own white balance. Great for sending a shoot to a client fast. It’s a clean, neutral develop — not a Lightroom edit.',
   opts:oSel('save as',[['jpg','JPG'],['png','PNG']],'to'),
@@ -900,11 +941,43 @@ add({cat:'audio',kinds:['audio'],rec:1,nm:'Convert Audio',ds:'Switch between MP3
 add({cat:'audio',kinds:['audio'],nm:'Even Out Volume',ds:'Make quiet and loud parts match',kw:'normalize volume loudness level',
   more:'Levels out the loudness so soft and loud parts sound about the same. Good for voice memos and recordings.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-af','loudnorm','-acodec','libmp3lame','-q:a','2',out],'Normalizing'),base(f.name)+'-leveled.mp3'); }});
+add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Split a Song into Vocals & Instrumental',ds:'Pull the acapella and the karaoke track apart',kw:'stems separate vocals acapella instrumental karaoke split isolate remove voice uvr demix',
+  more:'Splits a song into two tracks — just the vocals, and everything else. DJs get an acapella, karaoke night gets a backing track. The first run downloads the separation model once (~64 MB). Heads up: a full song takes a few minutes.',
+  run:async f=>{ const info=await nativeInfo(); if(!info.stems) return showGuide(needDesktop('Splitting a song'));
+    if(!info.stemsModel) await ensureModel('UVR-MDX-NET-Voc_FT.onnx','stemsModel','Downloading the separation model (one time, ~64 MB)');
+    const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','44100','-ac','2','-c:a','pcm_s16le',out],'Getting the audio ready');
+    const zip=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'stems',{},'out.zip','Splitting (a full song takes a few minutes)');
+    const {unzipSync}=await import('./vendor/fflate.mjs');
+    const parts=unzipSync(new Uint8Array(await zip.arrayBuffer()));
+    const out=[]; const enc=async(name,label)=>{ if(!parts[name])return;
+      const mp3=await runFF(new File([parts[name].slice().buffer],name,{type:'audio/wav'}),'out.mp3',(i,o2)=>['-i',i,'-acodec','libmp3lame','-q:a','2',o2],label);
+      out.push({name:base(f.name)+'-'+name.replace('.wav','.mp3'),data:new Uint8Array(await mp3.arrayBuffer())}); };
+    await enc('vocals.wav','Saving the vocals');
+    await enc('instrumental.wav','Saving the instrumental');
+    if(!out.length) throw new Error('Separation produced no tracks');
+    showMulti(out,base(f.name)+'-stems.zip','Vocals + instrumental, as MP3s.'); }});
+add({cat:'audio',kinds:['audio','video'],nm:'Find the BPM',ds:'Work out a track’s tempo',kw:'bpm tempo beats per minute detect dj analyze speed',
+  more:'Listens to a track and works out its tempo in beats per minute. Handy for DJs building sets and producers matching samples. Steady electronic beats read best; live drummers wander.',
+  run:async f=>{ const onP=progress('Listening for the beat'); onP(.2);
+    const {guess}=await import('./vendor/beat.mjs');
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    try{
+      const buf=await ac.decodeAudioData(await f.arrayBuffer()); onP(.6);
+      const {bpm}=await guess(buf); onP(1);
+      showGuide({title:`♩ ${bpm} BPM`,msg:`“${f.name}” sits at about ${bpm} beats per minute. If that feels half or double the real speed, it probably is — half/double-time readings are the classic gotcha.`});
+    }catch(e){ throw new Error('Couldn’t find a steady beat in that track. It works best on music with a clear drum beat.'); }
+    finally{ ac.close(); } }});
+add({cat:'audio',input:'text',nm:'Make a Voiceover',ds:'Turn typed words into natural speech',kw:'text to speech tts voiceover voice narrate speak read aloud audio',
+  more:'Types in, speech out — a natural-sounding voice reads your script and saves it as audio for slideshows and videos. English voice; the first run downloads it once (~64 MB). Everything happens on your computer.',
+  run:async txt=>{ const info=await nativeInfo(); if(!info.tts) return showGuide(needDesktop('Making a voiceover'));
+    if(!info.ttsModel) await ensureModel('vits-piper-en_US-amy-medium','ttsModel','Downloading the voice (one time, ~64 MB)');
+    const wav=await runTool(new File([txt.slice(0,5000)],'in.txt',{type:'text/plain'}),'tts',{},'out.wav','Reading it out');
+    showResult(wav,'voiceover.wav',{note:txt.length>5000?'That was a lot of text — the first ~5,000 characters were read.':''}); }});
 add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitles',ds:'Turn speech into text or an SRT caption file',kw:'transcribe transcription speech to text subtitles captions srt vtt whisper voice memo interview lecture auto',
   more:'Listens to a recording or video and writes out what was said — as plain text, or as an SRT subtitle file you can burn in with the captions tool. The first run downloads the speech model once (~140 MB); after that it works fully offline. Handles most languages.',
   opts:oSel('give me',[['srt','Subtitles (SRT)'],['txt','Plain text'],['vtt','Web captions (VTT)']],'fmt'),
   run:async (f,o)=>{ const info=await nativeInfo(); if(!info.whisper) return showGuide(needDesktop('Transcribing'));
-    if(!info.whisperModel) await ensureModel('ggml-base.bin','Downloading the speech model (one time, ~140 MB)');
+    if(!info.whisperModel) await ensureModel('ggml-base.bin','whisperModel','Downloading the speech model (one time, ~140 MB)');
     const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
     const fmt=['srt','txt','vtt'].includes(o.fmt)?o.fmt:'srt';
     const b=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt},'out.'+fmt,'Listening and writing (a long recording takes a while)');
@@ -1125,14 +1198,14 @@ const MODES={
   basics: {label:'Junk Drawer Basics', tools:['iPhone Photo to JPG','Shrink File Size','Shrink a Video','Make It an MP4',
     'Sign & Fill PDF','Combine PDFs','Open Any Archive','Remove Background']},
   photo:  {label:'Photographer', tools:['Camera RAW to JPG','Upscale an Image (4×)','Change Image Type','Resize Image',
-    'Shrink File Size','Remove Hidden Info','See Hidden Info','Remove Background','Rename Photos by Date Taken','Fix Photo Dates']},
-  creator:{label:'Content Creator', tools:['Transcribe to Text or Subtitles','Burn In Subtitles','Fix Phone Video for Editing',
-    'Shrink a Video','Trim a Video','Video to GIF','Save a Photo from a Video','Save the Audio as MP3']},
-  music:  {label:'Musician / DJ', tools:['Convert Audio','Find the BPM','Cut Out Silence','Podcast Loudness Fix',
-    'Even Out Volume','Trim Audio','Shrink Audio File','Save the Audio as MP3']},
+    'Shrink File Size','Strip Location Only','Fix Photo Dates','Rename Photos by Date Taken','Remove Background','Picture to SVG']},
+  creator:{label:'Content Creator', tools:['Transcribe to Text or Subtitles','Burn In Subtitles','Make a Voiceover',
+    'Fix Phone Video for Editing','Shrink a Video','Trim a Video','Video to GIF','Save a Photo from a Video']},
+  music:  {label:'Musician / DJ', tools:['Split a Song into Vocals & Instrumental','Find the BPM','Convert Audio',
+    'Cut Out Silence','Podcast Loudness Fix','Even Out Volume','Trim Audio','Save the Audio as MP3']},
   paper:  {label:'Paperwork', tools:['Sign & Fill PDF','Combine PDFs','Shrink a PDF','PDF to Pictures',
     'Split into Single Pages','Delete Pages','Add Page Numbers','Grab Text from a Picture']},
-  dev:    {label:'Developer', tools:['Tidy Up JSON','Switch JSON/YAML','CSV to JSON','JSON to CSV',
+  dev:    {label:'Developer', tools:['Tidy Up JSON','Switch Between JSON and YAML','CSV to JSON','JSON to CSV',
     'Make a QR Code','Make a Text Fingerprint','Scramble Text to Base64','Look Inside a File']},
 };
 const MODE_MIGRATE={photos:'photo',video:'creator',odds:'dev'}; // pre-persona stored values

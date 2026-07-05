@@ -175,8 +175,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 
 def main():
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
+    # Threading matters: a single-threaded server deadlocks the moment one browser tab
+    # holds a keep-alive connection open while another request comes in.
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    socketserver.ThreadingTCPServer.daemon_threads = True
+    with socketserver.ThreadingTCPServer(("127.0.0.1", PORT), Handler) as httpd:
         url = f"http://127.0.0.1:{PORT}/index.html"
         def say(s):  # Windows consoles often use cp1252, which can't print the emoji/arrows
             try: print(s)

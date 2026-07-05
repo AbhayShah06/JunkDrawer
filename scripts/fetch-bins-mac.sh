@@ -49,6 +49,37 @@ cp "$TMP/whisper/build/bin/whisper-cli" "$OUT/whisper/"
 chmod +x "$OUT/whisper/whisper-cli"
 lipo -info "$OUT/whisper/whisper-cli" || true
 
+echo "==> ExifTool 13.59 (perl distribution — macOS ships perl, so this just runs)"
+curl -sL -o "$TMP/exiftool.tgz" "https://master.dl.sourceforge.net/project/exiftool/Image-ExifTool-13.59.tar.gz?viasf=1"
+mkdir -p "$TMP/et" && tar -xzf "$TMP/exiftool.tgz" -C "$TMP/et"
+rm -rf "$OUT/exiftool" && mkdir -p "$OUT/exiftool"
+SRC="$(find "$TMP/et" -maxdepth 1 -type d -name 'Image-ExifTool-*' | head -1)"
+cp "$SRC/exiftool" "$OUT/exiftool/exiftool"
+cp -R "$SRC/lib" "$OUT/exiftool/lib"
+chmod +x "$OUT/exiftool/exiftool"
+"$OUT/exiftool/exiftool" -ver
+
+echo "==> sherpa-onnx v1.13.3 (universal2 — text-to-speech + stem separation)"
+curl -sL -o "$TMP/sherpa.tar.bz2" "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.3/sherpa-onnx-v1.13.3-osx-universal2-shared.tar.bz2"
+mkdir -p "$TMP/sherpa" && tar -xjf "$TMP/sherpa.tar.bz2" -C "$TMP/sherpa"
+rm -rf "$OUT/sherpa" && mkdir -p "$OUT/sherpa"
+SBIN="$(find "$TMP/sherpa" -name sherpa-onnx-offline-tts -type f | head -1)"
+cp "$SBIN" "$(dirname "$SBIN")/sherpa-onnx-offline-source-separation" "$OUT/sherpa/"
+# the shared build needs its dylibs beside the exes
+find "$TMP/sherpa" \( -name "*.dylib" \) -exec cp {} "$OUT/sherpa/" \;
+chmod +x "$OUT/sherpa/"sherpa-onnx-offline-*
+xattr -dr com.apple.quarantine "$OUT/sherpa" 2>/dev/null || true
+
+echo "==> VTracer 0.6.4 (universal via lipo from the two official arch builds)"
+curl -sL -o "$TMP/vt-arm.tar.gz" "https://github.com/visioncortex/vtracer/releases/download/0.6.4/vtracer-aarch64-apple-darwin.tar.gz"
+curl -sL -o "$TMP/vt-x64.tar.gz" "https://github.com/visioncortex/vtracer/releases/download/0.6.4/vtracer-x86_64-apple-darwin.tar.gz"
+mkdir -p "$TMP/vt-arm" "$TMP/vt-x64"
+tar -xzf "$TMP/vt-arm.tar.gz" -C "$TMP/vt-arm"; tar -xzf "$TMP/vt-x64.tar.gz" -C "$TMP/vt-x64"
+rm -rf "$OUT/vtracer" && mkdir -p "$OUT/vtracer"
+lipo -create "$(find "$TMP/vt-arm" -name vtracer -type f | head -1)" "$(find "$TMP/vt-x64" -name vtracer -type f | head -1)" -output "$OUT/vtracer/vtracer"
+chmod +x "$OUT/vtracer/vtracer"
+xattr -dr com.apple.quarantine "$OUT/vtracer" 2>/dev/null || true
+
 echo
-echo "Done. resources/bin/mac/ now has whisper/, libraw/, esrgan/ alongside ffmpeg + yt-dlp."
+echo "Done. resources/bin/mac/ now has whisper/, libraw/, esrgan/, exiftool/, sherpa/, vtracer/ alongside ffmpeg + yt-dlp."
 echo "Next: npm run dist:mac"
