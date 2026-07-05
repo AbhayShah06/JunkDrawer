@@ -707,6 +707,29 @@ add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'Switch between
   check:(f,o)=>{ const cur=ext(f.name), tgt=FF_IMG_OUT[o.type];
     return (cur===tgt||(cur==='jpeg'&&tgt==='jpg')) ? {msg:`This picture is already a ${tgt.toUpperCase()}, so there’s nothing to change. Pick a different type — JPG for photos, PNG for a clear background, WEBP for websites.`} : null; },
   run:async (f,o)=>{ showResult(await imgConvert(f,{type:o.type}),base(f.name)+'.'+FF_IMG_OUT[o.type]); }});
+add({cat:'image',kinds:['image','raw'],multi:true,rec:1,nm:'Batch Convert Images',ds:'Convert a whole folder of photos to one format',kw:'batch convert folder bulk many multiple mass heic raw jpg png webp shoot dump',
+  more:'Drop a folder (or pick many files) and turn them all into the same format at once — HEIC, RAW, PNG, JPG, WEBP go in, you get a zip of converted images. Great for an iPhone dump or a photo shoot. Everything stays on your computer.',
+  opts:oSel('convert all to',[['image/jpeg','JPG'],['image/png','PNG'],['image/webp','WEBP']],'type'),
+  run:async (fs,o)=>{
+    const type=o.type||'image/jpeg', outExt={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[type];
+    let rawChecked=false, rawOk=false; const out=[]; let raws=0, rawSkipped=0;
+    for(let i=0;i<fs.length;i++){ const f=fs[i];
+      try{
+        let blob;
+        if(kind(f)==='raw'){ raws++;
+          if(!rawChecked){ rawOk=!!(await nativeInfo()).raw; rawChecked=true; }
+          if(!rawOk){ rawSkipped++; continue; }
+          const rawTo=type==='image/jpeg'?'jpg':'png';
+          const dev=await runTool(f,'raw',{to:rawTo},'out.'+rawTo,`Developing ${i+1} of ${fs.length}`);
+          blob=('image/'+(rawTo==='jpg'?'jpeg':'png'))===type ? dev : await imgConvert(new File([dev],'d.'+rawTo),{type});
+        } else { progress(`Converting ${i+1} of ${fs.length}`); blob=await imgConvert(f,{type}); }
+        out.push({name:base(f.name)+'.'+outExt, data:new Uint8Array(await blob.arrayBuffer())});
+      }catch{ /* skip a file that won't decode; keep the batch going */ }
+    }
+    if(!out.length){ return showGuide(raws&&!rawOk ? needDesktop('Converting RAW photos') : {title:'Nothing converted',msg:'None of those files could be read as images.'}); }
+    const note=`${out.length} of ${fs.length} converted`+(rawSkipped?` (${rawSkipped} RAW skipped — needs the desktop app)`:'')+'.';
+    if(out.length===1) showResult(new Blob([out[0].data],{type}),out[0].name,{note});
+    else showMulti(out,'converted.zip',note); }});
 add({cat:'image',kinds:['image'],rec:1,nm:'Shrink File Size',ds:'Squeeze an image under a size you pick',kw:'compress smaller reduce size optimize',
   more:'Make an image fit a size limit you set, like under 8 MB. It keeps the picture as big and sharp as it can while hitting your target.',
   opts:oNum('target','8','MB','mb',{min:.2,step:.5}),
@@ -1540,7 +1563,9 @@ function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
   card.querySelector('.clearbtn').onclick=clearAll;
   card.append(el('div',{className:'meta',innerHTML:fs.map(f=>`<div>${esc(f.name)} <span class="k">(${fmt(f.size)})</span></div>`).join('')}));
   const rr=el('div',{className:'recos'});
+  const allConv=fs.every(f=>kind(f)==='image'||kind(f)==='raw');
   if(allPdf) rr.append(reco('Merge PDFs',()=>{ const t=T.find(x=>x.nm==='Combine PDFs'); renderRun(t,fs); $('#panel .btn').click(); }));
+  if(allConv) rr.append(reco('Batch convert…',()=>{ const t=T.find(x=>x.nm==='Batch Convert Images'); renderRun(t,fs); }));
   if(allImg) rr.append(reco('Images → one PDF',()=>imagesToPdf(fs)));
   if(rr.children.length){ card.append(el('div',{className:'want',textContent:'batch actions:'})); card.append(rr); }
   r.append(card); r.scrollIntoView({behavior:'smooth'});
@@ -2016,8 +2041,24 @@ const DROP_TYPES=['Files','text/uri-list','text/html','text/plain'];
 ;['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{
   const t=e.dataTransfer?[...e.dataTransfer.types]:[]; if(DROP_TYPES.some(x=>t.includes(x))){ e.preventDefault(); drop.classList.add('hot'); }}));
 document.addEventListener('dragleave',e=>{ if(!e.relatedTarget) drop.classList.remove('hot'); });
-document.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('hot');
+// Expand a dropped folder into its files (the browser hands folders over as directory entries,
+// not via dataTransfer.files). Entries must be grabbed synchronously during the drop event.
+async function entriesToFiles(entries){
+  const files=[];
+  async function walk(en){
+    if(!en) return;
+    if(en.isFile){ await new Promise(r=>en.file(f=>{ if(!f.name.startsWith('.')) files.push(f); r(); }, ()=>r())); }
+    else if(en.isDirectory){ const rd=en.createReader();
+      await new Promise(r=>{ const read=()=>rd.readEntries(async es=>{ if(!es.length) return r(); for(const c of es) await walk(c); read(); }, ()=>r()); read(); }); }
+  }
+  for(const en of entries) await walk(en);
+  return files;
+}
+document.addEventListener('drop',async e=>{ e.preventDefault(); drop.classList.remove('hot');
   const dt=e.dataTransfer; if(!dt)return;
+  // Dropped a folder? Expand it (grab entries synchronously, then recurse).
+  const entries=(dt.items?[...dt.items]:[]).map(it=>it.webkitGetAsEntry&&it.webkitGetAsEntry()).filter(Boolean);
+  if(entries.some(en=>en.isDirectory)){ const files=await entriesToFiles(entries); if(files.length) intake(files); else toast('That folder had no files'); return; }
   if(dt.files&&dt.files.length){ intake(dt.files); return; }
   const cands=[]; const push=s=>{ if(/^(https?:|blob:)/i.test(s))cands.push(s); };
   (dt.getData('text/uri-list')||'').split(/\s+/).forEach(push);
