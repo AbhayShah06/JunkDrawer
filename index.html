@@ -937,37 +937,37 @@ async function aiCheck(f){
   const expTxt=e=>e>=1?(+e.toFixed(1))+'s':'1/'+Math.round(1/e)+'s';
   let score,verdict,sub=null;
   if(sd){ score=98; verdict='AI-generated';
-    say('ai',`The prompt is still inside the file — ${sd[0]} wrote it into the PNG${sd[1]?`: “${sd[1].slice(0,110).replace(/\s+/g,' ')}…”`:''}`); }
+    say('ai',`${sd[0]} saved its prompt inside the PNG${sd[1]?`: “${sd[1].slice(0,110).replace(/\s+/g,' ')}…”`:''}`); }
   else if(trained||gAI){ score=97; verdict='AI-generated';
-    say('ai',gAI?'Tagged “Made with Google AI” — a Gemini / Google AI image':'Carries the IPTC “trained algorithmic media” tag — the industry-standard AI-generated marker');
+    say('ai',gAI?'Tagged “Made with Google AI” (Gemini / Google AI)':'Carries the IPTC “trained algorithmic media” tag, the industry-standard marker for AI-generated images');
     if(named) say('ai','Metadata names '+named); }
   else if(gen&&c2pa){ score=97; verdict='AI-generated';
     say('ai','Signed Content Credentials (C2PA) naming '+named); }
   else if(gen){ score=90; verdict='Almost certainly AI';
     say('ai','Metadata mentions '+named); }
   else if(composite||gEdit){ score=72; verdict='Real photo, edited with AI';
-    say('ai',gEdit?'Tagged “Edited with Google AI” — Magic Editor or similar touched it':'Tagged “composite with trained algorithmic media” — a real image with AI edits (generative fill, AI eraser…)'); }
-  else if(c2pa&&capture&&cam){ score=5; verdict='Real photo — signed by the camera';
+    say('ai',gEdit?'Tagged “Edited with Google AI”: Magic Editor or a similar tool touched it':'Tagged “composite with trained algorithmic media”: a real image with AI edits like generative fill'); }
+  else if(c2pa&&capture&&cam){ score=5; verdict='Real photo, signed by the camera';
     say('real','Content Credentials mark this as a direct camera capture (C2PA “digital capture”)'); }
   else if(c2pa){ score=70; verdict='Made with AI-era software';
-    say('ai','Has a signed Content Credentials (C2PA) manifest but no recognizable generator name — most tools that sign today are AI generators or Adobe apps'); }
+    say('ai','Has a signed Content Credentials (C2PA) manifest with no recognizable generator name; most tools that sign today are AI generators or Adobe apps'); }
   else if(cam&&optics){ score=ex.GPS?4:9; verdict='Looks like a real photo'; }
   else if(cam){ score=18; verdict='Leans real'; }
-  else if(shot){ score=50; verdict='Screenshot — origin unverifiable';
-    sub='A screenshot redraws the pixels into a brand-new file, wiping AI tags and camera info alike. What it shows could be real or AI — the trail is gone. (Google’s SynthID watermark survives screenshots, but only Google can read it.)'; }
+  else if(shot){ score=50; verdict='Screenshot: origin unverifiable';
+    sub='A screenshot redraws the pixels into a brand-new file and wipes AI tags and camera info alike, so what it shows could be real or AI. Google’s SynthID watermark survives screenshots, but only Google can read it.'; }
   else { score=50; verdict='No evidence either way';
-    sub='No AI tags, but no camera info either. Messengers and social sites strip metadata on upload, so this file carries no testimony about its origin.'; }
+    sub='No AI tags, but no camera info either. Messengers and social sites strip metadata on upload, so a bare file like this could have started anywhere.'; }
   if(cam&&score<70){ say('real',`Shot on ${ex.Make} ${ex.Model}${ex.Lens?' · '+ex.Lens:''}`);
     if(optics){ const b=[]; if(ex.FNumber)b.push('ƒ/'+ex.FNumber); if(ex.Exposure)b.push(expTxt(ex.Exposure)); if(ex.ISO)b.push('ISO '+ex.ISO); if(ex.FocalLength)b.push(ex.FocalLength+'mm');
       if(b.length) say('real','Real exposure settings: '+b.join(' · ')); }
-    if(ex.GPS) say('real','GPS location of the shot is embedded');
+    if(ex.GPS) say('real','Has the GPS location of the shot');
     if(ex.DateTaken) say('real','Date taken: '+ex.DateTaken); }
   if(composite&&cam) say('real',`Underlying camera info survives: ${ex.Make} ${ex.Model}`);
   if(shot){ if(nameShot)say('info','The filename says screenshot'); if(tagShot)say('info','Carries a “Screenshot” marker (Apple writes this)');
-    if(sizeShot)say('info',`Exactly a device screen size — ${w}×${h}`); }
-  else if((nameShot||sizeShot)&&score>=70) say('info','Also looks like a screenshot, but the AI tags above survived — they’re still trustworthy');
+    if(sizeShot)say('info',`Exactly a device screen size: ${w}×${h}`); }
+  else if((nameShot||sizeShot)&&score>=70) say('info','Also looks like a screenshot, but the AI tags above survived and still count');
   if(c2pa&&score>=90&&!(gen&&c2pa)) say('ai','Signed Content Credentials (C2PA) manifest present');
-  if(!ev.length) say('info','No metadata found in the file at all');
+  if(!ev.length) say('info','The file has no metadata at all');
   return {score,verdict,sub,evidence:ev};
 }
 function showAICheck(r,fname){
@@ -989,13 +989,13 @@ function showAICheck(r,fname){
     el('span',{style:`flex:none;width:9px;height:9px;background:${{ai:'var(--pdf)',real:'var(--img)',info:'var(--ink2)'}[e.lean]};border:1px solid var(--sh2)`}),
     el('span',{textContent:e.txt})])));
   box.append(ul);
-  box.append(el('div',{className:'note',style:'margin-top:12px',textContent:'Tags are evidence, not proof — anyone can strip them (a screenshot does it by accident) and a determined liar can fake them. A file with no tags is not proven real.'}));
+  box.append(el('div',{className:'note',style:'margin-top:12px',textContent:'Treat the rating as evidence. Anyone can strip these tags (a screenshot does it by accident), and a forger can write fake ones. A clean-looking file could still be AI.'}));
   const ag=el('button',{className:'btn ghost',textContent:'Home'}); ag.onclick=resetStage;
   box.append(el('div',{className:'actions',style:'margin-top:10px'},[ag]));
   out.append(box); out.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 add({cat:'image',kinds:['image'],rec:1,nm:'AI Image Checker',ds:'Real photo or AI-made? Read the evidence',kw:'ai detect fake real generated checker chatgpt dalle gemini midjourney firefly stable diffusion deepfake verify provenance c2pa content credentials origin screenshot',
-  more:'Reads the invisible tags AI tools leave behind — ChatGPT and Firefly sign their images (Content Credentials), Google tags “Made with Google AI”, Stable Diffusion embeds its whole prompt — and weighs them against real-camera evidence like exposure settings and GPS. You get a 0–100 rating with every clue spelled out. Screenshots and social-media re-uploads strip all tags, so it tells you honestly when the trail is gone instead of guessing. Nothing leaves your computer.',
+  more:'AI tools leave tags in the files they make: ChatGPT and Firefly sign their images (Content Credentials), Google writes “Made with Google AI”, Stable Diffusion saves its whole prompt in the PNG. This reads those tags, weighs them against real-camera evidence like exposure settings and GPS, and gives you a 0–100 rating with each clue listed. A screenshot or social-media re-upload strips the tags, and you get a straight “can’t tell” instead of a guess. Nothing leaves your computer.',
   run:async f=>{ const onP=progress('Reading the file’s hidden tags'); onP(.3);
     const r=await aiCheck(f); onP(1); showAICheck(r,f.name); }});
 add({cat:'arc',kinds:['archive'],rec:1,nm:'Open Any Archive',ds:'Unpack a RAR, 7z, ZIP, or TAR',kw:'unzip extract rar 7z zip tar gz archive open unpack attachment',
