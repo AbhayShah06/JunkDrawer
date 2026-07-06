@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "multitool",
-      "runtimeExecutable": "python",
+      "runtimeExecutable": "python3",
       "runtimeArgs": ["-X", "utf8", "serve.py"],
       "port": 8777
     }

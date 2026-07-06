@@ -875,6 +875,129 @@ add({cat:'image',kinds:['image'],nm:'Grab Text from a Picture',ds:'Copy the word
     const txt=(await ocrImage(f,onP)).trim();
     if(!txt) return showGuide({title:'No words found',msg:'Couldn’t make out any text in that picture. A sharper, straighter, better-lit shot usually does the trick.'});
     showText(txt,base(f.name)+'.txt'); }});
+/* ---- AI image check: provenance scan, fully local ----
+   What generators actually leave in the file (all plain bytes, so one latin1 scan finds them anywhere —
+   JPEG APP1, PNG iTXt, WebP/HEIC boxes, C2PA's CBOR all store these strings uncompressed):
+   · C2PA "Content Credentials" (ChatGPT/DALL·E, Adobe Firefly, Bing/Designer): a signed manifest naming the tool
+   · IPTC/XMP DigitalSourceType (Gemini/Imagen, Pixel Magic Editor): trainedAlgorithmicMedia = generated,
+     compositeWithTrainedAlgorithmicMedia = real image with AI edits; Google also writes "Made with Google AI"
+   · Stable Diffusion family: the whole prompt sits in PNG text chunks (parameters / ComfyUI workflow / NovelAI)
+   · Real cameras leave EXIF optics (exposure, aperture, GPS) that no generator bothers to fake
+   A screenshot or social-media re-encode redraws the pixels into a new file and wipes ALL of the above
+   (Google's SynthID pixel watermark survives but has no open reader), so "no tags" must mean "can't tell",
+   never "real" — we detect the screenshot itself and say so honestly. */
+const latin1=b=>{ try{ return new TextDecoder('latin1').decode(b); }catch{ return ''; } };
+function pngTexts(u8){ // uncompressed tEXt/iTXt key→value pairs; the SD family writes its prompts here
+  const out={}; if(u8.length<16||u8[0]!==0x89||u8[1]!==0x50) return out;
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength); let p=8;
+  while(p+12<=u8.length){ const len=dv.getUint32(p), type=latin1(u8.subarray(p+4,p+8)), d=p+8;
+    if(len>u8.length-d) break;
+    if(type==='tEXt'||type==='iTXt'){ const seg=u8.subarray(d,d+len), z=seg.indexOf(0);
+      if(z>0){ let val=null;
+        if(type==='tEXt') val=latin1(seg.subarray(z+1));
+        else if(!seg[z+1]){ let q=seg.indexOf(0,z+3); if(q>=0)q=seg.indexOf(0,q+1); // skip lang + translated keyword
+          if(q>=0){ try{ val=new TextDecoder().decode(seg.subarray(q+1)); }catch{} } }
+        if(val!=null) out[latin1(seg.subarray(0,z)).toLowerCase()]=val.slice(0,4000); } }
+    if(type==='IEND') break; p=d+len+4; }
+  return out; }
+// exact device screens (both orientations) — a PNG at exactly one of these with zero camera EXIF is a screenshot tell
+const SCREENS=new Set('640x1136 750x1334 828x1792 1080x1920 1080x2280 1080x2340 1080x2400 1125x2436 1170x2532 1179x2556 1206x2622 1242x2208 1242x2688 1284x2778 1290x2796 1320x2868 1440x3120 720x1600 1536x2048 1620x2160 1640x2360 1668x2388 2048x2732 2064x2752 1366x768 1536x864 1440x900 1680x1050 1920x1080 1920x1200 2256x1504 2560x1440 2560x1600 2560x1664 2736x1824 2880x1800 2880x1864 2880x1920 3024x1964 3456x2234 3840x2160 4480x2520 5120x2880'.split(' '));
+async function aiCheck(f){
+  const u8full=new Uint8Array(await f.arrayBuffer());
+  // metadata lives at the head (and C2PA sometimes at the tail) — cap the scan so a 300MB scan PNG doesn't chew RAM
+  const u8=u8full.length>67108864?(()=>{ const a=new Uint8Array(36*1048576);
+    a.set(u8full.subarray(0,32*1048576)); a.set(u8full.subarray(u8full.length-4*1048576),32*1048576); return a; })():u8full;
+  const hay=latin1(u8).toLowerCase();
+  const ev=[], say=(lean,txt)=>ev.push({lean,txt});
+  // generator names precise enough not to hit ordinary words ("firefly" the insect, "imagen" is Spanish)
+  const GENS=[['chatgpt','ChatGPT'],['gpt-image','OpenAI'],['openai','OpenAI'],['dall-e','DALL·E'],['dall·e','DALL·E'],
+    ['adobe firefly','Adobe Firefly'],['firefly image','Adobe Firefly'],['midjourney','Midjourney'],
+    ['stable diffusion','Stable Diffusion'],['stablediffusion','Stable Diffusion'],['comfyui','ComfyUI'],
+    ['novelai','NovelAI'],['invokeai','InvokeAI'],['leonardo.ai','Leonardo AI'],['ideogram.ai','Ideogram'],
+    ['recraft.ai','Recraft'],['black forest labs','Flux (Black Forest Labs)'],['bing image creator','Bing Image Creator'],
+    ['microsoft designer','Microsoft Designer']];
+  const gen=GENS.find(([k])=>hay.includes(k))||null, named=gen?gen[1]:null;
+  const c2pa=hay.includes('c2pa.claim')||hay.includes('c2pa.assertions')||hay.split('c2pa').length>3;
+  const composite=hay.includes('compositewithtrainedalgorithmicmedia');
+  const trained=hay.replace(/compositewithtrainedalgorithmicmedia/g,'').includes('trainedalgorithmicmedia');
+  const gAI=hay.includes('made with google ai'), gEdit=hay.includes('edited with google ai');
+  const capture=hay.includes('digitalcapture');
+  const tx=pngTexts(u8full);
+  const sd=(tx.parameters&&/steps:\s*\d/i.test(tx.parameters))?['Stable Diffusion',tx.parameters]:
+    (tx.prompt&&tx.workflow)?['ComfyUI',null]:
+    (tx.software&&/novelai/i.test(tx.software))?['NovelAI',tx.comment||null]:
+    (tx.invokeai_metadata||tx['sd-metadata']||tx.sui_image_params)?['a Stable Diffusion app',null]:null;
+  let ex=null; try{ ex=readExif(u8full.buffer); }catch{}
+  const cam=!!(ex&&ex.Make&&ex.Model), optics=!!(ex&&(ex.Exposure!=null||ex.FNumber!=null||ex.ISO!=null||ex.Lens));
+  let w=0,h=0; try{ const bm=await createImageBitmap(f); w=bm.width; h=bm.height; bm.close&&bm.close(); }catch{}
+  const nameShot=/screen[\s_-]?shot|bildschirmfoto/i.test(f.name), tagShot=hay.includes('screenshot');
+  const sizeShot=!!(w&&(SCREENS.has(w+'x'+h)||SCREENS.has(h+'x'+w)));
+  const isPng=u8full[0]===0x89&&u8full[1]===0x50;
+  const shot=!cam&&(nameShot||tagShot||(isPng&&sizeShot&&!ex));
+  const expTxt=e=>e>=1?(+e.toFixed(1))+'s':'1/'+Math.round(1/e)+'s';
+  let score,verdict,sub=null;
+  if(sd){ score=98; verdict='AI-generated';
+    say('ai',`The prompt is still inside the file — ${sd[0]} wrote it into the PNG${sd[1]?`: “${sd[1].slice(0,110).replace(/\s+/g,' ')}…”`:''}`); }
+  else if(trained||gAI){ score=97; verdict='AI-generated';
+    say('ai',gAI?'Tagged “Made with Google AI” — a Gemini / Google AI image':'Carries the IPTC “trained algorithmic media” tag — the industry-standard AI-generated marker');
+    if(named) say('ai','Metadata names '+named); }
+  else if(gen&&c2pa){ score=97; verdict='AI-generated';
+    say('ai','Signed Content Credentials (C2PA) naming '+named); }
+  else if(gen){ score=90; verdict='Almost certainly AI';
+    say('ai','Metadata mentions '+named); }
+  else if(composite||gEdit){ score=72; verdict='Real photo, edited with AI';
+    say('ai',gEdit?'Tagged “Edited with Google AI” — Magic Editor or similar touched it':'Tagged “composite with trained algorithmic media” — a real image with AI edits (generative fill, AI eraser…)'); }
+  else if(c2pa&&capture&&cam){ score=5; verdict='Real photo — signed by the camera';
+    say('real','Content Credentials mark this as a direct camera capture (C2PA “digital capture”)'); }
+  else if(c2pa){ score=70; verdict='Made with AI-era software';
+    say('ai','Has a signed Content Credentials (C2PA) manifest but no recognizable generator name — most tools that sign today are AI generators or Adobe apps'); }
+  else if(cam&&optics){ score=ex.GPS?4:9; verdict='Looks like a real photo'; }
+  else if(cam){ score=18; verdict='Leans real'; }
+  else if(shot){ score=50; verdict='Screenshot — origin unverifiable';
+    sub='A screenshot redraws the pixels into a brand-new file, wiping AI tags and camera info alike. What it shows could be real or AI — the trail is gone. (Google’s SynthID watermark survives screenshots, but only Google can read it.)'; }
+  else { score=50; verdict='No evidence either way';
+    sub='No AI tags, but no camera info either. Messengers and social sites strip metadata on upload, so this file carries no testimony about its origin.'; }
+  if(cam&&score<70){ say('real',`Shot on ${ex.Make} ${ex.Model}${ex.Lens?' · '+ex.Lens:''}`);
+    if(optics){ const b=[]; if(ex.FNumber)b.push('ƒ/'+ex.FNumber); if(ex.Exposure)b.push(expTxt(ex.Exposure)); if(ex.ISO)b.push('ISO '+ex.ISO); if(ex.FocalLength)b.push(ex.FocalLength+'mm');
+      if(b.length) say('real','Real exposure settings: '+b.join(' · ')); }
+    if(ex.GPS) say('real','GPS location of the shot is embedded');
+    if(ex.DateTaken) say('real','Date taken: '+ex.DateTaken); }
+  if(composite&&cam) say('real',`Underlying camera info survives: ${ex.Make} ${ex.Model}`);
+  if(shot){ if(nameShot)say('info','The filename says screenshot'); if(tagShot)say('info','Carries a “Screenshot” marker (Apple writes this)');
+    if(sizeShot)say('info',`Exactly a device screen size — ${w}×${h}`); }
+  else if((nameShot||sizeShot)&&score>=70) say('info','Also looks like a screenshot, but the AI tags above survived — they’re still trustworthy');
+  if(c2pa&&score>=90&&!(gen&&c2pa)) say('ai','Signed Content Credentials (C2PA) manifest present');
+  if(!ev.length) say('info','No metadata found in the file at all');
+  return {score,verdict,sub,evidence:ev};
+}
+function showAICheck(r,fname){
+  clearStatus(); const out=$('#output'); out.innerHTML=''; freeResUrls();
+  const box=el('div',{className:'result'});
+  box.append(el('h3',{textContent:'AI check · '+fname}));
+  const bar=el('div',{style:'position:relative;height:14px;margin:16px 2px 4px;border:2px solid;border-color:var(--sb);background:linear-gradient(90deg,var(--img) 0%,var(--face) 50%,var(--pdf) 100%)'});
+  bar.append(el('div',{style:`position:absolute;top:-5px;bottom:-5px;left:calc(${r.score}% - 2px);width:4px;background:var(--ink);outline:1px solid var(--hi)`}));
+  box.append(bar);
+  const lab=el('div',{style:'display:flex;justify-content:space-between;font:11px var(--mono);color:var(--ink2);margin:3px 2px 0'});
+  lab.append(el('span',{textContent:'camera photo'}),el('span',{textContent:'can’t tell'}),el('span',{textContent:'AI-made'}));
+  box.append(lab);
+  box.append(el('div',{style:'display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:12px 0 2px'},[
+    el('div',{style:'font:bold 15px var(--sans)',textContent:r.verdict}),
+    el('div',{style:'font:12px var(--mono);color:var(--ink2)',textContent:r.score+'/100 AI-likely'})]));
+  if(r.sub) box.append(el('div',{className:'note',textContent:r.sub}));
+  const ul=el('div',{style:'margin-top:10px;display:grid;gap:6px'});
+  r.evidence.forEach(e=>ul.append(el('div',{style:'display:flex;gap:8px;align-items:baseline;font:13px var(--sans)'},[
+    el('span',{style:`flex:none;width:9px;height:9px;background:${{ai:'var(--pdf)',real:'var(--img)',info:'var(--ink2)'}[e.lean]};border:1px solid var(--sh2)`}),
+    el('span',{textContent:e.txt})])));
+  box.append(ul);
+  box.append(el('div',{className:'note',style:'margin-top:12px',textContent:'Tags are evidence, not proof — anyone can strip them (a screenshot does it by accident) and a determined liar can fake them. A file with no tags is not proven real.'}));
+  const ag=el('button',{className:'btn ghost',textContent:'Home'}); ag.onclick=resetStage;
+  box.append(el('div',{className:'actions',style:'margin-top:10px'},[ag]));
+  out.append(box); out.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+add({cat:'image',kinds:['image'],rec:1,nm:'AI Image Checker',ds:'Real photo or AI-made? Read the evidence',kw:'ai detect fake real generated checker chatgpt dalle gemini midjourney firefly stable diffusion deepfake verify provenance c2pa content credentials origin screenshot',
+  more:'Reads the invisible tags AI tools leave behind — ChatGPT and Firefly sign their images (Content Credentials), Google tags “Made with Google AI”, Stable Diffusion embeds its whole prompt — and weighs them against real-camera evidence like exposure settings and GPS. You get a 0–100 rating with every clue spelled out. Screenshots and social-media re-uploads strip all tags, so it tells you honestly when the trail is gone instead of guessing. Nothing leaves your computer.',
+  run:async f=>{ const onP=progress('Reading the file’s hidden tags'); onP(.3);
+    const r=await aiCheck(f); onP(1); showAICheck(r,f.name); }});
 add({cat:'arc',kinds:['archive'],rec:1,nm:'Open Any Archive',ds:'Unpack a RAR, 7z, ZIP, or TAR',kw:'unzip extract rar 7z zip tar gz archive open unpack attachment',
   more:'Unpacks almost any archive — RAR, 7z, ZIP, TAR, and friends — and gives you the files inside as a plain ZIP your computer opens natively. Nothing gets uploaded.',
   run:async f=>{ const onP=progress('Unpacking'); onP(.2);
