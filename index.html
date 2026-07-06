@@ -994,7 +994,7 @@ function showAICheck(r,fname){
   box.append(el('div',{className:'actions',style:'margin-top:10px'},[ag]));
   out.append(box); out.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
-add({cat:'image',kinds:['image'],rec:1,nm:'AI Image Checker',ds:'Real photo or AI-made? Read the evidence',kw:'ai detect fake real generated checker chatgpt dalle gemini midjourney firefly stable diffusion deepfake verify provenance c2pa content credentials origin screenshot',
+add({cat:'image',kinds:['image'],rec:1,nm:'AI Image Checker',ds:'Real photo or AI-made? Read the evidence',kw:'ai detect fake real photo authentic genuine original generated aigenerated synthetic checker check spot tell is this real photoshopped chatgpt dalle gemini imagen midjourney firefly dream stable diffusion sdxl flux deepfake verify verification provenance source c2pa content credentials origin screenshot watermark synthid',
   more:'AI tools leave tags in the files they make: ChatGPT and Firefly sign their images (Content Credentials), Google writes “Made with Google AI”, Stable Diffusion saves its whole prompt in the PNG. This reads those tags, weighs them against real-camera evidence like exposure settings and GPS, and gives you a 0–100 rating with each clue listed. A screenshot or social-media re-upload strips the tags, and you get a straight “can’t tell” instead of a guess. Nothing leaves your computer.',
   run:async f=>{ const onP=progress('Reading the file’s hidden tags'); onP(.3);
     const r=await aiCheck(f); onP(1); showAICheck(r,f.name); }});
@@ -1371,9 +1371,9 @@ const MODES={
   basics: {label:'Junk Drawer Basics', tools:['iPhone Photo to JPG','Shrink File Size','Shrink a Video','Make It an MP4',
     'Sign & Fill PDF','Combine PDFs','Open Any Archive','Remove Background']},
   photo:  {label:'Photographer', tools:['Camera RAW to JPG','Upscale an Image (4×)','Change Image Type','Resize Image',
-    'Shrink File Size','Strip Location Only','Fix Photo Dates','Rename Photos by Date Taken','Remove Background','Picture to SVG']},
+    'Shrink File Size','Strip Location Only','Fix Photo Dates','Rename Photos by Date Taken','Remove Background','Picture to SVG','AI Image Checker']},
   creator:{label:'Content Creator', tools:['Caption Studio','Transcribe to Text or Subtitles','Burn In Subtitles','Make a Voiceover',
-    'Fix Phone Video for Editing','Shrink a Video','Trim a Video','Video to GIF','Save a Photo from a Video']},
+    'Fix Phone Video for Editing','Shrink a Video','Trim a Video','Video to GIF','Save a Photo from a Video','AI Image Checker']},
   music:  {label:'Musician / DJ', tools:['Split a Song into Vocals & Instrumental','Find the BPM','Convert Audio',
     'Cut Out Silence','Podcast Loudness Fix','Even Out Volume','Trim Audio','Save the Audio as MP3']},
   paper:  {label:'Paperwork', tools:['Sign & Fill PDF','Combine PDFs','Shrink a PDF','PDF to Pictures',
