@@ -11,6 +11,9 @@ vendor/
 # Kept locally on the build machine; recipients get them inside the released .dmg.
 resources/bin/
 
+# local batch-transcription inputs and generated working audio
+.transcription-work/
+
 # macOS / session cruft
 .DS_Store
 HANDOFF.md

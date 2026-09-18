@@ -41,6 +41,18 @@ Type a URL or any text to get a QR image you can download, copy, or drag straigh
 
 The video tools, background remover, and QR tools fetch a small engine the first time you run each one, then keep it on hand. Stay online for that first use. The transcriber, voiceover, and song-splitter each download their model once on first use (~64–140 MB) and are fully offline after that.
 
+For important recordings, the transcriber offers Whisper large-v3-turbo as its recommended quality setting. It is a one-time download of about 1.5 GB and then runs entirely on the computer.
+
+### Batch transcription
+
+The desktop build can turn a folder of audio/video recordings into individual TXT/SRT files and one timestamped Markdown document:
+
+```sh
+npm run transcribe:batch -- --input "path/to/recordings" --output "path/to/transcripts" --title "Project name"
+```
+
+By default this uses the large-v3-turbo model downloaded by Junk Drawer. Use `--model "path/to/model.bin"` to select another local Whisper model.
+
 ## Building the macOS `.dmg`
 
 On the Mac build machine, after `git pull`:

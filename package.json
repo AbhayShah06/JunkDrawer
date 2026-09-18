@@ -12,7 +12,8 @@
     "dist:mac": "npm run vendor && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal",
     "release:mac": "npm run vendor && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal --publish always",
     "dist:win": "npm run vendor && electron-builder --win nsis",
-    "fetch-bins:win": "node scripts/fetch-bins-win.mjs"
+    "fetch-bins:win": "node scripts/fetch-bins-win.mjs",
+    "transcribe:batch": "node scripts/batch-transcribe.mjs"
   },
   "devDependencies": {
     "@ffmpeg/core": "^0.12.6",

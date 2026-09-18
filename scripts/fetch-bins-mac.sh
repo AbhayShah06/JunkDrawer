@@ -42,9 +42,9 @@ done
 chmod +x "$OUT/esrgan/realesrgan-ncnn-vulkan"
 xattr -dr com.apple.quarantine "$OUT/esrgan" 2>/dev/null || true
 
-echo "==> whisper.cpp v1.9.1 (built from source as a universal binary — needs cmake)"
+echo "==> whisper.cpp v1.9.4 (built from source as a universal binary — needs cmake)"
 command -v cmake >/dev/null || { echo "cmake not found. brew install cmake, then re-run."; exit 1; }
-git clone --depth 1 --branch v1.9.1 https://github.com/ggml-org/whisper.cpp "$TMP/whisper"
+git clone --depth 1 --branch v1.9.4 https://github.com/ggml-org/whisper.cpp "$TMP/whisper"
 cmake -S "$TMP/whisper" -B "$TMP/whisper/build" -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF >/dev/null
 cmake --build "$TMP/whisper/build" --config Release -j --target whisper-cli >/dev/null

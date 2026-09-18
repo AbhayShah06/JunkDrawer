@@ -134,7 +134,9 @@ async function main() {
     const t = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-bins-'));
     const zp = path.join(t, 'w.zip');
     console.log('Downloading whisper.cpp (win x64) ...');
-    await download('https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.1/whisper-bin-x64.zip', zp);
+    // Stable tag v1.9.4 and nightly b5130 point at the same signed commit; release binaries
+    // are published on the nightly tag while the stable tag intentionally has no assets.
+    await download('https://github.com/ggml-org/whisper.cpp/releases/download/b5130/whisper-bin-x64.zip', zp);
     const x = spawnSync('tar', ['-xf', zp, '-C', t], { encoding: 'utf8' });
     if (x.status !== 0) { console.error('tar failed on whisper:', x.stderr || x.error); process.exit(1); }
     const rel = path.join(t, 'Release');

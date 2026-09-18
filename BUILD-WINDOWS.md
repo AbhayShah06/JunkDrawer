@@ -42,7 +42,7 @@ the macOS Gatekeeper "unidentified developer" right-click → Open dance.
    ```
    - `yt-dlp.exe` from the yt-dlp GitHub releases, `ffmpeg.exe` from BtbN's static win64
      GPL build. Zips are extracted with Windows' built-in `tar` (Windows 10 1803+).
-   - `whisper\` (whisper-cli + dlls, from whisper.cpp v1.9.1 releases — speech-to-text),
+   - `whisper\` (whisper-cli + dlls, from whisper.cpp v1.9.4 releases — speech-to-text),
      `libraw\` (dcraw_emu + libraw.dll, LibRaw 0.22.1 — camera RAW developing), and
      `esrgan\` (realesrgan-ncnn-vulkan + models — 4× upscaling).
    - When done, `resources\bin\win\` contains `yt-dlp.exe`, `ffmpeg.exe`, and the

@@ -1140,13 +1140,13 @@ add({cat:'audio',input:'text',nm:'Make a Voiceover',ds:'Turn typed words into na
     const wav=await runTool(new File([txt.slice(0,5000)],'in.txt',{type:'text/plain'}),'tts',{},'out.wav','Reading it out');
     showResult(wav,'voiceover.wav',{note:txt.length>5000?'That was a lot of text — the first ~5,000 characters were read.':''}); }});
 add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitles',ds:'Turn speech into text or an SRT caption file',kw:'transcribe transcription speech to text subtitles captions srt vtt whisper voice memo interview lecture auto',
-  more:'Listens to a recording or video and writes out what was said — as plain text, or as an SRT subtitle file you can burn in with the captions tool. The first run downloads the speech model once (~140 MB); after that it works fully offline. Handles most languages.',
+  more:'Listens to a recording or video and writes out what was said — as plain text, or as an SRT subtitle file you can burn in with the captions tool. The first run downloads your chosen speech model once; after that it works fully offline. Handles most languages.',
   opts:()=>{ const fmt=el('select'); [['srt','Subtitles (SRT)'],['txt','Plain text'],['vtt','Web captions (VTT)']].forEach(([v,l])=>fmt.append(el('option',{value:v,textContent:l})));
-    const q=el('select'); [['base','Fast (~140 MB) — quickest, fine for clear speech'],['small','Balanced (~465 MB) — much better, recommended'],['medium','Accurate (~1.5 GB) — best, slow, catches the hard parts']].forEach(([v,l])=>q.append(el('option',{value:v,textContent:l}))); q.value='small';
+    const q=el('select'); [['base','Fast (~140 MB) — quickest, fine for clear speech'],['small','Balanced (~465 MB) — much better'],['medium','Accurate (~1.5 GB) — strong but slow'],['turbo','Best (~1.5 GB) — recommended for important recordings']].forEach(([v,l])=>q.append(el('option',{value:v,textContent:l}))); q.value='turbo';
     return {node:el('div',{},[el('label',{},['give me ',fmt]),el('label',{style:'margin-left:12px'},['quality ',q])]),get:()=>({fmt:fmt.value,model:q.value})}; },
   run:async (f,o)=>{ const info=await nativeInfo(); if(!info.whisper) return showGuide(needDesktop('Transcribing'));
-    const MODELS={base:{file:'ggml-base.bin',flag:'whisperModel',label:'Fast',size:'~140 MB'},small:{file:'ggml-small.bin',flag:'whisperSmall',label:'Balanced',size:'~465 MB'},medium:{file:'ggml-medium.bin',flag:'whisperMedium',label:'Accurate',size:'~1.5 GB'}};
-    const model=['base','small','medium'].includes(o.model)?o.model:'small';
+    const MODELS={base:{file:'ggml-base.bin',flag:'whisperModel',label:'Fast',size:'~140 MB'},small:{file:'ggml-small.bin',flag:'whisperSmall',label:'Balanced',size:'~465 MB'},medium:{file:'ggml-medium.bin',flag:'whisperMedium',label:'Accurate',size:'~1.5 GB'},turbo:{file:'ggml-large-v3-turbo.bin',flag:'whisperTurbo',label:'Best',size:'~1.5 GB'}};
+    const model=['base','small','medium','turbo'].includes(o.model)?o.model:'turbo';
     const m=MODELS[model];
     if(!info[m.flag]) await ensureModel(m.file,m.flag,`Downloading the ${m.label.toLowerCase()} speech model (one time, ${m.size})`);
     const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
@@ -1806,8 +1806,9 @@ async function captionStudio(file){
   const isVideo=kind(file)==='video';
   const MODELS=[
     {id:'base',   file:'ggml-base.bin',   flag:'whisperModel', label:'Fast',     size:'~140 MB', note:'quickest — fine for clear speech'},
-    {id:'small',  file:'ggml-small.bin',  flag:'whisperSmall', label:'Balanced', size:'~465 MB', note:'much better — recommended'},
-    {id:'medium', file:'ggml-medium.bin', flag:'whisperMedium',label:'Accurate', size:'~1.5 GB', note:'best — slow, but catches the hard parts (music, overlaps)'},
+    {id:'small',  file:'ggml-small.bin',  flag:'whisperSmall', label:'Balanced', size:'~465 MB', note:'much better'},
+    {id:'medium', file:'ggml-medium.bin', flag:'whisperMedium',label:'Accurate', size:'~1.5 GB', note:'strong but slow'},
+    {id:'turbo',  file:'ggml-large-v3-turbo.bin', flag:'whisperTurbo', label:'Best', size:'~1.5 GB', note:'recommended for important recordings'},
   ];
 
   function picker(){
@@ -1816,7 +1817,7 @@ async function captionStudio(file){
     box.append(el('div',{className:'want',textContent:'caption quality'}));
     const sel=el('select',{style:'font:13px var(--sans);padding:4px;margin:4px 0;max-width:100%'});
     MODELS.forEach(m=>sel.append(el('option',{value:m.id,textContent:`${m.label} (${m.size}) — ${m.note}${info[m.flag]?'  ✓ ready':''}`})));
-    sel.value='small';
+    sel.value='turbo';
     const go=el('button',{className:'btn',textContent:'Generate captions'});
     go.onclick=()=>{ const m=MODELS.find(x=>x.id===sel.value); go.disabled=true; generate(m); };
     box.append(el('div',{},[sel]),go,
