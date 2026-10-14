@@ -8,6 +8,7 @@ const path = require('path');
 const os = require('os');
 const { spawn, spawnSync } = require('child_process');
 const https = require('https');
+const { integrationCatalog } = require('./integrations');
 let PKG = {}; try { PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')); } catch {}
 
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript',
@@ -101,7 +102,7 @@ function handleDownload(req, res, binDir) {
     // If the client goes away mid-download (e.g. the user switches from MP3 to MP4), kill the
     // whole download tree and clean up — otherwise it keeps running, orphaned, and piles up.
     res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(child); cleanup(tmp); } });
-    child.stderr.on('data', d => { err += d; });
+    child.stderr.on('data', d => { err += d; if (err.length > 20000) err = err.slice(-20000); });
     child.on('error', e => { if (aborted) return; cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
     child.on('close', code => {
       if (aborted) return;
@@ -116,16 +117,23 @@ function handleDownload(req, res, binDir) {
         if (z.status === 0 && fs.existsSync(zip)) { out = zip; name = 'downloads.zip'; }
         else { out = files.sort((a,b) => fs.statSync(b).size - fs.statSync(a).size)[0]; name = path.basename(out); }
       } else { out = files[0]; name = path.basename(out); }
-      const data = fs.readFileSync(out);
+      let stat;
+      try { stat = fs.statSync(out); }
+      catch { cleanup(tmp); return sendJSON(res, { error: 'read-failed' }, 500); }
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Length', data.length);
+      res.setHeader('Content-Length', stat.size);
       const safeName = (name || 'download').replace(/[^\w.\- ]+/g, '_').slice(0, 200) || 'download';
       res.setHeader('Content-Disposition', `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(name)}`);
       res.setHeader('X-Filename', encodeURIComponent(name));
       res.setHeader('Access-Control-Expose-Headers', 'X-Filename');
-      res.end(data);
-      cleanup(tmp);
+      // Stream large media instead of holding another complete copy in the Electron main
+      // process. The renderer may still choose to preview the returned Blob, but the backend
+      // now has constant memory use while handing it over.
+      const rs = fs.createReadStream(out);
+      rs.on('error', () => { try { res.destroy(); } catch {} cleanup(tmp); });
+      rs.on('close', () => cleanup(tmp));
+      rs.pipe(res);
     });
   });
 }
@@ -586,47 +594,52 @@ function handleTool(req, res, binDir, modelsDir) {
 /* ---- memory-card detection: any mounted volume with a DCIM folder (card readers,
    cameras in mass-storage mode). Import copies photos/videos into ~/Pictures. ---- */
 const CARD_MEDIA = /\.(jpe?g|png|heic|heif|webp|gif|tiff?|bmp|cr2|cr3|nef|arw|raf|dng|orf|rw2|pef|srw|mp4|mov|avi|mts|m2ts|3gp|wav|mp3)$/i;
-function listCards() {
+async function listCards() {
   const out = [];
   if (process.platform === 'win32') {
-    for (let i = 68; i <= 90; i++) { // D..Z
+    // Probe drives concurrently. A disconnected network/removable drive can take a while to
+    // answer; doing D..Z synchronously used to stall every backend request during polling.
+    await Promise.all(Array.from({ length: 23 }, (_, n) => 68 + n).map(async i => { // D..Z
       const root = String.fromCharCode(i) + ':\\';
-      try { if (fs.existsSync(path.join(root, 'DCIM'))) out.push({ root, label: String.fromCharCode(i) + ':' }); } catch {}
-    }
+      try { await fs.promises.access(path.join(root, 'DCIM')); out.push({ root, label: String.fromCharCode(i) + ':' }); } catch {}
+    }));
   } else {
-    try { for (const v of fs.readdirSync('/Volumes')) {
+    try { for (const v of await fs.promises.readdir('/Volumes')) {
       const root = path.join('/Volumes', v);
-      try { if (fs.existsSync(path.join(root, 'DCIM'))) out.push({ root, label: v }); } catch {}
+      try { await fs.promises.access(path.join(root, 'DCIM')); out.push({ root, label: v }); } catch {}
     } } catch {}
   }
   return out;
 }
-function walkDcim(dir, acc) {
-  let ents = []; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+async function walkDcim(dir, acc) {
+  let ents = []; try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
   for (const e of ents) {
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) walkDcim(p, acc);
+    if (e.isDirectory()) await walkDcim(p, acc);
     else if (e.isFile() && CARD_MEDIA.test(e.name)) acc.push(p);
   }
 }
 function handleImportCard(req, res) {
   let chunks = [];
   req.on('data', c => { chunks.push(c); if (Buffer.concat(chunks).length > 4096) req.destroy(); });
-  req.on('end', () => {
+  req.on('end', async () => {
     let j; try { j = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return sendJSON(res, { error: 'bad body' }, 400); }
     // only roots we ourselves detect are importable — the client can't name arbitrary paths
-    const card = listCards().find(c => c.root === j.root);
+    const card = (await listCards()).find(c => c.root === j.root);
     if (!card) return sendJSON(res, { error: 'card-gone' }, 404);
-    const files = []; walkDcim(path.join(card.root, 'DCIM'), files);
+    const files = []; await walkDcim(path.join(card.root, 'DCIM'), files);
     if (!files.length) return sendJSON(res, { error: 'empty' }, 404);
     const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '.');
     const dest = path.join(os.homedir(), 'Pictures', 'Junk Drawer Import ' + stamp);
-    try { fs.mkdirSync(dest, { recursive: true }); } catch { return sendJSON(res, { error: 'write-failed' }, 500); }
+    try { await fs.promises.mkdir(dest, { recursive: true }); } catch { return sendJSON(res, { error: 'write-failed' }, 500); }
     let done = 0, copied = 0, failed = 0;
     for (const f of files) {
       let name = path.basename(f), target = path.join(dest, name), n = 1;
-      while (fs.existsSync(target)) target = path.join(dest, path.basename(name, path.extname(name)) + '-' + (n++) + path.extname(name));
-      try { fs.copyFileSync(f, target); copied++; } catch { failed++; }
+      while (true) {
+        try { await fs.promises.access(target); target = path.join(dest, path.basename(name, path.extname(name)) + '-' + (n++) + path.extname(name)); }
+        catch { break; }
+      }
+      try { await fs.promises.copyFile(f, target); copied++; } catch { failed++; }
       done++; ffProgress.set('card-import', Math.min(0.999, done / files.length));
     }
     ffProgress.delete('card-import');
@@ -653,7 +666,9 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
         "worker-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; " +
         "img-src 'self' data: blob: https:; font-src 'self' data:; " +
         "connect-src 'self' https: data: blob:; media-src 'self' blob: data:");
-      const url = decodeURIComponent(req.url.split('?')[0]);
+      let url;
+      try { url = decodeURIComponent(req.url.split('?')[0]); }
+      catch { res.statusCode = 400; return res.end('bad request'); }
       if (url.startsWith('/api/') && !localOnly(req, expectedHost)) { res.statusCode = 403; return res.end('forbidden'); }
       if (url === '/api/check')
         return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir),
@@ -664,6 +679,16 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
           exif: !!toolBin(binDir, 'exiftool', 'exiftool'), vtracer: !!toolBin(binDir, 'vtracer', 'vtracer'),
           tts: !!toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-tts'), ttsModel: modelReady(modelsDir, 'vits-piper-en_US-amy-medium'),
           stems: !!toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-source-separation'), stemsModel: modelReady(modelsDir, 'UVR-MDX-NET-Voc_FT.onnx') });
+      if (url === '/api/integrations')
+        return sendJSON(res, integrationCatalog({
+          ffmpeg: have('ffmpeg', binDir),
+          'whisper-cpp': !!toolBin(binDir, 'whisper', 'whisper-cli'),
+          realesrgan: !!toolBin(binDir, 'esrgan', 'realesrgan-ncnn-vulkan'),
+          'yt-dlp': have('yt-dlp', binDir),
+          // These providers are bundled JavaScript modules and are available with the app shell.
+          libarchive: true,
+          'pdf-lib': true,
+        }));
       if (url === '/api/update-check')
         return handleUpdateCheck(res, updater);
       if (url === '/api/update-state')
@@ -685,16 +710,28 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
       if (url === '/api/fetch-model' && req.method === 'POST') return handleFetchModel(req, res, modelsDir);
       if (url === '/api/models') return handleModels(res, modelsDir);
       if (url === '/api/delete-model' && req.method === 'POST') return handleDeleteModel(req, res, modelsDir);
-      if (url === '/api/cards') return sendJSON(res, { cards: listCards() });
+      if (url === '/api/cards') {
+        listCards().then(cards => sendJSON(res, { cards })).catch(() => sendJSON(res, { cards: [] }));
+        return;
+      }
       if (url === '/api/import-card' && req.method === 'POST') return handleImportCard(req, res);
       // A file the user opened from the OS ("Open with → Junk Drawer"). main.js queues its
       // absolute path; we read it once and hand the renderer the bytes for the viewer. The
       // path is set only by main.js from OS open events — never from client input.
       if (url === '/api/opened-file') {
         const p = opener && opener.take && opener.take();
-        if (!p) return sendJSON(res, { none: true });
-        try { return sendJSON(res, { name: path.basename(p), b64: fs.readFileSync(p).toString('base64') }); }
-        catch { return sendJSON(res, { none: true }); }
+        if (!p) { res.statusCode = 204; return res.end(); }
+        try {
+          const stat = fs.statSync(p);
+          const name = path.basename(p);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.setHeader('Content-Length', stat.size);
+          res.setHeader('X-Filename', encodeURIComponent(name));
+          const rs = fs.createReadStream(p);
+          rs.on('error', () => { try { res.destroy(); } catch {} });
+          return rs.pipe(res);
+        } catch { res.statusCode = 204; return res.end(); }
       }
       // Static files, confined to appRoot. Reject backslashes/NUL (Windows traversal),
       // then require the resolved path to sit on a separator boundary inside the root

@@ -7,6 +7,7 @@
   "repository": "github:AbhayShah06/JunkDrawer",
   "main": "electron/main.js",
   "scripts": {
+    "test": "node --test tests/*.test.js",
     "start": "electron .",
     "vendor": "node scripts/vendor.mjs",
     "dist:mac": "npm run vendor && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --universal",
@@ -22,8 +23,8 @@
     "@ffmpeg/util": "^0.12.1",
     "@imgly/background-removal": "^1.4.5",
     "@imgly/background-removal-data": "^1.4.5",
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
+    "electron": "^44.4.3",
+    "electron-builder": "^26.16.1",
     "esbuild": "^0.28.1",
     "fflate": "^0.8.2",
     "heic2any": "^0.0.4",
