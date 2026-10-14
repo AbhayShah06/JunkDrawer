@@ -9,6 +9,7 @@ const os = require('os');
 const { spawn, spawnSync } = require('child_process');
 const https = require('https');
 const { integrationCatalog } = require('./integrations');
+const { buildTwoPassArgs } = require('./compression');
 let PKG = {}; try { PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')); } catch {}
 
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript',
@@ -56,6 +57,42 @@ function sendJSON(res, obj, code=200) {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Length', b.length);
   res.end(b);
+}
+
+function getSystemProfile(binDir, modelsDir) {
+  const totalMemory = os.totalmem(), freeMemory = os.freemem();
+  const ffmpeg = findBin('ffmpeg', binDir);
+  let encoders = [];
+  if (ffmpeg) {
+    const probe = spawnSync(ffmpeg, ['-hide_banner', '-encoders'], { encoding: 'utf8', timeout: 2500, windowsHide: true });
+    if (!probe.error && probe.status === 0) {
+      const output = (probe.stdout || '') + (probe.stderr || '');
+      encoders = ['libx264', 'h264_videotoolbox', 'h264_nvenc', 'h264_qsv', 'h264_amf'].filter(name => new RegExp('\\b' + name + '\\b').test(output));
+    }
+  }
+  const tier = recommendTier(totalMemory, freeMemory);
+  return {
+    platform: process.platform, arch: process.arch, logicalCpus: os.cpus().length,
+    totalMemoryBytes: totalMemory, freeMemoryBytes: freeMemory,
+    engines: { ffmpeg: !!ffmpeg, whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), pdf: true, browser: true },
+    ffmpegEncoders: encoders,
+    models: {
+      whisperBase: modelReady(modelsDir, 'ggml-base.bin'), whisperSmall: modelReady(modelsDir, 'ggml-small.bin'),
+      whisperMedium: modelReady(modelsDir, 'ggml-medium.bin'), whisperTurbo: modelReady(modelsDir, 'ggml-large-v3-turbo.bin'),
+      voiceAmy: modelReady(modelsDir, 'vits-piper-en_US-amy-medium'), stemsVocals: modelReady(modelsDir, 'UVR-MDX-NET-Voc_FT.onnx'),
+    },
+    recommendation: { tier, reason: tier === 'limited' ? 'Free memory is low right now; avoid running several demanding jobs at once.' : tier === 'compatibility' ? 'This machine is below the 16 GB design baseline; normal file tools remain available.' : tier === 'standard' ? '16 GB is the standard baseline; normal quality and export settings remain available.' : 'This machine has extra room for demanding local workflows.' },
+  };
+}
+
+function recommendTier(totalBytes, freeBytes) {
+  const gb = totalBytes / 1073741824, freeGb = freeBytes / 1073741824;
+  if (freeGb < 1.5) return 'limited';
+  // Accept both OS-reported GiB and rounded, advertised decimal GB. A marketed
+  // 16 GB kit commonly appears as about 14.9 GiB; 24 GB similarly appears as 22.4 GiB.
+  if (gb >= 22 || Math.round(totalBytes / 1e9) >= 24) return 'full';
+  if (gb >= 15 || Math.round(totalBytes / 1e9) >= 16) return 'standard';
+  return 'compatibility';
 }
 
 function handleDownload(req, res, binDir) {
@@ -255,6 +292,81 @@ function handleFFmpeg(req, res, binDir) {
       rs.on('close', () => { if (id) ffProgress.delete(id); cleanup(tmp); });
       rs.pipe(res);
     });
+  });
+}
+
+// The hard-size video route owns its argv and temp-file lifecycle. Only the streamed input,
+// duration, target and opaque progress id cross the request boundary; no arbitrary FFmpeg argv.
+function handleVideoCompress(req, res, binDir) {
+  const reject = (obj, code) => { try { req.resume(); } catch {} return sendJSON(res, obj, code); };
+  req.on('error', () => {});
+  let meta;
+  try { meta = JSON.parse(new URLSearchParams(req.url.split('?')[1] || '').get('meta') || ''); }
+  catch { return reject({ error: 'bad-meta' }, 400); }
+  const id = new URLSearchParams(req.url.split('?')[1] || '').get('id') || '';
+  if (!/^[A-Za-z0-9-]{1,64}$/.test(id)) return reject({ error: 'bad-job-id' }, 400);
+  let plan;
+  try { plan = buildTwoPassArgs({ duration: meta && meta.duration, targetMb: meta && meta.targetMb }); }
+  catch (e) { return reject({ error: e.code || 'bad-compression-options', detail: e.message }, 400); }
+  let ffmpeg = findBin('ffmpeg', binDir);
+  if (!ffmpeg) return reject({ error: 'ffmpeg-missing' }, 501);
+  ffmpeg = path.resolve(ffmpeg);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-video-'));
+  const inPath = path.join(tmp, 'input.bin'), outPath = path.join(tmp, 'output.mp4');
+  const ws = fs.createWriteStream(inPath);
+  let size = 0, aborted = false, active = null;
+  const fail = (error, code=500, detail='') => {
+    if (aborted) return; aborted = true;
+    if (active) killTree(active);
+    try { ws.destroy(); } catch {}
+    ffProgress.delete(id); cleanup(tmp);
+    sendJSON(res, Object.assign({ error }, detail ? { detail: String(detail).slice(-2500) } : {}), code);
+  };
+  req.on('aborted', () => { if (!aborted) { aborted = true; if (active) killTree(active); try { ws.destroy(); } catch {} ffProgress.delete(id); cleanup(tmp); } });
+  res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; if (active) killTree(active); ffProgress.delete(id); cleanup(tmp); } });
+  req.on('data', chunk => { size += chunk.length; if (size > 500 * 1048576) fail('too-big', 413); });
+  ws.on('error', e => fail('write-failed', 500, e.message));
+  req.on('error', e => fail('upload-failed', 400, e.message));
+  req.pipe(ws);
+  ws.on('finish', async () => {
+    if (aborted) return;
+    const duration = Number(meta.duration);
+    const runPass = (args, passIndex) => new Promise((resolve, rejectPass) => {
+      if (aborted) return rejectPass(Object.assign(new Error('cancelled'), { jdAborted: true }));
+      const child = spawn(ffmpeg, args, { cwd: tmp, detached: true, stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
+      active = child;
+      let stderr = '';
+      child.stderr.on('data', data => {
+        const chunk = String(data); stderr += chunk; if (stderr.length > 12000) stderr = stderr.slice(-12000);
+        const match = /time=\s*(\d+):(\d\d):(\d\d(?:\.\d+)?)/.exec(chunk);
+        if (match && duration > 0) {
+          const seconds = +match[1] * 3600 + +match[2] * 60 + +match[3];
+          ffProgress.set(id, Math.min(0.999, passIndex * 0.5 + Math.max(0, seconds / duration) * 0.5));
+        }
+      });
+      child.on('error', error => { error.passIndex = passIndex; rejectPass(error); });
+      child.on('close', code => { if (active === child) active = null; code === 0 ? resolve() : rejectPass(Object.assign(new Error(stderr.slice(-2500) || `ffmpeg exit ${code}`), { passIndex })); });
+    });
+    ffProgress.set(id, 0);
+    try {
+      await runPass(plan.pass1, 0);
+      if (aborted) return;
+      await runPass(plan.pass2, 1);
+      if (aborted) return;
+      const stat = fs.statSync(outPath);
+      if (!stat.isFile() || stat.size === 0) return fail('no-output', 500);
+      ffProgress.set(id, 1);
+      res.statusCode = 200; res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Length', stat.size); res.setHeader('X-Filename', 'video-smaller.mp4');
+      res.setHeader('Access-Control-Expose-Headers', 'X-Filename');
+      const stream = fs.createReadStream(outPath);
+      stream.on('error', () => { try { res.destroy(); } catch {} ffProgress.delete(id); cleanup(tmp); });
+      stream.on('close', () => { ffProgress.delete(id); cleanup(tmp); });
+      stream.pipe(res);
+    } catch (e) {
+      if (aborted || e.jdAborted) return;
+      fail(e.passIndex === 0 ? 'pass1-failed' : 'pass2-failed', 500, e.message);
+    }
   });
 }
 
@@ -679,6 +791,8 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
           exif: !!toolBin(binDir, 'exiftool', 'exiftool'), vtracer: !!toolBin(binDir, 'vtracer', 'vtracer'),
           tts: !!toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-tts'), ttsModel: modelReady(modelsDir, 'vits-piper-en_US-amy-medium'),
           stems: !!toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-source-separation'), stemsModel: modelReady(modelsDir, 'UVR-MDX-NET-Voc_FT.onnx') });
+      if (url === '/api/system-profile')
+        return sendJSON(res, getSystemProfile(binDir, modelsDir));
       if (url === '/api/integrations')
         return sendJSON(res, integrationCatalog({
           ffmpeg: have('ffmpeg', binDir),
@@ -705,6 +819,7 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
       if (url === '/api/ffmpeg-progress')
         return sendJSON(res, { percent: ffProgress.get(new URLSearchParams(req.url.split('?')[1] || '').get('id') || '') || 0 });
       if (url === '/api/ffmpeg' && req.method === 'POST') return handleFFmpeg(req, res, binDir);
+      if (url === '/api/video-compress' && req.method === 'POST') return handleVideoCompress(req, res, binDir);
       if (url === '/api/ffmpeg-extra' && req.method === 'POST') return handleFFmpegExtra(req, res);
       if (url === '/api/tool' && req.method === 'POST') return handleTool(req, res, binDir, modelsDir);
       if (url === '/api/fetch-model' && req.method === 'POST') return handleFetchModel(req, res, modelsDir);
@@ -754,7 +869,7 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
   });
 }
 
-module.exports = { startServer, findBin, have };
+module.exports = { startServer, findBin, have, recommendTier };
 
 // allow `node electron/server.js [appRoot] [binDir]` for standalone testing
 if (require.main === module) {

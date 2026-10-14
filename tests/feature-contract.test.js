@@ -70,3 +70,23 @@ test('the home screen exposes drawers instead of hiding the catalog', () => {
   assert.match(source, /e\.key\.toLowerCase\(\)==='k'/);
   assert.doesNotMatch(source, /linear-gradient\(90deg,var\(--title1\),var\(--title2\)\)/);
 });
+
+test('workspace navigation remains discoverable and Video Studio labels project editing as planned', () => {
+  for (const id of ['workspacesBtn', 'workspacesMenu', 'workspaceLaunchers', 'workspaceView', 'drawerBrowser'])
+    assert.ok(source.includes(`id="${id}"`), `missing navigation surface ${id}`);
+  for (const name of ['Video Studio', 'Photo Desk', 'PDF Desk', 'Audio Desk', 'Download Desk', 'Developer Bench'])
+    assert.ok(source.includes(`name:'${name}'`), `missing workspace ${name}`);
+  assert.match(source, /Project editing · planned/);
+  assert.match(source, /This needs Video Studio because it changes multiple parts of the video/);
+  assert.match(source, /Edit in Video Studio/);
+  assert.match(source, /Selected video ready/);
+  assert.match(source, /function leaveWorkspace\(\)/);
+  assert.match(source, /const receipt=\$\('#receipt'\);receipt\.style\.display=state\.file\?'block':'none'/);
+  assert.match(source, /const needsStudio=/);
+  assert.match(source, /openWorkspace\('video'\)/);
+  assert.match(source, /aria-expanded/);
+  assert.match(source, /async function systemProfile\(\)/);
+  assert.match(source, /fetch\('\/api\/system-profile'\)/);
+  assert.doesNotMatch(source, /profileLine|profile-line|wstatus|status:'(?:LIGHT|ADAPTS|MODEL)'/);
+  assert.match(source, /name:'Video Studio',desc:[^\n]+cats:\['video'\]/);
+});

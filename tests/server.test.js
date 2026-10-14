@@ -4,7 +4,7 @@ const http = require('node:http');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
-const { startServer } = require('../electron/server');
+const { startServer, recommendTier } = require('../electron/server');
 
 let server;
 let origin;
@@ -39,6 +39,63 @@ test('serves the application shell', async () => {
   const response = await fetch(origin + '/index.html');
   assert.equal(response.status, 200);
   assert.match(await response.text(), /Junk Drawer/);
+});
+
+test('system profile reports machine capacity and safe operating recommendation', async () => {
+  const response = await fetch(origin + '/api/system-profile');
+  assert.equal(response.status, 200);
+  const profile = await response.json();
+  assert.equal(profile.platform, process.platform);
+  assert.equal(profile.arch, process.arch);
+  assert.ok(profile.logicalCpus > 0);
+  assert.ok(profile.totalMemoryBytes > 0);
+  assert.ok(profile.freeMemoryBytes > 0);
+  assert.ok(['limited', 'compatibility', 'standard', 'full'].includes(profile.recommendation.tier));
+  for (const model of ['whisperBase', 'whisperSmall', 'whisperMedium', 'whisperTurbo', 'voiceAmy', 'stemsVocals'])
+    assert.equal(typeof profile.models[model], 'boolean');
+  assert.equal(typeof profile.engines.ffmpeg, 'boolean');
+  assert.ok(Array.isArray(profile.ffmpegEncoders));
+  const serialized = JSON.stringify(profile);
+  for (const sensitive of [os.hostname(), os.homedir()]) assert.ok(!serialized.includes(sensitive));
+});
+
+test('system profile tiers respond deterministically to capacity and low free memory', () => {
+  const gb = 1024 ** 3;
+  assert.equal(recommendTier(8 * gb, 6 * gb), 'compatibility');
+  assert.equal(recommendTier(12 * gb, 8 * gb), 'compatibility');
+  assert.equal(recommendTier(15 * gb, 12 * gb), 'standard');
+  assert.equal(recommendTier(15.5 * gb, 12 * gb), 'standard');
+  assert.equal(recommendTier(16e9, 12e9), 'standard');
+  assert.equal(recommendTier(22 * gb, 18 * gb), 'full');
+  assert.equal(recommendTier(24e9, 18e9), 'full');
+  assert.equal(recommendTier(32 * gb, 1 * gb), 'limited');
+});
+
+test('native two-pass compression validates structured options and reports missing engine safely', async () => {
+  const headers = { Origin: missingOrigin, 'Content-Type': 'application/octet-stream' };
+  const malformed = await fetch(`${missingOrigin}/api/video-compress?meta=%7B&id=job-1`, { method: 'POST', headers, body: 'fixture' });
+  assert.equal(malformed.status, 400);
+  assert.equal((await malformed.json()).error, 'bad-meta');
+
+  const badId = await fetch(`${missingOrigin}/api/video-compress?meta=${encodeURIComponent(JSON.stringify({ duration: 60, targetMb: 20 }))}&id=../bad`, { method: 'POST', headers, body: 'fixture' });
+  assert.equal(badId.status, 400);
+  assert.equal((await badId.json()).error, 'bad-job-id');
+
+  const badDuration = await fetch(`${missingOrigin}/api/video-compress?meta=${encodeURIComponent(JSON.stringify({ duration: 0, targetMb: 20 }))}&id=job-2`, { method: 'POST', headers, body: 'fixture' });
+  assert.equal(badDuration.status, 400);
+  assert.equal((await badDuration.json()).error, 'bad-duration');
+
+  const badTarget = await fetch(`${missingOrigin}/api/video-compress?meta=${encodeURIComponent(JSON.stringify({ duration: 60, targetMb: 10001 }))}&id=job-3`, { method: 'POST', headers, body: 'fixture' });
+  assert.equal(badTarget.status, 400);
+  assert.equal((await badTarget.json()).error, 'bad-target');
+
+  const impossible = await fetch(`${missingOrigin}/api/video-compress?meta=${encodeURIComponent(JSON.stringify({ duration: 7 * 24 * 3600, targetMb: 1 }))}&id=job-3b`, { method: 'POST', headers, body: 'fixture' });
+  assert.equal(impossible.status, 400);
+  assert.equal((await impossible.json()).error, 'target-unrealistic');
+
+  const noEngine = await fetch(`${missingOrigin}/api/video-compress?meta=${encodeURIComponent(JSON.stringify({ duration: 60, targetMb: 20, args: ['-f', 'lavfi'] }))}&id=job-4`, { method: 'POST', headers, body: 'fixture' });
+  assert.equal(noEngine.status, 501);
+  assert.equal((await noEngine.json()).error, 'ffmpeg-missing');
 });
 
 test('rejects malformed percent encoding without crashing', async () => {

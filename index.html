@@ -52,6 +52,16 @@
   .toolsdd .mi:hover{background:var(--title1); color:#fff}
   .toolsdd .mi .dot{width:8px; height:8px; background:var(--c); border:1px solid var(--sh2); flex:none}
   .toolsdd .mi .cnt{margin-left:auto; font-size:11px; opacity:.7}
+  .workspacesdd{position:relative}
+  .workspace-menu{position:absolute;left:0;top:calc(100% + 4px);z-index:81;width:min(430px,92vw);background:var(--face);border:2px solid;border-color:var(--rb);box-shadow:3px 3px 0 #0005;padding:4px}
+  .workspace-menu[hidden]{display:none}.workspace-item{display:grid;grid-template-columns:1fr auto;gap:2px 10px;width:100%;text-align:left;padding:6px 8px;border:0;background:transparent;color:var(--ink);font:12px var(--sans);cursor:pointer}
+  .workspace-item:hover,.workspace-item:focus{background:var(--title1);color:#fff;outline:0}.workspace-item small{grid-column:1;color:var(--ink2);font:11px var(--sans)}.workspace-item:hover small,.workspace-item:focus small{color:#fff}
+  .workspace-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+  .workspace-launch{display:block;text-align:left;min-height:82px;padding:9px 10px;background:var(--well);color:var(--ink);border:2px solid;border-color:var(--rb);cursor:pointer;font:12px var(--sans)}
+  .workspace-launch:hover,.workspace-launch:focus{background:var(--hover);outline:1px dotted var(--ink)}.workspace-launch b{display:block;font-size:13px}.workspace-launch small{display:block;color:var(--ink2);margin-top:3px}
+  .workspace-view{display:none;background:var(--face);border:2px solid;border-color:var(--rb);padding:14px;margin-bottom:14px}
+  .workspace-view .workspace-head{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding-bottom:9px;margin-bottom:10px}
+  .workspace-view .workspace-head h2{font-size:18px;margin:0}.workspace-view .workspace-tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
   .toolsdd .toolslib{width:min(580px,92vw)}
   .toolsdd .lib-head{display:flex; align-items:center; gap:9px; padding:3px 3px 7px; border-bottom:1px solid var(--line); margin-bottom:7px}
   .toolsdd .lib-head b{font:bold 12px var(--sans)}
@@ -272,7 +282,7 @@
   .md-view blockquote{margin:12px 0; padding:4px 14px; border-left:4px solid var(--line); color:var(--ink2)}
   .md-view ul,.md-view ol{margin:10px 0; padding-left:26px} .md-view li{margin:4px 0}
   .md-view img{max-width:100%} .md-view hr{border:none; border-top:1px solid var(--line); margin:18px 0}
-  @media(max-width:760px){ .home-index{grid-template-columns:1fr} }
+  @media(max-width:760px){ .home-index{grid-template-columns:1fr}.workspace-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
   @media(max-width:620px){ .hero h1{font-size:18px} nav{display:none} .result .row{flex-direction:column} .drawer-list{grid-template-columns:1fr} }
 </style>
 </head>
@@ -285,6 +295,7 @@
     <div class="dd" id="toolsMenu" hidden></div>
     <div class="dd toolslib" id="toolsLib" hidden></div>
   </div>
+  <div class="workspacesdd" id="workspacesDD"><button class="toolsbtn" id="workspacesBtn" aria-haspopup="true" aria-expanded="false">Workspaces ▾</button><div class="workspace-menu" id="workspacesMenu" hidden></div></div>
   <nav>
     <a href="#" id="resetBtn" title="Clear everything and start over">↺ Reset</a>
     <a href="#" id="themeToggle">Theme</a>
@@ -303,7 +314,7 @@
 <div id="cardBar" hidden></div>
 
 <main>
-  <section class="hero">
+  <section class="hero" id="heroHome">
     <div id="drop" tabindex="0">
       <span class="big">Open a file</span>
       <span class="sub">Click to pick one from your computer, or paste an image. Works with photos, video, audio, PDF, Markdown, and text.</span>
@@ -321,18 +332,17 @@
       <div class="pal" id="pal"></div>
     </div>
 
+    <section aria-label="Workspaces"><h2 style="margin:14px 0 0;font-size:15px">Choose a workspace</h2><div class="workspace-grid" id="workspaceLaunchers"></div></section>
     <div class="home-index">
-      <section class="home-pane" aria-label="Browse drawers">
-        <div class="home-pane-title"><span>Browse drawers</span><span>all tools</span></div>
-        <div id="drawerBrowser"></div>
+      <section class="home-pane shortcut-pane" aria-label="Quick actions and recent work"><div class="home-pane-title"><span>Quick actions</span><span>one-step jobs</span></div>
+        <div class="quick qrow" id="recentRow"><span class="qlabel">Recent work</span><div id="recentPlaceholder" class="drawer-summary">Tools you use will appear here.</div><div class="qtools" id="recentTools"></div></div>
+        <div class="quick qrow"><span class="qlabel">Picked for you · <span id="modeLabel">Basics</span></span><div class="qtools" id="starTools"></div></div>
       </section>
-      <section class="home-pane shortcut-pane" aria-label="Shortcuts">
-        <div class="home-pane-title"><span>Shortcuts</span><span>picked for you</span></div>
-        <div class="quick qrow" id="recentRow" hidden><span class="qlabel">Recent</span><div class="qtools" id="recentTools"></div></div>
-        <div class="quick qrow"><span class="qlabel" id="modeLabel">Basics</span><div class="qtools" id="starTools"></div></div>
-      </section>
+      <section class="home-pane" aria-label="All tools"><div class="home-pane-title"><span>All tools</span><span>full catalog</span></div><div id="drawerBrowser"></div></section>
     </div>
   </section>
+
+  <section class="workspace-view" id="workspaceView" aria-live="polite"></section>
 
   <section id="receipt"></section>
   <section id="stage"><div class="panel" id="panel"></div><div id="status"></div><div id="output"></div></section>
@@ -373,6 +383,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="/electron/compression.js"></script>
 <script type="module">
 import { PDFDocument, degrees, rgb, StandardFonts } from "./vendor/pdf-lib.mjs";
 import * as pdfjsLib from "./vendor/pdfjs/pdf.min.mjs";
@@ -501,6 +512,26 @@ async function runFFNative(file,inName,outName,args,label,extra){
     return new Blob([buf],{type:mimeOf(outName)});
   } catch(e){ if(e&&e.name==='AbortError') throw Object.assign(new Error('cancelled'),{jdAborted:true}); throw e; }
   finally { clearInterval(poll); }
+}
+async function runVideoCompress(file,duration,targetMb){
+  if(file.size>500*1048576) throw new Error(`This video is ${Math.round(file.size/1048576)} MB, past the roughly 500 MB the app can handle in memory. Trim it to a shorter clip first, or export a smaller version from your phone or editor.`);
+  if(!await nativeFFAvailable()){
+    const blob=await runFF(file,'out.mp4',(i,out)=>JDCompression.buildCompressionArgs({mode:'size',duration,targetMb,input:i,output:out}),'One-pass size estimate (browser fallback)');
+    return {blob,native:false};
+  }
+  if(_jobCtl){try{_jobCtl.abort();}catch{}}
+  const ctl=new AbortController();_jobCtl=ctl;
+  const id=(((self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'-'+Math.random()))+'').replace(/[^a-z0-9-]/gi,'').slice(0,64);
+  const meta=encodeURIComponent(JSON.stringify({duration,targetMb}));
+  const onP=progress('Two-pass size encode');onP(.04);
+  const poll=setInterval(async()=>{try{const r=await fetch('/api/ffmpeg-progress?id='+id);const j=await r.json();if(j&&typeof j.percent==='number')onP(.04+.9*Math.min(1,Math.max(0,j.percent)));}catch{}},500);
+  try{
+    const res=await fetch('/api/video-compress?meta='+meta+'&id='+id,{method:'POST',body:file,signal:ctl.signal});
+    if(!res.ok){let payload={};try{payload=await res.json();}catch{}const error=new Error(payload.detail||payload.error||`Video compression failed (${res.status})`);error.code=payload.error||'compression-failed';throw error;}
+    const data=await res.arrayBuffer();if(ctl.signal.aborted)throw Object.assign(new Error('cancelled'),{jdAborted:true});
+    onP(1);if(_jobCtl===ctl)_jobCtl=null;return {blob:new Blob([data],{type:'video/mp4'}),native:true};
+  }catch(e){if(e&&e.name==='AbortError')throw Object.assign(new Error('cancelled'),{jdAborted:true});throw e;}
+  finally{clearInterval(poll);}
 }
 /* Native helper tools beyond ffmpeg (whisper / RAW / upscale) — desktop app only.
    The server builds the argv; we just name the tool, simple options, and stream the file. */
@@ -651,6 +682,10 @@ function suggestFor(t,fk){ const words=(t&&t.nm||'').toLowerCase().split(/\W+/).
   return cand.find(x=>words.some(w=>x.nm.toLowerCase().includes(w))) || cand.find(x=>x.rec) || cand[0] || null; }
 function friendly(e,t,f){
   const raw=((e&&e.message)||String(e||'')).toLowerCase();
+  if(e&&e.code==='bad-duration')return {title:'Video duration unavailable',msg:'This file has no readable duration. Try another copy before using Fit under a size.'};
+  if(e&&e.code==='bad-target')return {title:'Invalid target size',msg:'Choose a target between 1 and 10,000 MB.'};
+  if(e&&e.code==='target-unrealistic')return {title:'Target is too small',msg:'That target leaves too little bitrate for the video. Choose a larger size.'};
+  if(e&&(e.code==='pass1-failed'||e.code==='pass2-failed'))return {title:'Could not finish the size encode',msg:'FFmpeg stopped during the two-pass export. Your original video is unchanged; try a larger target or Recommended quality.'};
   const M=[
     [/failed to parse|no pdf header|not a valid pdf|invalid pdf|pdf.* header/, "This doesn’t look like a real PDF inside. If it’s a Word document, open it, choose Save As → PDF, then try again."],
     [/is encrypted|encrypted pdf|password/, "This PDF is locked with a password. Open it, type the password, and save an unlocked copy — then bring that one here."],
@@ -1102,21 +1137,21 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Video to GIF',ds:'Turn a clip into a 
     return {node:el('div',{},[el('label',{},['fps ',fps]),el('label',{},['width ',w,' px'])]),get:()=>({fps:+fps.value||12,w:+w.value||480})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.gif',(i,out)=>['-i',i,'-vf',
     `fps=${o.fps},scale=${o.w}:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse`,'-loop','0',out],'Rendering GIF'),base(f.name)+'.gif'); }});
-add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make the file smaller to send',kw:'compress shrink smaller size discord email tiny',
-  more:'Makes a video small enough to fit an email or upload limit. You pick the size you want in MB.',
-  opts:oNum('target','10','MB','mb',{min:1,step:1}),
-  check:(f,o)=> (!o.mb||o.mb<=0) ? {msg:'Enter a target size in MB, like 10 or 25.'}
-    : (f && f.size<=o.mb*1048576 ? {title:'Already small enough', msg:`This video is already ${fmt(f.size)}, under your ${o.mb} MB target. Try a smaller number if you want it tinier.`} : null),
-  run:async (f,o)=>{ const onP=progress('Reading length'); const dur=await videoDuration(f)||30;
-    const mb=o.mb||10;
-    // Split the MB budget across the whole duration. 1 MB ≈ 8388.6 kbit; keep ~8% headroom for
-    // container overhead, use lighter audio when the budget is tight, and give the rest to video.
-    const totalKbps=mb*8388.608/dur*0.92;
-    const akbps=totalKbps<300?64:128;
-    const vkbps=Math.max(64,Math.floor(totalKbps-akbps));
-    showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-b:v',vkbps+'k','-maxrate',vkbps+'k',
-      '-bufsize',(vkbps*2)+'k','-preset','slow','-vf',"scale=-2:'min(720,ih)',fps='min(30,source_fps)'",'-c:a','aac','-b:a',akbps+'k','-movflags','+faststart',out],'Compressing video'),
-      base(f.name)+'-small.mp4',{note:`~${mb} MB target (${vkbps}k video, ${akbps}k audio)${vkbps===64?'. A long clip may still exceed the target':''}.`}); }});
+add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Reduce file size while keeping the original picture size and frame rate',kw:'compress shrink smaller size discord email tiny',
+  more:'Recommended quality uses H.264 CRF 20 and keeps the original resolution and frame rate. Fit under a size uses native FFmpeg two-pass encoding when available. The browser fallback is one pass; either mode may miss the target slightly.',
+  opts:()=>{ const mode=el('select'); [['quality','Recommended quality'],['size','Fit under a size']].forEach(([v,l])=>mode.append(el('option',{value:v,textContent:l})));
+    const mb=el('input',{type:'number',value:25,min:1,max:10000,step:1}); const hint=el('div',{className:'note',textContent:'Recommended quality preserves resolution and frame rate. Native desktop FFmpeg uses two passes for size mode; browser fallback uses one pass.'});
+    const label=el('label',{},['Mode ',mode]); const target=el('label',{},['Target size (MB) ',mb]); target.hidden=true;
+    mode.onchange=()=>{target.hidden=mode.value!=='size';};
+    return {node:el('div',{},[label,target,hint]),get:()=>({mode:mode.value,mb:+mb.value})}; },
+  check:(f,o)=>o.mode==='size'&&(!Number.isFinite(o.mb)||o.mb<1||o.mb>10000)?{title:'Invalid target size',msg:'Enter a target from 1 to 10,000 MB.'}:null,
+  run:async (f,o)=>{ const seconds=await videoDuration(f);
+    if(o.mode==='quality'){
+      const out=await runFF(f,'out.mp4',(i,out)=>JDCompression.buildCompressionArgs({mode:'quality',input:i,output:out}),'Compressing at recommended quality');
+      showResult(out,base(f.name)+'-smaller.mp4',{note:'Recommended quality · original resolution and frame rate preserved.'}); return;
+    }
+    const result=await runVideoCompress(f,seconds,o.mb);
+    showResult(result.blob,base(f.name)+'-smaller.mp4',{note:result.native?`Two-pass target ${o.mb} MB · original resolution and frame rate preserved. Container overhead can cause a small size variance.`:`Browser fallback · one-pass target ${o.mb} MB. Original resolution and frame rate are preserved; actual size may exceed target.`}); }});
 add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the sound out as an MP3',kw:'extract audio mp3 sound from video',
   more:'Takes just the sound from a video and saves it as an MP3 file.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-acodec','libmp3lame','-q:a','2',out],'Extracting audio'),base(f.name)+'.mp3'); }});
@@ -1434,6 +1469,52 @@ const MODES={
     'Make a QR Code','Make a Text Fingerprint','Scramble Text to Base64','Look Inside a File']},
 };
 const MODE_MIGRATE={photos:'photo',video:'creator',odds:'dev'}; // pre-persona stored values
+const WORKSPACES=[
+  {id:'video',name:'Video Studio',desc:'Edit, caption, resize, and export video.',cats:['video']},
+  {id:'photo',name:'Photo Desk',desc:'Crop, convert, retouch, and prepare assets.',cats:['image']},
+  {id:'pdf',name:'PDF Desk',desc:'Read, sign, combine, split, and shrink documents.',cats:['pdf','doc']},
+  {id:'audio',name:'Audio Desk',desc:'Trim, convert, transcribe, and make voiceovers.',cats:['audio']},
+  {id:'download',name:'Download Desk',desc:'Save permitted media from supported links.',cats:['web']},
+  {id:'dev',name:'Developer Bench',desc:'Work with JSON, CSV, YAML, QR, and file utilities.',cats:['data','dev','arc','weird']},
+];
+function renderWorkspaceEntries(){
+  const launch=$('#workspaceLaunchers'), menu=$('#workspacesMenu'); if(!launch||!menu)return;
+  launch.innerHTML=''; menu.innerHTML='';
+  WORKSPACES.forEach(w=>{
+    const go=()=>openWorkspace(w.id);
+    launch.append(el('button',{className:'workspace-launch',onclick:go},[el('b',{textContent:w.name}),el('small',{textContent:w.desc})]));
+    menu.append(el('button',{className:'workspace-item',onclick:()=>{go();menu.hidden=true;$('#workspacesBtn').setAttribute('aria-expanded','false');}},[
+      el('span',{textContent:w.name}),el('small',{textContent:w.desc})]));
+  });
+  const btn=$('#workspacesBtn'), dd=$('#workspacesDD');
+  const close=()=>{menu.hidden=true;btn.setAttribute('aria-expanded','false');};
+  btn.onclick=()=>{menu.hidden=!menu.hidden;btn.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)menu.querySelector('button')?.focus();};
+  dd.addEventListener('keydown',e=>{if(e.key==='Escape'){close();btn.focus();}});
+  document.addEventListener('click',e=>{if(!e.target.closest('#workspacesDD'))close();});
+}
+function openWorkspace(id){
+  const w=WORKSPACES.find(x=>x.id===id);if(!w)return;
+  resetStage();$('#heroHome').style.display='none';$('#workspaceView').style.display='block';$('#receipt').style.display='none';
+  const host=$('#workspaceView');host.innerHTML='';
+  const back=el('button',{className:'btn ghost',textContent:'← Back to Junk Drawer',onclick:leaveWorkspace});
+  const head=el('div',{className:'workspace-head'},[back,el('div',{},[el('h2',{textContent:w.name}),el('div',{className:'ds',textContent:w.desc})])]);
+  host.append(head);
+  if(id==='video'){
+    host.append(el('p',{textContent:'Quick jobs use FFmpeg directly. Choose a file tool below for compression, trimming, captions, conversion, and audio extraction.'}));
+    if(state.file&&kind(state.file)==='video'){
+      host.append(el('div',{className:'filechip'},[`Selected video ready · ${state.file.name} · ${fmt(state.file.size)}`]));
+      host.append(el('div',{className:'guide'},[el('div',{className:'g-t',textContent:'This needs Video Studio because it changes multiple parts of the video.'}),el('div',{textContent:'Your selected file is ready here. Choose a quick action below, or keep it ready for project editing when the saved timeline is available.'})]));
+    }
+    host.append(el('div',{className:'guide'},[el('div',{className:'g-t',textContent:'Project editing · planned'}),el('div',{textContent:'A saved timeline editor is a later phase. Video Studio does not open a pretend timeline; use the quick actions below until project editing is ready.'})]));
+  } else host.append(el('p',{textContent:'Choose a quick action to work on a file. Your files stay on this computer.'}));
+  const tools=T.filter(t=>w.cats.includes(t.cat));const grid=el('div',{className:'workspace-tools'});
+  tools.forEach(t=>grid.append(toolCard(t,CATS[t.cat].color)));host.append(grid);
+}
+let _systemProfile=null;
+async function systemProfile(){
+  if(_systemProfile)return _systemProfile;
+  try{const r=await fetch('/api/system-profile');if(!r.ok)return null;_systemProfile=await r.json();return _systemProfile;}catch{return null;}
+}
 let MODE=(()=>{ try{ let m=localStorage.getItem('jd-mode'); m=MODE_MIGRATE[m]||m; return MODES[m]?m:'basics'; }catch{ return 'basics'; } })();
 function setMode(m){ MODE=MODES[m]?m:'basics'; try{ localStorage.setItem('jd-mode',MODE); }catch{} renderQuick(); }
 function modeTools(){ return MODES[MODE].tools.map(nm=>T.find(t=>t.nm===nm)).filter(Boolean); }
@@ -1445,7 +1526,8 @@ function renderQuick(){
     tools.forEach(t=>{ if(t){ host.append(toolCard(t,CATS[t.cat].color)); n++; } }); return n; };
   const lbl=$('#modeLabel'); if(lbl)lbl.textContent=MODES[MODE].label;
   fill($('#starTools'),modeTools().slice(0,6));
-  const rr=$('#recentRow'), n=fill($('#recentTools'),recentList().map(nm=>T.find(x=>x.nm===nm))); if(rr) rr.hidden=!n;
+  const rr=$('#recentRow'), n=fill($('#recentTools'),recentList().map(nm=>T.find(x=>x.nm===nm))); if(rr) rr.hidden=false;
+  const placeholder=$('#recentPlaceholder');if(placeholder)placeholder.hidden=!!n;
 }
 
 /* Visible drawer index. The old Tools menu remains a compact route, but the home
@@ -1708,6 +1790,11 @@ function showReceipt(file){
   card.querySelector('.clearbtn').onclick=clearAll;
   r.append(card);
   if(k==='image'||k==='video') addPreview(card,file,k);
+  if(k==='video'){
+    const rr=el('div',{className:'recos'});
+    rr.append(reco('Edit in Video Studio',()=>openWorkspace('video')));
+    card.append(el('div',{className:'want',textContent:'For a larger editing workflow'}),rr);
+  }
   meta(file,k).then(m=>{ const md=el('div',{className:'meta'}); md.innerHTML=m; card.insertBefore(md,card.children[1]||null);
     const recos=T.filter(t=>t.rec && (t.kinds&&(t.kinds.includes(k)||t.kinds.includes('any'))));
     if(recos.length){ card.append(el('div',{className:'want',textContent:'What you can do'}));
@@ -2228,9 +2315,14 @@ function search(input){ const raw=input.trim(); const str=raw.toLowerCase(); if(
   // surface the download tools when a link is in the box
   if(/youtu\.?be|youtube\.com/i.test(raw)) items=[T.find(x=>x.nm==='YouTube to Video'),T.find(x=>x.nm==='YouTube to MP3'),...items];
   items=[...new Set(items.filter(Boolean))].slice(0,7);
-  palItems=items; palSel=0;
-  pal.innerHTML=''; if(!items.length){ pal.innerHTML=`<div class="row"><span class="ds">no tool matches “${esc(str)}”. try a file type or action</span></div>`; pal.classList.add('show'); return; }
-  items.forEach((t,i)=>{ const row=el('div',{className:'row'+(i===0?' sel':'')});
+  const needsStudio=/\b(edit|timeline|combine clips|add music|overlay|transitions|multiple parts)\b/i.test(raw)
+    && /\b(video|clip|movie|footage)\b/i.test(raw);
+  palItems=needsStudio?[null,...items]:items; palSel=0;
+  pal.innerHTML='';
+  if(needsStudio){ const row=el('button',{className:'row',type:'button'},[el('div',{},[el('div',{className:'nm',textContent:'This needs Video Studio'}),el('div',{className:'ds',textContent:'It changes multiple parts of the video. Open the workspace and keep your selected file with you.'})]),el('span',{className:'tag',textContent:'Studio'})]);
+    row.onclick=()=>{pal.classList.remove('show');openWorkspace('video');};pal.append(row); }
+  if(!items.length&&!needsStudio){ pal.innerHTML=`<div class="row"><span class="ds">no tool matches “${esc(str)}”. try a file type or action</span></div>`; pal.classList.add('show'); return; }
+  items.forEach((t,i)=>{ const selectedIndex=i+(needsStudio?1:0);const row=el('div',{className:'row'+(selectedIndex===palSel?' sel':'')});
     row.append(el('div',{},[el('div',{className:'nm',textContent:t.nm}),el('div',{className:'ds',textContent:t.ds})]));
     const tag=el('span',{className:'tag',textContent:CATS[t.cat].label}); tag.style.background=CATS[t.cat].color; row.append(tag);
     row.onclick=()=>{ pal.classList.remove('show'); q.value='';
@@ -2248,7 +2340,7 @@ q.addEventListener('input',e=>search(e.target.value));
 q.addEventListener('keydown',e=>{ if(!pal.classList.contains('show'))return;
   if(e.key==='ArrowDown'){ e.preventDefault(); palSel=Math.min(palSel+1,palItems.length-1); markSel(); }
   else if(e.key==='ArrowUp'){ e.preventDefault(); palSel=Math.max(palSel-1,0); markSel(); }
-  else if(e.key==='Enter'){ e.preventDefault(); const t=palItems[palSel]; if(t){ const raw=q.value.trim(); pal.classList.remove('show'); q.value='';
+  else if(e.key==='Enter'){ e.preventDefault(); if(palItems[palSel]===null&&palItems.length){pal.classList.remove('show');openWorkspace('video');return;} const t=palItems[palSel]; if(t){ const raw=q.value.trim(); pal.classList.remove('show'); q.value='';
     if(/^https?:\/\//i.test(raw)&&t.input==='url') state.pendingUrl=raw; openTool(t); } }
   else if(e.key==='Escape'){ pal.classList.remove('show'); } });
 function markSel(){ [...pal.children].forEach((r,i)=>r.classList.toggle('sel',i===palSel)); }
@@ -2350,6 +2442,7 @@ function svg(path){ const ns='http://www.w3.org/2000/svg'; const s=document.crea
   const p=document.createElementNS(ns,'path'); p.setAttribute('d',path); s.append(p); return s; }
 
 buildTopbar();
+renderWorkspaceEntries();
 renderQuick();
 renderDrawerBrowser();
 
@@ -2382,7 +2475,13 @@ async function pollCards(){
 pollCards(); setInterval(pollCards,8000);
 // Always-available reset: the brand logo and the "↺ Reset" nav link both clear everything
 // and return to the start screen, from anywhere in the app.
-const goHome=e=>{ if(e)e.preventDefault(); clearAll(); window.scrollTo(0,0); };
+const goHome=e=>{ if(e)e.preventDefault(); clearAll(); $('#heroHome').style.display=''; $('#workspaceView').style.display='none'; window.scrollTo(0,0); };
+function leaveWorkspace(){
+  $('#workspaceView').style.display='none';$('#heroHome').style.display='';
+  const receipt=$('#receipt');receipt.style.display=state.file?'block':'none';
+  document.querySelectorAll('.quick').forEach(row=>row.style.display=state.file?'none':'');
+  window.scrollTo(0,0);
+}
 $('#resetBtn').onclick=goHome; $('#brandHome').onclick=goHome;
 
 // Opened from the OS ("Open with → Junk Drawer" on a PDF/MD/TXT): main.js queues the file
