@@ -71,15 +71,19 @@ test('the home screen exposes drawers instead of hiding the catalog', () => {
   assert.doesNotMatch(source, /linear-gradient\(90deg,var\(--title1\),var\(--title2\)\)/);
 });
 
-test('workspace navigation remains discoverable and Video Studio labels project editing as planned', () => {
+test('workspace navigation remains discoverable and Video Studio is a working editor shell', () => {
   for (const id of ['workspacesBtn', 'workspacesMenu', 'workspaceLaunchers', 'workspaceView', 'drawerBrowser'])
     assert.ok(source.includes(`id="${id}"`), `missing navigation surface ${id}`);
   for (const name of ['Video Studio', 'Photo Desk', 'PDF Desk', 'Audio Desk', 'Download Desk', 'Developer Bench'])
     assert.ok(source.includes(`name:'${name}'`), `missing workspace ${name}`);
-  assert.match(source, /Project editing · planned/);
-  assert.match(source, /This needs Video Studio because it changes multiple parts of the video/);
-  assert.match(source, /Edit in Video Studio/);
-  assert.match(source, /Selected video ready/);
+  assert.match(source, /function openVideoStudio\(host\)/);
+  assert.match(source, /className:'vs-preview'/);
+  assert.match(source, /className:'vs-timeline'/);
+  assert.match(source, /video\.ontimeupdate/);
+  assert.match(source, /leaveStudioForTool\('Trim a Video',marks\)/);
+  assert.match(source, /leaveStudioForTool\('Shrink a Video'\)/);
+  assert.match(source, /reco\('Edit video'/);
+  assert.doesNotMatch(source, /Project editing/);
   assert.match(source, /function leaveWorkspace\(\)/);
   assert.match(source, /const receipt=\$\('#receipt'\);receipt\.style\.display=state\.file\?'block':'none'/);
   assert.match(source, /const needsStudio=/);

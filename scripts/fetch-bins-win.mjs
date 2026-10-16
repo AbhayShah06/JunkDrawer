@@ -169,7 +169,8 @@ async function main() {
     const t = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-bins-'));
     const zp = path.join(t, 'e.zip');
     console.log('Downloading ExifTool 13.59 (win64) ...');
-    await download('https://master.dl.sourceforge.net/project/exiftool/exiftool-13.59_64.zip?viasf=1', zp);
+    // The SourceForge project download route keeps the redirect chain on HTTPS.
+    await download('https://sourceforge.net/projects/exiftool/files/exiftool-13.59_64.zip/download', zp);
     const x = spawnSync('tar', ['-xf', zp, '-C', t], { encoding: 'utf8' });
     if (x.status !== 0) { console.error('tar failed on exiftool:', x.stderr || x.error); process.exit(1); }
     const src = fs.readdirSync(t).map(n => path.join(t, n)).find(p => fs.statSync(p).isDirectory());

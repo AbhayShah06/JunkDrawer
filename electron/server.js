@@ -249,9 +249,8 @@ function handleFFmpeg(req, res, binDir) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-ff-'));
   const inPath = path.join(tmp, inName), outPath = path.join(tmp, outName);
   const ws = fs.createWriteStream(inPath);
-  let size = 0, aborted = false;
+  let aborted = false;
   const die = (obj, code) => { if (aborted) return; aborted = true; try { req.destroy(); } catch {} try { ws.destroy(); } catch {} cleanup(tmp); sendJSON(res, obj, code); };
-  req.on('data', c => { size += c.length; if (size > 500 * 1048576) die({ error: 'too-big' }, 413); });
   req.on('error', () => die({ error: 'upload-failed' }, 400));
   ws.on('error', () => die({ error: 'write-failed' }, 500));
   req.pipe(ws);
@@ -314,7 +313,7 @@ function handleVideoCompress(req, res, binDir) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-video-'));
   const inPath = path.join(tmp, 'input.bin'), outPath = path.join(tmp, 'output.mp4');
   const ws = fs.createWriteStream(inPath);
-  let size = 0, aborted = false, active = null;
+  let aborted = false, active = null;
   const fail = (error, code=500, detail='') => {
     if (aborted) return; aborted = true;
     if (active) killTree(active);
@@ -324,7 +323,6 @@ function handleVideoCompress(req, res, binDir) {
   };
   req.on('aborted', () => { if (!aborted) { aborted = true; if (active) killTree(active); try { ws.destroy(); } catch {} ffProgress.delete(id); cleanup(tmp); } });
   res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; if (active) killTree(active); ffProgress.delete(id); cleanup(tmp); } });
-  req.on('data', chunk => { size += chunk.length; if (size > 500 * 1048576) fail('too-big', 413); });
   ws.on('error', e => fail('write-failed', 500, e.message));
   req.on('error', e => fail('upload-failed', 400, e.message));
   req.pipe(ws);
@@ -660,9 +658,8 @@ function handleTool(req, res, binDir, modelsDir) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-tool-'));
   const inPath = path.join(tmp, inName), outPath = path.join(tmp, outName);
   const ws = fs.createWriteStream(inPath);
-  let size = 0, aborted = false;
+  let aborted = false;
   const die = (obj, code) => { if (aborted) return; aborted = true; try { req.destroy(); } catch {} try { ws.destroy(); } catch {} cleanup(tmp); sendJSON(res, obj, code); };
-  req.on('data', c => { size += c.length; if (size > 500 * 1048576) die({ error: 'too-big' }, 413); });
   req.on('error', () => die({ error: 'upload-failed' }, 400));
   ws.on('error', () => die({ error: 'write-failed' }, 500));
   req.pipe(ws);

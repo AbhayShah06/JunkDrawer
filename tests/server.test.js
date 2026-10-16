@@ -35,6 +35,11 @@ test.after(async () => {
   fs.rmSync(missingBinDir, { recursive: true, force: true });
 });
 
+test('local file jobs do not impose a fixed input size cap', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'server.js'), 'utf8');
+  assert.doesNotMatch(source, /size > 500 \* 1048576/);
+});
+
 test('serves the application shell', async () => {
   const response = await fetch(origin + '/index.html');
   assert.equal(response.status, 200);
