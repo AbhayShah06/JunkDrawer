@@ -38,7 +38,7 @@
     "web-audio-beat-detector": "^8.2.37"
   },
   "build": {
-    "appId": "vc.axl.junkdrawer",
+    "appId": "com.abhayshah.junkdrawer",
     "productName": "Junk Drawer",
     "fileAssociations": [
       {
@@ -107,6 +107,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "uninstallDisplayName": "Junk Drawer ${version}",
+      "deleteAppDataOnUninstall": false,
       "installerIcon": "icon.ico",
       "uninstallerIcon": "icon.ico"
     },
