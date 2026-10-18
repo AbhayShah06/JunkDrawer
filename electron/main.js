@@ -2,7 +2,7 @@ const { app, BrowserWindow, shell, Menu, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { startServer } = require('./server');
-const { autoUpdater } = require('electron-updater');
+const { createUpdater } = require('./updates');
 
 let win, srv;
 
@@ -27,30 +27,12 @@ function argvOpenPath(argv) {
   return null;
 }
 
-// ---- in-app auto-update. Windows only: electron-updater downloads the new build from
-// the GitHub release and applies it on restart. macOS needs a signed app for Squirrel.Mac,
-// so there it stays disabled and the renderer falls back to opening the release page.
-// The renderer drives this through the local server (no preload/IPC needed). ----
-autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
-let upState = { status: 'idle', version: '', percent: 0, error: '' };
-autoUpdater.on('update-available', i => { upState = { status: 'available', version: i.version, percent: 0, error: '' }; });
-autoUpdater.on('update-not-available', () => { if (upState.status === 'idle') upState.status = 'none'; });
-autoUpdater.on('download-progress', p => { upState.status = 'downloading'; upState.percent = p.percent || 0; });
-autoUpdater.on('update-downloaded', i => { upState = { status: 'ready', version: i.version, percent: 100, error: '' }; });
-autoUpdater.on('error', e => { upState.status = 'error'; upState.error = String((e && e.message) || e); });
-const updater = {
-  enabled: false,                          // set true at launch on packaged Windows
-  state: () => upState,
-  check: async () => { try { await autoUpdater.checkForUpdates(); } catch (e) { upState.status = 'error'; upState.error = String((e && e.message) || e); } },
-  download: async () => {
-    upState = { status: 'downloading', version: upState.version, percent: 0, error: '' };
-    try { await autoUpdater.checkForUpdates(); await autoUpdater.downloadUpdate(); }
-    catch (e) { upState.status = 'error'; upState.error = String((e && e.message) || e); }
-  },
-  apply: () => { setImmediate(() => { try { autoUpdater.quitAndInstall(); } catch {} }); },
-};
-
+// Resolve the optional updater only after the local window is ready.
+const updater = createUpdater(() => require('electron-updater').autoUpdater, error => {
+  try {
+    fs.appendFileSync(path.join(app.getPath('userData'), 'update-errors.log'), `${new Date().toISOString()} ${error?.stack || error}\n`);
+  } catch {}
+});
 // macOS uninstall — the analogue of the Windows NSIS uninstaller (Windows already has its
 // own in Add/Remove Programs). Confirms, then moves the .app to the Trash, clears the app's
 // saved data, and quits. User files are never touched.
@@ -109,13 +91,13 @@ async function create() {
   buildAppMenu();
   // Don't nag about updates while developing (npm start) — only the packaged app checks.
   process.env.JD_DEV = app.isPackaged ? '' : '1';
-  updater.enabled = app.isPackaged && process.platform === 'win32';
+
   const { port, server } = await startServer(appRoot(), binDir(), updater, opener,
     path.join(app.getPath('userData'), 'models')); // download-on-first-use models (whisper) live outside the app dir so updates don't re-download them
   srv = server;
   // Launched by opening a file? Queue it so the renderer picks it up on first load.
   if (!pendingOpenPath) { const initial = argvOpenPath(process.argv); if (initial) pendingOpenPath = initial; }
-  if (updater.enabled) updater.check();
+
   win = new BrowserWindow({
     width: 1180, height: 840, minWidth: 720, minHeight: 560,
     title: 'Junk Drawer', backgroundColor: '#23262b', show: false,
@@ -131,7 +113,11 @@ async function create() {
       experimentalFeatures: false,
     },
   });
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => {
+    win.show();
+    updater.init(app.isPackaged && process.platform === 'win32');
+    if (updater.enabled) void updater.check();
+  });
   // The app needs no web permissions (camera/mic/geolocation/notifications/etc.). Deny every
   // permission request outright so untrusted file content can never prompt for or gain one.
   win.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
@@ -164,7 +150,11 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', (_e, argv) => { const p = argvOpenPath(argv); if (p) queueOpen(p); else if (win) { try { win.focus(); } catch {} } });
   app.on('open-file', (e, p) => { e.preventDefault(); queueOpen(p); });   // macOS delivers file-opens here
-  app.whenReady().then(create);
+  app.whenReady().then(create).catch(error => {
+    try { fs.appendFileSync(path.join(app.getPath('userData'), 'startup-errors.log'), String(error?.stack || error) + '\n'); } catch {}
+    dialog.showErrorBox('Junk Drawer could not start', String(error?.message || error));
+    app.quit();
+  });
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) create(); });
 }
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
