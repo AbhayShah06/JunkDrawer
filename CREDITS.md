@@ -33,3 +33,13 @@ Junk Drawer stands on a lot of excellent open-source work. Every engine runs loc
 > **Note on the background remover:** `@imgly/background-removal` is licensed under **AGPL-3.0**, a strong copyleft license. Bundling it into a distributed application carries AGPL obligations for the whole work. See the project root for how this is handled.
 
 Built by Abhay Shah.
+
+## Optional local model integrations (1.8.0)
+
+- [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR), browser SDK 0.4.2 and PP-OCRv6 small detection/recognition models: Apache-2.0. Uses [OpenCV.js](https://github.com/TechStark/opencv-js) and [ONNX Runtime](https://github.com/microsoft/onnxruntime) locally. The SDK worker is rebuilt to share the pinned ORT version with its vendored WASM assets.
+- [BiRefNet](https://github.com/ZhengPeng7/BiRefNet), using the [studioludens 512-pixel ONNX export](https://huggingface.co/studioludens/birefnet-lite-512): MIT. Optional 192 MB CPU model; 1024-pixel exports exceeded the WASM memory budget in testing.
+- [Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR): Apache-2.0. The optional Q8 GGUF conversion is from [sakasegawa](https://huggingface.co/sakasegawa/Qwen3-ASR-0.6B-GGUF).
+- [speech.cpp](https://github.com/nyosegawa/speech.cpp), pinned runtime 0.8.11: MIT. Windows runtime archive SHA-256: `63f4c5b5c60aeab9d4c90193298fe4ee5d2a6c931cdbdcbc8cbb126fbffc56d0`. The bundled binary is invoked only with verified local model paths; its server, updater, and model auto-download commands are not invoked.
+- [Silero VAD](https://github.com/snakers4/silero-vad), optional v6.2 GGUF speech detector from [sakasegawa](https://huggingface.co/sakasegawa/silero-vad-GGUF): MIT.
+
+Download URLs, revisions, byte sizes, and SHA-256 hashes are recorded in `electron/model-packs.json`. Original license notices for downloaded models are linked from these upstream repositories; speech.cpp's license is included beside the bundled runtime.

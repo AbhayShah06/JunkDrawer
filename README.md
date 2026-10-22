@@ -4,6 +4,14 @@ Local tools for the file jobs that get in the way: convert a photo, shrink a vid
 
 Drop files, choose an action, and save the result. Your originals stay untouched. The home screen has six task entry points; specialized jobs are under More tools. The first choices are smaller files, JPG, PDF merge, MP4, MP3, and image resizing. Search still understands older formats such as MTS.
 
+## Compression and local models
+
+Video compression offers H.264 MP4, HEVC, and AV1. CPU encoding is the default. The optional faster mode tests hardware encoding and falls back to CPU. Size limits use a two-pass H.264 encode with a final byte-size check. Larger results are rejected. HDR input requires HEVC or AV1; it is not silently converted to 8-bit H.264.
+
+The included OCR/background tools remain available offline. Optional downloads add PaddleOCR v6 multilingual OCR (32 MB), BiRefNet Lite 512 background removal (192 MB), and Qwen3-ASR 0.6B text transcription with speech detection (843 MB). Models download only when chosen or requested from Manage storage, and are checked against pinned SHA-256 hashes. Processing stays local after download. Qwen3 is text-only; Whisper remains available for timed subtitles.
+
+The Windows build bundles speech.cpp 0.8.11. There is no Python, cloud inference service, or required GPU. Native media/transcription jobs are queued; image inference uses workers that are terminated after each job. Model downloads can be removed under Manage storage.
+
 ## Quick access
 
 Click the tray icon or press **Ctrl+Alt+J** (Mac: **Command+Option+J**) for a compact file panel. The tray also opens the full workspace. Closing the window keeps quick access ready; choose Quit from the tray menu to exit. **Start with Windows** is optional under Settings & quick access. It starts disabled, remains listed in Windows Settings → Apps → Startup, and honors changes made there.

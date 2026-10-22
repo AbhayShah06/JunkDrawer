@@ -173,6 +173,7 @@ async function main() {
   }
 
   console.log('\nDone. resources/bin/win/ now has yt-dlp, ffmpeg, whisper/, libraw/, exiftool/.');
+  await import('./fetch-speech-win.mjs');
   console.log('Next: npm run dist:win');
 }
 

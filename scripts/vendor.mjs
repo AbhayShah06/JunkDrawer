@@ -2,20 +2,24 @@
 // ZERO remote code at runtime (fully offline, no CDN supply-chain exposure).
 // Run after `npm install`; the build scripts run it automatically.
 import { build } from 'esbuild';
-import { rmSync, mkdirSync, cpSync } from 'fs';
+import { rmSync, mkdirSync, cpSync, readdirSync, readFileSync } from 'fs';
 import path from 'path';
+import {createRequire} from 'node:module';
 
 const root = process.cwd();
 const V = path.join(root, 'vendor');
+const visionOrt=path.dirname(path.dirname(createRequire(path.join(root,'node_modules/@paddleocr/paddleocr-js/package.json')).resolve('onnxruntime-web')));
 rmSync(V, { recursive: true, force: true });
-for (const d of ['ffmpeg/core-mt', 'ffmpeg/core', 'pdfjs', 'imgly', 'tesseract/lang', 'libarchive']) mkdirSync(path.join(V, d), { recursive: true });
+for (const d of ['ffmpeg/core-mt', 'ffmpeg/core', 'pdfjs', 'imgly', 'tesseract/lang', 'libarchive', 'vision/ort']) mkdirSync(path.join(V, d), { recursive: true });
 
 const common = { bundle: true, format: 'esm', platform: 'browser', minify: true,
   define: { 'process.env.NODE_ENV': '"production"' } };
 
 // 1. bundle each library into one self-contained browser ESM file, re-exporting only
 //    the symbols the app uses (node resolution picks the right entry per package).
+const backgroundThreadLimit={name:'background-cpu-limit',setup(b){b.onLoad({filter:/@imgly[\\/]background-removal[\\/]dist[\\/]index\.mjs$/},args=>{const original=readFileSync(args.path,'utf8'),contents=original.replace('navigator.hardwareConcurrency ?? 4','Math.min(2,navigator.hardwareConcurrency ?? 2)');if(contents===original)throw Error('Review the included background model thread limit.');return {contents,loader:'js',resolveDir:path.dirname(args.path)};});}};
 const bundles = [
+  { out:'vision/vision.mjs',src:"export {PaddleOCR} from '@paddleocr/paddleocr-js'; import * as ort from 'onnxruntime-web'; export {ort};" },
   { out: 'pdf-lib.mjs',                  src: "export { PDFDocument, degrees, rgb, StandardFonts } from 'pdf-lib';" },
   { out: 'fflate.mjs',                   src: "export { zipSync, unzipSync, strFromU8 } from 'fflate';" },
   { out: 'js-yaml.mjs',                  src: "export { dump, load } from 'js-yaml';" },
@@ -29,8 +33,17 @@ const bundles = [
   { out: 'libarchive/libarchive.mjs',    src: "export { Archive } from 'libarchive.js';" },
 ];
 for (const b of bundles)
-  await build({ ...common, stdin: { contents: b.src, resolveDir: root, sourcefile: 'entry.mjs', loader: 'js' },
+  await build({ ...common, ...(b.out.startsWith('imgly/')?{plugins:[backgroundThreadLimit]}:{}), ...(b.out.startsWith('vision/')?{external:['fs','path'],alias:{'onnxruntime-web':path.join(visionOrt,'dist/ort.wasm.bundle.min.mjs')}}:{}), stdin: { contents: b.src, resolveDir: root, sourcefile: 'entry.mjs', loader: 'js' },
     outfile: path.join(V, b.out) });
+
+// Use PaddleOCR's worker image handling and the same pinned ORT build as its WASM assets.
+const paddleAssets=path.join(root,'node_modules/@paddleocr/paddleocr-js/dist/assets');
+for(const filename of readdirSync(paddleAssets).filter(f=>/^worker-entry.*\.js$/.test(f))){
+  const source=readFileSync(path.join(paddleAssets,filename),'utf8');
+  const patched=source.replace(/ortModulePromise = Promise\.resolve\(\)\.then\(function\(\) \{\s*return ort_bundle_min;\s*\}\);/, "ortModulePromise = import('/vendor/vision/vision.mjs').then(m=>m.ort);");
+  if(patched===source)throw Error('Review the PaddleOCR worker runtime integration.');
+  await build({...common,external:['fs','path','/vendor/vision/vision.mjs'],stdin:{contents:patched,resolveDir:paddleAssets,loader:'js'},outfile:path.join(V,'vision/assets',filename)});
+}
 
 // 2. @ffmpeg/ffmpeg spawns this as a separate module worker at runtime (new URL('./worker.js', import.meta.url)).
 await build({ ...common, entryPoints: [path.join(root, 'node_modules/@ffmpeg/ffmpeg/dist/esm/worker.js')],
@@ -57,4 +70,5 @@ cp('resources/tessdata/eng.traineddata.gz', 'tesseract/lang/eng.traineddata.gz')
 cp('node_modules/libarchive.js/dist/worker-bundle.js', 'libarchive/worker-bundle.js');
 cp('node_modules/libarchive.js/dist/libarchive.wasm', 'libarchive/libarchive.wasm');
 
+for(const filename of readdirSync(path.join(visionOrt,'dist')))if(/^ort-wasm.*\.(wasm|mjs)$/.test(filename))cpSync(path.join(visionOrt,'dist',filename),path.join(V,'vision/ort',filename));
 console.log('vendor/ rebuilt');

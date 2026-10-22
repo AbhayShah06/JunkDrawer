@@ -36,6 +36,12 @@ async function main() {
     assert.equal(check.status, 200);
     const capabilities = await check.json();
     assert.equal(capabilities.ffmpeg, true);
+    assert.equal(capabilities.qwen,process.platform==='win32');
+    if(process.platform==='win32')assert.ok(fs.existsSync(path.join(binDir,'speech','speech.exe')));
+    const packs=await(await fetch(origin+'/api/model-packs')).json();assert.equal(packs.packs.length,3);assert.ok(packs.packs.every(p=>!p.ready));
+    assert.equal((await fetch(origin+'/electron/local-vision-worker.js')).status,200);
+    assert.equal((await fetch(origin+'/vendor/vision/vision.mjs')).status,200);
+    const codecOptions=await(await fetch(origin+'/api/compression-capabilities')).json();assert.ok(codecOptions.codecs.includes('h264'));
     assert.equal(capabilities.ytdlp, true);
     assert.equal(capabilities.whisper, true);
 

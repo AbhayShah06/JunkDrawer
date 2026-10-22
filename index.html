@@ -250,7 +250,7 @@
     <button data-nav="arc"><span>▣</span>Archives</button>
     <button data-nav="identify"><span>⌕</span>Identify a file</button>
   </nav>
-  <div class="sidebar-bottom"><div class="sidebar-label">QUICK ACCESS</div><button id="sidebarIntegration">Quick access <kbd>Ctrl Alt J</kbd></button><p>From Explorer, the tray, or a shortcut.</p><span class="app-version">Junk Drawer 1.7.1</span></div>
+  <div class="sidebar-bottom"><div class="sidebar-label">QUICK ACCESS</div><button id="sidebarIntegration">Quick access <kbd>Ctrl Alt J</kbd></button><p>From Explorer, the tray, or a shortcut.</p><span class="app-version">Junk Drawer 1.8.0</span></div>
 </aside>
 <header><div class="topbar">
   <div class="cmd">
@@ -396,19 +396,19 @@ async function extractArchive(f){
     if(v instanceof File) out.push({name:prefix+k,file:v}); else if(v&&typeof v==='object') walk(v,prefix+k+'/'); } };
   walk(tree,''); return out;
 }
-let _bg=null, _bgGpu=null;  // _bgGpu: null=untried, true=GPU works, false=fell back to CPU
-async function bgRemove(blob,onP){ if(!_bg) _bg=(await import("./vendor/imgly/background-removal.mjs")).removeBackground;
-  // imgly can't decode HEIC, so an iPhone photo would fail outright, convert it to PNG first.
-  const e=blob.name?ext(blob.name):'';
-  if(e==='heic'||e==='heif'){ const {img,url}=await toImage(blob); const c=el('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
-    c.getContext('2d').drawImage(img,0,0); URL.revokeObjectURL(url); blob=await blobOf(c,'image/png'); }
-  const base={publicPath:new URL('vendor/imgly/data/',location.origin+'/').href,progress:(k,c,t)=>onP&&onP(c/t)};
-  // WebGPU (when present) runs the segmentation model far faster than the wasm CPU path.
-  // The jsep/WebGPU runtime is vendored locally, so this stays fully offline. Fall back to
-  // CPU if GPU init fails for any reason.
-  if(_bgGpu!==false && navigator.gpu){ try{ const r=await _bg(blob,{...base,device:'gpu'}); _bgGpu=true; return r; }
-    catch{ _bgGpu=false; } }
-  return _bg(blob,{...base,device:'cpu'}); }
+function modelChoice(task,choices){const selected=el('select');for(const [value,label] of choices)selected.append(el('option',{value,textContent:label}));try{const saved=localStorage.getItem('jd-model-'+task);if(choices.some(([value])=>value===saved))selected.value=saved;}catch{}selected.onchange=()=>{try{localStorage.setItem('jd-model-'+task,selected.value);}catch{}};return {node:el('label',{},['Model ',selected]),get:()=>({model:selected.value})};}
+async function ensureModelPack(id){
+ const response=await fetch('/api/model-packs');if(!response.ok)throw Error('Model downloads need the installed app.');const {packs}=await response.json();const pack=packs.find(p=>p.id===id);if(!pack)throw Error('Unknown model.');if(pack.ready)return;
+ const onP=progress('Downloading '+pack.label+' ('+pack.sizeMB+' MB)');const timer=setInterval(async()=>{try{const {packs}=await(await fetch('/api/model-packs')).json();onP(packs.find(p=>p.id===id)?.progress||0);}catch{}},600);
+ try{const result=await fetch('/api/download-model-pack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});const body=await result.json();if(!result.ok)throw Error(body.detail||'Model download failed.');}finally{clearInterval(timer);}
+}
+async function localVision(type,file){
+ const epoch=conversionEpoch;if(type!=='included-background')await ensureModelPack(type==='ocr'?'paddleocr-v6':'birefnet-lite');if(epoch!==conversionEpoch)throw Object.assign(Error('Cancelled'),{jdAborted:true});
+ const png=await imgConvert(file,{type:'image/png'});if(epoch!==conversionEpoch)throw Object.assign(Error('Cancelled'),{jdAborted:true});if(_jobCtl)try{_jobCtl.abort();}catch{}const ctl=new AbortController();_jobCtl=ctl;
+ progress(type==='ocr'?'Reading text':'Removing background');
+ return new Promise((resolve,reject)=>{const worker=new Worker('/electron/local-vision-worker.js',{type:'module'}),id=crypto.randomUUID();let done=false;const finish=(error,value)=>{if(done)return;done=true;worker.terminate();if(_jobCtl===ctl)_jobCtl=null;error?reject(error):resolve(value);};ctl.signal.addEventListener('abort',()=>finish(Object.assign(Error('Cancelled'),{jdAborted:true})),{once:true});worker.onerror=e=>finish(Error(e.message||'The image model could not run.'));worker.onmessage=({data})=>{if(data.id===id)finish(data.error?Error(data.error):null,data.result);};worker.postMessage({id,type,blob:png});});
+}
+async function bgRemove(blob){return localVision('included-background',blob);}
 let _qrgen=null, _qrdec=null;
 async function qrGen(){ if(!_qrgen) _qrgen=(await import("./vendor/qrcode.mjs")).default; return _qrgen; }
 async function qrDec(){ if(!_qrdec) _qrdec=(await import("./vendor/jsqr.mjs")).default; return _qrdec; }
@@ -472,24 +472,19 @@ async function runFFNative(file,inName,outName,args,label,extra){
   } catch(e){ if(e&&e.name==='AbortError') throw Object.assign(new Error('cancelled'),{jdAborted:true}); throw e; }
   finally { clearInterval(poll); }
 }
-async function runVideoCompress(file,duration,targetMb){
+async function runVideoCompress(file,duration,options){
   if(!await nativeFFAvailable()){
-    const blob=await runFF(file,'out.mp4',(i,out)=>JDCompression.buildCompressionArgs({mode:'size',duration,targetMb,input:i,output:out}),'One-pass size estimate (browser fallback)');
-    return {blob,native:false};
+    if(options.codec!=='h264')throw Error('HEVC and AV1 compression need the installed desktop app.');
+    const blob=await runFF(file,'out.mp4',(i,out)=>JDCompression.buildCompressionArgs({...options,duration,input:i,output:out}),'Compressing video');
+    if(blob.size>=file.size)throw Object.assign(Error('The converted copy would be larger. Keep the original.'),{code:'already-small'});
+    if(options.mode==='size'&&blob.size>options.targetMb*1e6)throw Object.assign(Error('The browser encoder could not meet that size limit. Use the desktop app or a larger limit.'),{code:'target-not-met'});
+    return {blob,note:'Browser encoding'};
   }
-  if(_jobCtl){try{_jobCtl.abort();}catch{}}
-  const ctl=new AbortController();_jobCtl=ctl;
-  const id=(((self.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'-'+Math.random()))+'').replace(/[^a-z0-9-]/gi,'').slice(0,64);
-  const meta=encodeURIComponent(JSON.stringify({duration,targetMb}));
-  const onP=progress('Two-pass size encode');onP(.04);
-  const poll=setInterval(async()=>{try{const r=await fetch('/api/ffmpeg-progress?id='+id);const j=await r.json();if(j&&typeof j.percent==='number')onP(.04+.9*Math.min(1,Math.max(0,j.percent)));}catch{}},500);
-  try{
-    const res=await fetch('/api/video-compress?meta='+meta+'&id='+id,{method:'POST',body:file,signal:ctl.signal});
-    if(!res.ok){let payload={};try{payload=await res.json();}catch{}const error=new Error(payload.detail||payload.error||`Video compression failed (${res.status})`);error.code=payload.error||'compression-failed';throw error;}
-    const data=await res.arrayBuffer();if(ctl.signal.aborted)throw Object.assign(new Error('cancelled'),{jdAborted:true});
-    onP(1);if(_jobCtl===ctl)_jobCtl=null;return {blob:new Blob([data],{type:'video/mp4'}),native:true};
-  }catch(e){if(e&&e.name==='AbortError')throw Object.assign(new Error('cancelled'),{jdAborted:true});throw e;}
-  finally{clearInterval(poll);}
+  if(_jobCtl){try{_jobCtl.abort();}catch{}}const ctl=new AbortController();_jobCtl=ctl;
+  const id=crypto.randomUUID();const onP=progress(options.mode==='size'?'Encoding to size limit':'Compressing video');onP(.02);
+  const poll=setInterval(async()=>{try{const j=await(await fetch('/api/ffmpeg-progress?id='+id)).json();if(typeof j.percent==='number')onP(.02+.96*j.percent);}catch{}},500);
+  try{const response=await fetch('/api/video-compress?meta='+encodeURIComponent(JSON.stringify({...options,duration,probeDuration:true}))+'&id='+id,{method:'POST',body:file,signal:ctl.signal});if(!response.ok){const j=await response.json();throw Object.assign(Error(j.detail||j.error),{code:j.error});}const blob=await response.blob();if(ctl.signal.aborted)throw Object.assign(Error('Cancelled'),{jdAborted:true});return {blob,note:response.headers.get('X-Compression-Note')};}
+  finally{clearInterval(poll);if(_jobCtl===ctl)_jobCtl=null;}
 }
 /* Native helper tools beyond ffmpeg (whisper / RAW / upscale), desktop app only.
    The server builds the argv; we just name the tool, simple options, and stream the file. */
@@ -724,13 +719,13 @@ function showMulti(files,zipName,note){ const seen=new Set();const entries=files
 /* ================= TOOL REGISTRY ================= */
 const CATS = {
   image:{label:'Image', color:'var(--img)', icon:icon('img'),  blurb:'fix, convert, and shrink photos'},
-  pdf:  {label:'PDF',   color:'var(--pdf)', icon:icon('doc'),   blurb:'sign, merge, split, shrink, and more'},
-  video:{label:'Video', color:'var(--vid)', icon:icon('film'), blurb:'shrink, trim, convert, grab frames'},
-  audio:{label:'Audio', color:'var(--aud)', icon:icon('music'),blurb:'convert, trim, even out, shrink'},
+  pdf:  {label:'PDF',   color:'var(--pdf)', icon:icon('doc'),   blurb:'sign, merge, split, and compress PDFs'},
+  video:{label:'Video', color:'var(--vid)', icon:icon('film'), blurb:'compress, trim, convert, and extract audio'},
+  audio:{label:'Audio', color:'var(--aud)', icon:icon('music'),blurb:'convert, trim, compress, and transcribe'},
   web:  {label:'Download',color:'var(--web)',icon:icon('down'), blurb:'save video or sound from a link'},
   data: {label:'Data',  color:'var(--data)',icon:icon('grid'), blurb:'switch between spreadsheet and JSON'},
   arc:  {label:'Archive',color:'var(--arc)',icon:icon('box'),  blurb:'zip and unzip files'},
-  weird:{label:'File info', color:'var(--weird)',icon:icon('star'),blurb:'the odd jobs'},
+  weird:{label:'File info', color:'var(--weird)',icon:icon('star'),blurb:'identify file types and inspect contents'},
   dev:  {label:'QR codes',   color:'var(--dev)', icon:icon('code'), blurb:'make or read a QR code'},
 };
 const T = []; // tools
@@ -742,12 +737,13 @@ const oSel=(label,pairs,key)=>()=>{ const s=el('select'); pairs.forEach(([v,l])=
 
 /* ---- IMAGE ---- */
 add({cat:'image',kinds:['image'],rec:1,nm:'Remove Background',ds:'Cut out the subject and get a clear PNG',kw:'remove background transparent cutout zap',
-  more:'Cuts the subject out of a photo and gives you a see-through PNG. Great for product shots, profile pics, and stickers. The first run loads a small model from the app, then it works right away.',
-  run:async f=>{ const onP=progress('Removing background (first run loads the model, a few seconds)'); const b=await bgRemove(f,onP);
+  more:'Outputs a transparent PNG. The optional BiRefNet model is downloaded only when selected.',
+  opts:()=>modelChoice('background',[['included','Included model'],['birefnet','BiRefNet Lite 512 (192 MB download)']]),
+  run:async (f,o)=>{ const onP=progress('Removing background'); const b=o.model==='birefnet'?await localVision('background',f):await bgRemove(f,onP);
     showResult(b,base(f.name)+'-nobg.png'); }});
 
 add({cat:'image',kinds:['image','raw'],multi:true,rec:1,nm:'Batch Convert Images',ds:'Convert a whole folder of photos to one format',kw:'batch convert folder bulk many multiple mass heic raw jpg png webp shoot dump',
-  more:'Drop a folder (or pick many files) and turn them all into the same format at once, HEIC, RAW, PNG, JPG, WEBP go in, you get a zip of converted images. Great for an iPhone dump or a photo shoot. Everything stays on your computer.',
+  more:'Choose several images and one output format. Saves one file or a ZIP.',
   opts:oSel('convert all to',[['image/jpeg','JPG'],['image/png','PNG'],['image/webp','WEBP']],'type'),
   run:async (fs,o)=>{
     const type=o.type||'image/jpeg', outExt={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[type];
@@ -770,19 +766,19 @@ add({cat:'image',kinds:['image','raw'],multi:true,rec:1,nm:'Batch Convert Images
     if(out.length===1) showResult(new Blob([out[0].data],{type}),out[0].name,{note});
     else showMulti(out,'converted.zip',note); }});
 add({cat:'image',kinds:['image'],rec:1,nm:'Shrink File Size',ds:'Squeeze an image under a size you pick',kw:'compress smaller reduce size optimize',
-  more:'Make an image fit a size limit you set, like under 8 MB. It keeps the picture as big and sharp as it can while hitting your target.',
+  more:'Choose a maximum size. Image dimensions may be reduced to meet it.',
   opts:oNum('target','8','MB','mb',{min:.2,step:.5}),
   check:(f,o)=> (!o.mb||o.mb<=0) ? {msg:'Enter a target size like 1 or 2 MB, and I’ll get the image as close as I can.'}
     : (f && f.size<=o.mb*1048576 ? {title:'Already small enough', msg:`This image is already ${fmt(f.size)}, under your ${o.mb} MB target. Pick a smaller number if you’d like it tinier.`} : null),
   run:async (f,o)=>{ showResult(await compressTo(f,(o.mb||8)*1048576,'image/jpeg'),base(f.name)+'-small.jpg',{note:`aimed at ${o.mb} MB`}); }});
 add({cat:'image',kinds:['image'],nm:'Resize Image',ds:'Set the longest side in pixels',kw:'resize scale dimensions shrink',
-  more:'Set how long the longest side can be, so the image is no bigger than you need. For example, use 1920 pixels for the web.',
+  more:'Set the longest side in pixels. The aspect ratio is kept.',
   opts:oNum('max side','1920','px','maxDim',{min:16,step:16}),
   run:async (f,o)=>{ const photo=['jpg','jpeg','webp','heic','heif'].includes(ext(f.name)); // photos stay photos, a resized PNG of a photo is huge
     const type=photo?'image/jpeg':'image/png', oe=photo?'jpg':'png';
     showResult(await imgConvert(f,{type,quality:.92,maxDim:o.maxDim||1920}),base(f.name)+'-'+(o.maxDim||1920)+'.'+oe); }});
 add({cat:'image',kinds:['image'],nm:'Rotate or Flip',ds:'Turn or mirror an image',kw:'rotate flip mirror turn',
-  more:'Turn an image a quarter or half turn, or mirror it side to side or top to bottom. Handy for sideways phone photos.',
+  more:'Rotate the picture or mirror it horizontally or vertically.',
   opts:oSel('do',[['r90','Rotate 90° CW'],['r270','Rotate 90° CCW'],['r180','Rotate 180°'],['fh','Flip horizontal'],['fv','Flip vertical']],'op'),
   run:async (f,o)=>{
     const isJpg=['jpg','jpeg'].includes(ext(f.name)), type=isJpg?'image/jpeg':'image/png', oe=isJpg?'jpg':'png';
@@ -799,7 +795,7 @@ add({cat:'image',kinds:['image'],nm:'Rotate or Flip',ds:'Turn or mirror an image
     x.drawImage(img,-img.naturalWidth/2,-img.naturalHeight/2); URL.revokeObjectURL(url);
     showResult(await blobOf(c,type,.95),base(f.name)+'-turned.'+oe); }});
 add({cat:'image',kinds:['image'],rec:1,nm:'Remove Hidden Info',ds:'Drop GPS, camera, and date tags',kw:'remove metadata exif gps location privacy strip clean',
-  more:'Removes hidden tags like your location, camera, and date by saving the image fresh. Do this before you post a photo in public.',
+  more:'Removes metadata, including location and camera details.',
   run:async f=>{ const onP=progress('Scrubbing metadata'); onP(.4);
     const isPng=ext(f.name)==='png'; const b=await imgConvert(f,{type:isPng?'image/png':'image/jpeg',quality:.95,strip:true});
     showResult(b,base(f.name)+'-clean.'+(isPng?'png':'jpg'),{note:'re-encoded with no embedded metadata.'}); }});
@@ -847,12 +843,12 @@ function readExif(buf){
   return Object.keys(out).length?out:null;
 }
 add({cat:'image',kinds:['image'],nm:'Strip Location Only',ds:'Remove GPS but keep camera info and dates',kw:'gps location remove strip privacy exif keep metadata coordinates',
-  more:'Deletes just the GPS coordinates from a photo, where it was taken, while keeping the camera settings and date info intact. Use “Remove Hidden Info” instead if you want everything gone.',
+  more:'Removes GPS fields while keeping other metadata.',
   run:async f=>{ const info=await nativeInfo(); if(!info.exif) return showGuide(needDesktop('Editing photo tags'));
     const oe=ext(f.name); showResult(await runTool(f,'exif',{op:'strip-gps'},'out.'+oe,'Removing location'),base(f.name)+'-nogps.'+oe,
       {note:'GPS removed. Camera info and dates kept.'}); }});
 add({cat:'image',kinds:['image','raw'],multi:true,nm:'Fix Photo Dates',ds:'Set the date-taken so albums sort right',kw:'date taken fix exif change datetime sort slideshow whatsapp wrong order album',
-  more:'Sets the “date taken” on photos so slideshows and albums sort them correctly, the classic fix for pictures WhatsApp or email stripped. Pick the date the photos are really from.',
+  more:'Writes the date-taken metadata used by photo applications.',
   opts:()=>{ const d=el('input',{type:'datetime-local',value:new Date().toISOString().slice(0,16)});
     return {node:el('label',{},['date taken ',d]),get:()=>({when:d.value})}; },
   check:(f,o)=>!o.when?{msg:'Pick the date these photos were really taken.'}:null,
@@ -865,7 +861,7 @@ add({cat:'image',kinds:['image','raw'],multi:true,nm:'Fix Photo Dates',ds:'Set t
     if(out.length===1) showResult(new Blob([out[0].data],{type:mimeOf(out[0].name)}),out[0].name,{note:'Date taken set to '+date+'.'});
     else showMulti(out,'dated-photos.zip',`${out.length} photos set to ${date}.`); }});
 add({cat:'image',kinds:['image','raw'],multi:true,nm:'Rename Photos by Date Taken',ds:'Filenames become the moment they were shot',kw:'rename date taken batch order sort img_0001 filename organize',
-  more:'Reads when each photo was really taken and renames the copies to that moment, “2024-06-14 18.03.22.jpg” instead of “IMG_4032.jpg”, so any folder sorts into the true timeline. The photos themselves aren’t touched.',
+  more:'Renames copies using each photo’s recorded date and time.',
   run:async fs=>{ const info=await nativeInfo(); if(!info.exif) return showGuide(needDesktop('Reading photo tags'));
     const out=[], used={}; let missing=0;
     for(let i=0;i<fs.length;i++){
@@ -880,7 +876,7 @@ add({cat:'image',kinds:['image','raw'],multi:true,nm:'Rename Photos by Date Take
     showMulti(out,'renamed-photos.zip',`${out.length} photos renamed by date taken${missing?` (${missing} had no date and kept their name)`:''}.`); }});
 
 add({cat:'image',kinds:['raw'],multi:true,rec:1,nm:'Camera RAW to JPG',ds:'Develop RAW photos into ready-to-send JPGs',kw:'raw cr2 cr3 nef arw raf dng orf rw2 convert develop batch camera canon nikon sony fuji',
-  more:'Turns camera RAW files (Canon CR2/CR3, Nikon NEF, Sony ARW, Fuji RAF, DNG and more) into JPGs with the camera’s own white balance. Great for sending a shoot to a client fast. It’s a clean, neutral develop, not a Lightroom edit.',
+  more:'Develops camera RAW files locally using LibRaw.',
   opts:oSel('save as',[['jpg','JPG'],['png','PNG']],'to'),
   run:async (fs,o)=>{ const info=await nativeInfo(); if(!info.raw) return showGuide(needDesktop('Developing RAW photos'));
     const to=o.to==='png'?'png':'jpg'; const out=[];
@@ -892,22 +888,23 @@ add({cat:'image',kinds:['raw'],multi:true,rec:1,nm:'Camera RAW to JPG',ds:'Devel
     else showMulti(out,'developed-photos.zip',`${out.length} photos developed with camera white balance.`); }});
 
 add({cat:'image',kinds:['image'],nm:'Grab Text from a Picture',ds:'Copy the words out of a screenshot or scan',kw:'ocr text extract screenshot scan read words copy grab recognize',
-  more:'Reads the words in a screenshot, photo, or scan and hands you the text to copy or save. English works best. Runs entirely on your computer.',
-  run:async f=>{ const onP=progress('Reading the picture (the first run loads the reader)'); onP(.05);
-    const txt=(await ocrImage(f,onP)).trim();
+  more:'Extracts text from an image. Choose bundled English OCR or the optional multilingual model.',
+  opts:()=>modelChoice('ocr',[['included','English (included)'],['paddle','PaddleOCR v6 multilingual (32 MB download)']]),
+  run:async (f,o)=>{ const onP=progress('Reading the picture (the first run loads the reader)'); onP(.05);
+    const txt=(o.model==='paddle'?await localVision('ocr',f):await ocrImage(f,onP)).trim();
     if(!txt) return showGuide({title:'No words found',msg:'Couldn’t make out any text in that picture. A sharper, straighter, better-lit shot usually does the trick.'});
     showText(txt,base(f.name)+'.txt'); }});
 add({cat:'arc',kinds:['any'],multi:true,nm:'Create a ZIP',ds:'Pack files together for sending or storage',kw:'zip create archive pack compress files bundle',
-  more:'Select files to bundle into a ZIP. Files with the same name get a numbered suffix so nothing is replaced. Your original files stay untouched.',run:async files=>{progress('Creating ZIP')(.3);showMulti(await Promise.all(files.map(async f=>({name:f.name,data:new Uint8Array(await f.arrayBuffer())}))),'files.zip');}});
+  more:'Packs selected files into one ZIP archive.',run:async files=>{progress('Creating ZIP')(.3);showMulti(await Promise.all(files.map(async f=>({name:f.name,data:new Uint8Array(await f.arrayBuffer())}))),'files.zip');}});
 add({cat:'arc',kinds:['archive'],rec:1,nm:'Extract an Archive',ds:'Unpack a RAR, 7z, ZIP, or TAR',kw:'unzip extract rar 7z zip tar gz archive open unpack attachment',
-  more:'Unpacks almost any archive, RAR, 7z, ZIP, TAR, and friends, and gives you the files inside as a plain ZIP your computer opens natively. Nothing gets uploaded.',
+  more:'Extracts supported ZIP, RAR, 7z, and TAR archives.',
   run:async f=>{ const onP=progress('Unpacking'); onP(.2);
     const entries=await extractArchive(f); onP(.7);
     if(!entries.length) return showGuide({title:'Empty archive',msg:'That archive unpacked fine, but there was nothing inside it.'});
     const files=[]; for(const e of entries) files.push({name:e.name,data:new Uint8Array(await e.file.arrayBuffer())});
     showMulti(files,base(f.name)+'-contents.zip',`${files.length} file${files.length>1?'s':''} unpacked, saved as a regular ZIP.`); }});
 add({cat:'image',kinds:['image','pdf'],rec:1,nm:'See Hidden Info',ds:'Read the GPS, camera, and date tags',kw:'metadata exif gps location camera date read see info hidden pdf author show',
-  more:'Shows the hidden tags inside a photo (where and when it was taken, the camera) or a PDF (title, author, dates). It only reads them and never changes your file. Nothing leaves your computer.',
+  more:'Displays metadata recorded in the file.',
   run:async f=>{ const onP=progress('Reading metadata'); onP(.4); const lines=[]; const row=(k,v)=>{ if(v!=null&&v!=='')lines.push(String(k).padEnd(12)+' '+v); };
     if(ext(f.name)==='pdf'){ try{ const d=await PDFDocument.load(await f.arrayBuffer(),{ignoreEncryption:true});
       const dstr=dt=>{ try{ return dt?dt.toISOString().slice(0,19).replace('T',' '):null; }catch{ return null; } };
@@ -926,7 +923,7 @@ add({cat:'image',kinds:['image','pdf'],rec:1,nm:'See Hidden Info',ds:'Read the G
     showText('HIDDEN INFO, '+f.name+'\n──────────────────────────────\n'+body+'\n', base(f.name)+'-info.txt'); }});
 
 add({cat:'image',kinds:['image'],nm:'Image to PDF',ds:'Turn an image into a one-page PDF',kw:'image to pdf',
-  more:'Puts a single image into a one-page PDF, sized to fit the picture.',
+  more:'Saves an image as a one-page PDF.',
   run:async f=>{ const onP=progress('Making PDF'); onP(.3); const png=await imgConvert(f,{type:'image/png'});
     const pdf=await PDFDocument.create(); const im=await pdf.embedPng(await png.arrayBuffer());
     pdf.addPage([im.width,im.height]).drawImage(im,{x:0,y:0,width:im.width,height:im.height});
@@ -934,38 +931,35 @@ add({cat:'image',kinds:['image'],nm:'Image to PDF',ds:'Turn an image into a one-
 
 /* ---- VIDEO ---- */
 add({cat:'video',kinds:['video'],rec:1,nm:'Video to GIF',ds:'Turn a clip into a looping GIF',kw:'gif convert to gif loop discord',
-  more:'Turns a short clip into a looping GIF you can post in a chat. You set the width and how smooth it looks.',
+  more:'Choose the GIF width and frame rate. Audio is removed.',
   opts:()=>{ const fps=el('input',{type:'number',value:12,min:4,max:30}); const w=el('input',{type:'number',value:480,min:120,step:20});
     return {node:el('div',{},[el('label',{},['fps ',fps]),el('label',{},['width ',w,' px'])]),get:()=>({fps:+fps.value||12,w:+w.value||480})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.gif',(i,out)=>['-i',i,'-vf',
     `fps=${o.fps},scale=${o.w}:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse`,'-loop','0',out],'Rendering GIF'),base(f.name)+'.gif'); }});
-add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make a smaller copy',kw:'compress shrink smaller size discord email tiny',
-  more:'Make the file smaller. Pick normal quality or set a size limit.',
-  opts:()=>{ const mode=el('select'); [['quality','Recommended quality'],['size','Fit under a size']].forEach(([v,l])=>mode.append(el('option',{value:v,textContent:l})));
-    const mb=el('input',{type:'number',value:25,min:1,max:10000,step:1}); const hint=el('div',{className:'note',textContent:'Normal keeps the same picture size and frame rate.'});
-    const label=el('label',{},['Mode ',mode]); const target=el('label',{},['Target size (MB) ',mb]); target.hidden=true;
-    mode.onchange=()=>{target.hidden=mode.value!=='size';};
-    return {node:el('div',{},[label,target,hint]),get:()=>({mode:mode.value,mb:+mb.value})}; },
-  check:(f,o)=>o.mode==='size'&&(!Number.isFinite(o.mb)||o.mb<1||o.mb>10000)?{title:'Invalid target size',msg:'Enter a target from 1 to 10,000 MB.'}:null,
-  run:async (f,o)=>{ const seconds=await videoDuration(f);
-    if(o.mode==='quality'){
-      const out=await runFF(f,'out.mp4',(i,out)=>JDCompression.buildCompressionArgs({mode:'quality',input:i,output:out}),'Compressing at recommended quality');
-      showResult(out,base(f.name)+'-smaller.mp4',{note:'Same picture size and frame rate.'}); return;
-    }
-    const result=await runVideoCompress(f,seconds,o.mb);
-    showResult(result.blob,base(f.name)+'-smaller.mp4',{note:`Target: ${o.mb} MB. The saved file may be slightly larger or smaller.`}); }});
+add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Reduce a video’s file size',kw:'compress shrink smaller size discord email tiny hevc h265 av1',
+  more:'Choose a compression format or a file-size limit. Saves a copy and keeps the original.',
+  opts:()=>{const mode=el('select');[['quality','Compress'],['size','Fit under a size limit']].forEach(([v,l])=>mode.append(el('option',{value:v,textContent:l})));
+    const codec=el('select');[['h264','Easy to share · MP4'],['hevc','Smaller file · HEVC'],['av1','Smallest file · AV1, slower']].forEach(([v,l])=>codec.append(el('option',{value:v,textContent:l})));
+    fetch('/api/compression-capabilities').then(r=>r.json()).then(caps=>{for(const option of codec.options)if(option.value!=='h264')option.disabled=!caps.available||!caps.codecs.includes(option.value);}).catch(()=>{for(const option of codec.options)if(option.value!=='h264')option.disabled=true;});
+    const speed=el('input',{type:'checkbox'}),mb=el('input',{type:'number',value:25,min:1,max:10000,step:1});
+    const limit=el('label',{},['Limit (MB) ',mb]);limit.hidden=true;
+    const note=el('p',{className:'note',textContent:'HEVC and AV1 need a compatible player. Resolution and frame rate are kept. HDR requires HEVC or AV1.'});
+    mode.onchange=()=>{limit.hidden=mode.value!=='size';codec.disabled=mode.value==='size';speed.disabled=mode.value==='size';};
+    return {node:el('div',{},[el('label',{},['Task ',mode]),el('label',{},['Format ',codec]),limit,el('label',{},[speed,' Faster encoding (use hardware when available)']),note]),get:()=>({mode:mode.value,codec:mode.value==='size'?'h264':codec.value,speed:speed.checked?'fast':'efficient',targetMb:+mb.value})};},
+  check:(f,o)=>o.mode==='size'&&(!Number.isFinite(o.targetMb)||o.targetMb<1||o.targetMb>10000)?{msg:'Enter a limit from 1 to 10,000 MB.'}:null,
+  run:async(f,o)=>{try{const result=await runVideoCompress(f,await nativeFFAvailable()?0:await videoDuration(f),o);showResult(result.blob,base(f.name)+'-smaller.mp4',{note:result.note||'Saved '+fmt(f.size-result.blob.size)+' ('+Math.round(100*(1-result.blob.size/f.size))+'% smaller).'});}catch(e){if(e.code==='already-small'||e.code==='hdr-format'||e.code==='target-not-met')return showGuide({msg:e.message});throw e;}}});
 add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the sound out as an MP3',kw:'extract audio mp3 sound from video',
-  more:'Takes just the sound from a video and saves it as an MP3 file.',
+  more:'Extracts the first audio track and saves it as MP3.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-acodec','libmp3lame','-q:a','2',out],'Extracting audio'),base(f.name)+'.mp3'); }});
 
 add({cat:'video',kinds:['video'],nm:'Trim a Video',ds:'Keep just one part of the clip',kw:'trim cut clip shorten',
-  more:'Keeps only the part between a start and end time and drops the rest. Times are in minutes and seconds.',
+  more:'Choose the start and end times. Saves the selected section as MP4.',
   opts:()=>{ const a=el('input',{type:'text',value:'00:00',placeholder:'mm:ss'}); const b=el('input',{type:'text',value:'00:10',placeholder:'mm:ss'});
     return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Clipping'),base(f.name)+'-clip.mp4'); }});
 
 add({cat:'video',kinds:['video'],nm:'Burn In Subtitles',ds:'Print captions right onto the video',kw:'subtitles captions srt vtt burn hardcode hardsub tiktok reels muted',
-  more:'Prints a subtitle file permanently onto the picture, so captions show even where subtitles aren’t supported. Most social video is watched on mute, captions keep people watching.',
+  more:'Makes the selected subtitle file a permanent part of the video picture.',
   opts:()=>{ const inp=el('input',{type:'file',accept:'.srt,.vtt,.ass'});
     const sz=el('select'); [['18','Small'],['28','Medium'],['40','Large']].forEach(([v,l])=>sz.append(el('option',{value:v,textContent:l}))); sz.value='28';
     const pos=el('select'); [['bottom','Bottom'],['top','Top']].forEach(([v,l])=>pos.append(el('option',{value:v,textContent:l})));
@@ -975,45 +969,45 @@ add({cat:'video',kinds:['video'],nm:'Burn In Subtitles',ds:'Print captions right
     const fstyle=jdCapStyle(o.fsize,o.fpos);
     showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-vf',`subtitles=${sn}:force_style='${fstyle}'`,'-c:v','libx264','-pix_fmt','yuv420p','-crf','21','-preset','veryfast','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Burning in captions',{name:sn,data:o.sub}),base(f.name)+'-captioned.mp4'); }});
 add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'mute remove audio silence',
-  more:'Removes the sound and keeps the picture. Good for hiding background noise before you share.',
+  more:'Removes audio from the video copy.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
 
 /* ---- AUDIO ---- */
 
 
 add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitles',ds:'Turn speech into text or an SRT caption file',kw:'transcribe transcription speech to text subtitles captions srt vtt whisper voice memo interview lecture auto',
-  more:'Listens to a recording or video and writes out what was said, as plain text, or as an SRT subtitle file you can burn in with the captions tool. The first run downloads your chosen speech model once; after that it works fully offline. Handles most languages.',
+  more:'Runs speech recognition locally. Whisper supports subtitles; Qwen3 outputs text.',
   opts:()=>{ const fmt=el('select'); [['srt','Subtitles (SRT)'],['txt','Plain text'],['vtt','Web captions (VTT)']].forEach(([v,l])=>fmt.append(el('option',{value:v,textContent:l})));
-    const q=el('select'); [['base','Fast (~140 MB), quickest, fine for clear speech'],['small','Balanced (~465 MB), much better'],['medium','Accurate (~1.5 GB), strong but slow'],['turbo','Best (~1.5 GB), recommended for important recordings']].forEach(([v,l])=>q.append(el('option',{value:v,textContent:l}))); q.value='turbo';
-    return {node:el('div',{},[el('label',{},['give me ',fmt]),el('label',{style:'margin-left:12px'},['quality ',q])]),get:()=>({fmt:fmt.value,model:q.value})}; },
-  run:async (f,o)=>{ const info=await nativeInfo(); if(!info.whisper) return showGuide(needDesktop('Transcribing'));
-    const MODELS={base:{file:'ggml-base.bin',flag:'whisperModel',label:'Fast',size:'~140 MB'},small:{file:'ggml-small.bin',flag:'whisperSmall',label:'Balanced',size:'~465 MB'},medium:{file:'ggml-medium.bin',flag:'whisperMedium',label:'Accurate',size:'~1.5 GB'},turbo:{file:'ggml-large-v3-turbo.bin',flag:'whisperTurbo',label:'Best',size:'~1.5 GB'}};
+    const q=el('select'); [['base','Whisper base (~148 MB)'],['small','Whisper small (~488 MB)'],['medium','Whisper medium (~1.5 GB)'],['turbo','Whisper turbo (~1.6 GB)']].forEach(([v,l])=>q.append(el('option',{value:v,textContent:l}))); q.value='turbo';const qwenOption=el('option',{value:'qwen',textContent:'Qwen3-ASR 0.6B (843 MB download, text only)',disabled:true});q.append(qwenOption);nativeInfo().then(info=>qwenOption.disabled=!info.qwen);q.onchange=()=>{fmt.disabled=q.value==='qwen';if(q.value==='qwen')fmt.value='txt';};
+    return {node:el('div',{},[el('label',{},['Output ',fmt]),el('label',{style:'margin-left:12px'},['Model ',q])]),get:()=>({fmt:fmt.value,model:q.value})}; },
+  run:async (f,o)=>{const transcriptionEpoch=conversionEpoch;if(o.model==='qwen'){const epoch=conversionEpoch;await ensureModelPack('qwen3-asr');if(epoch!==conversionEpoch)return;if(transcriptionEpoch!==conversionEpoch)return;const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Preparing audio');const text=await runTool(new File([wav],'input.wav',{type:'audio/wav'}),'qwen-asr',{fmt:'txt'},'out.txt','Transcribing');showText((await text.text()).trim(),base(f.name)+'.txt');return;} const info=await nativeInfo(); if(!info.whisper) return showGuide(needDesktop('Transcribing'));
+    const MODELS={base:{file:'ggml-base.bin',flag:'whisperModel',label:'Whisper base',size:'~140 MB'},small:{file:'ggml-small.bin',flag:'whisperSmall',label:'Whisper small',size:'~465 MB'},medium:{file:'ggml-medium.bin',flag:'whisperMedium',label:'Whisper medium',size:'~1.5 GB'},turbo:{file:'ggml-large-v3-turbo.bin',flag:'whisperTurbo',label:'Whisper turbo',size:'~1.5 GB'}};
     const model=['base','small','medium','turbo'].includes(o.model)?o.model:'turbo';
     const m=MODELS[model];
-    if(!info[m.flag]) await ensureModel(m.file,m.flag,`Downloading the ${m.label.toLowerCase()} speech model (one time, ${m.size})`);
-    const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
+    if(!info[m.flag]) await ensureModel(m.file,m.flag,`Downloading ${m.label} (${m.size})`);
+    if(transcriptionEpoch!==conversionEpoch)return;const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
     const fmt=['srt','txt','vtt'].includes(o.fmt)?o.fmt:'srt';
     const b=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt,model},'out.'+fmt,'Listening and writing (a long recording takes a while)');
     if(fmt==='txt') showText((await b.text()).trim(),base(f.name)+'.txt');
-    else showResult(b,base(f.name)+'.'+fmt,{note:fmt==='srt'?'Pairs perfectly with “Burn In Subtitles”.':''}); }});
+    else showResult(b,base(f.name)+'.'+fmt,{note:fmt==='srt'?'Use this file with Burn In Subtitles.':''}); }});
 
 
 
 add({cat:'audio',kinds:['audio'],nm:'Trim Audio',ds:'Keep only the part you want',kw:'trim cut audio',
-  more:'Set a start and end time and keep just that stretch of sound. The rest gets cut away.',
+  more:'Saves the audio between the selected start and end times.',
   opts:()=>{ const a=el('input',{type:'text',value:'00:00'}); const b=el('input',{type:'text',value:'00:30'});
     return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-acodec','libmp3lame','-q:a','2',out],'Trimming'),base(f.name)+'-trim.mp3'); }});
 add({cat:'audio',kinds:['audio'],nm:'Shrink Audio File',ds:'Make the file smaller',kw:'bitrate compress smaller audio',
-  more:'Saves the sound at a lower quality so the file takes up less space.',
+  more:'Encodes audio at the selected bitrate.',
   opts:oSel('bitrate',[['128','128 kbps'],['96','96 kbps'],['64','64 kbps'],['192','192 kbps']],'kb'),
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-b:a',o.kb+'k','-acodec','libmp3lame',out],'Re-encoding'),base(f.name)+'-'+o.kb+'k.mp3'); }});
 
 /* ---- PDF ---- */
 add({cat:'pdf',kinds:['pdf'],rec:1,custom:f=>pdfSignFill(f),nm:'Sign & Fill PDF',ds:'Add a signature, text, and the date',kw:'sign signature fill form text date annotate edit adobe acrobat esign initials',
-  more:'Open a PDF and drop your signature, text, and today\'s date anywhere on the page, then save it. Your file stays on your computer.'});
+  more:'Place text, a date, or a signature on a PDF and save a copy.'});
 add({cat:'pdf',kinds:['pdf'],rec:1,nm:'Shrink a PDF',ds:'Make a big PDF smaller',kw:'compress shrink pdf smaller size squish',
-  more:'Turns each page into a picture to shrink the file. Best for scanned documents. The text still shows, but you can no longer select it.',
+  more:'Reduces embedded image size. Some PDFs cannot be made smaller.',
   run:async f=>{ const onP=progress('Compressing PDF'); const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;
     const pdf=await PDFDocument.create();
     for(let p=1;p<=doc.numPages;p++){ onP(p/doc.numPages); const pg=await doc.getPage(p); const vp=pg.getViewport({scale:1.5});
@@ -1022,32 +1016,32 @@ add({cat:'pdf',kinds:['pdf'],rec:1,nm:'Shrink a PDF',ds:'Make a big PDF smaller'
       pdf.addPage([vp.width,vp.height]).drawImage(im,{x:0,y:0,width:vp.width,height:vp.height}); }
     showResult(new Blob([await pdf.save()],{type:'application/pdf'}),base(f.name)+'-small.pdf'); }});
 add({cat:'pdf',kinds:['pdf'],rec:1,nm:'PDF to Pictures',ds:'Save each page as a PNG image',kw:'pdf to images png export pages',
-  more:'Turns every page into a sharp PNG picture and puts them in a zip. Good for sharing pages as images.',
+  more:'Saves each page as an image.',
   run:async f=>{ const onP=progress('Rendering pages'); const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise; const out=[];
     for(let p=1;p<=doc.numPages;p++){ onP(p/doc.numPages); const pg=await doc.getPage(p); const vp=pg.getViewport({scale:2});
       const c=el('canvas'); c.width=vp.width; c.height=vp.height; await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
       const b=await blobOf(c,'image/png',.95); out.push({name:`${base(f.name)}-p${String(p).padStart(2,'0')}.png`,data:new Uint8Array(await b.arrayBuffer())}); }
     out.length===1?showResult(new Blob([out[0].data],{type:'image/png'}),out[0].name):showMulti(out,base(f.name)+'-pages.zip'); }});
 add({cat:'pdf',kinds:['pdf'],nm:'Split into Single Pages',ds:'Make one PDF per page',kw:'split pages separate pdf',
-  more:'Breaks a PDF into a separate file for each page and puts them all in a zip.',
+  more:'Saves one PDF per page.',
   run:async f=>{ const onP=progress('Splitting'); const src=await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true }); const n=src.getPageCount(); const out=[];
     for(let i=0;i<n;i++){ onP((i+1)/n); const d=await PDFDocument.create(); const [pg]=await d.copyPages(src,[i]); d.addPage(pg);
       out.push({name:`${base(f.name)}-p${String(i+1).padStart(2,'0')}.pdf`,data:await d.save()}); }
     showMulti(out,base(f.name)+'-split.zip'); }});
 add({cat:'pdf',kinds:['pdf'],nm:'Turn Pages',ds:'Turn every page the right way up',kw:'rotate pages turn orientation',
-  more:'Turns every page 90 or 180 degrees. Fixes a scan that came out sideways or upside down.',
+  more:'Rotates PDF pages by the selected angle.',
   opts:oSel('turn',[['90','90° clockwise'],['270','90° counter-clockwise'],['180','180°']],'deg'),
   run:async (f,o)=>{ const onP=progress('Rotating'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
     d.getPages().forEach(p=>p.setRotation(degrees((p.getRotation().angle+ +o.deg)%360)));
     showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-rotated.pdf'); }});
 add({cat:'pdf',kinds:['pdf'],nm:'Add Page Numbers',ds:'Number every page',kw:'page numbers number stamp footer',
-  more:'Stamps the page number at the bottom of each page, like 3 / 12.',
+  more:'Adds page numbers to the PDF.',
   run:async f=>{ const onP=progress('Numbering'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
     const font=await d.embedFont(StandardFonts.Helvetica); const ps=d.getPages();
     ps.forEach((p,i)=>{ const {width}=p.getSize(); p.drawText(`${i+1} / ${ps.length}`,{x:width/2-14,y:18,size:10,font,color:rgb(.2,.2,.2)}); });
     showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-numbered.pdf'); }});
 add({cat:'pdf',kinds:['pdf'],nm:'Add a Watermark',ds:'Stamp text across every page',kw:'watermark stamp text overlay draft confidential',
-  more:'Prints faint slanted text across every page, like CONFIDENTIAL or DRAFT. Type your own words.',
+  more:'Adds the selected text across PDF pages.',
   opts:()=>{ const t=el('input',{type:'text',value:'CONFIDENTIAL'}); return {node:el('label',{},['text ',t]),get:()=>({t:t.value||'DRAFT'})}; },
   run:async (f,o)=>{ const onP=progress('Stamping'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
     const font=await d.embedFont(StandardFonts.HelveticaBold);
@@ -1055,7 +1049,7 @@ add({cat:'pdf',kinds:['pdf'],nm:'Add a Watermark',ds:'Stamp text across every pa
       p.drawText(o.t,{x:width/2-120,y:height/2,size:50,font,color:rgb(.6,.1,.1),opacity:.18,rotate:degrees(35)}); });
     showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-marked.pdf'); }});
 add({cat:'pdf',kinds:['pdf'],nm:'Delete Pages',ds:'Take out pages you don\'t want',kw:'delete remove pages drop',
-  more:'Removes the pages you name. Type page numbers with commas and ranges, like 1,3,5-7.',
+  more:'Removes the selected page numbers from a PDF copy.',
   opts:()=>{ const t=el('input',{type:'text',value:'1',placeholder:'e.g. 1,3,5-7'}); return {node:el('label',{},['remove ',t]),get:()=>({spec:t.value})}; },
   run:async (f,o)=>{ const onP=progress('Removing'); onP(.3); const d=await PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true });
     const drop=new Set(); o.spec.split(',').forEach(s=>{ s=s.trim(); if(s.includes('-')){ const [a,b]=s.split('-').map(Number);
@@ -1063,7 +1057,7 @@ add({cat:'pdf',kinds:['pdf'],nm:'Delete Pages',ds:'Take out pages you don\'t wan
     [...drop].sort((a,b)=>b-a).forEach(i=>{ if(i>=0&&i<d.getPageCount())d.removePage(i); });
     showResult(new Blob([await d.save()],{type:'application/pdf'}),base(f.name)+'-trimmed.pdf'); }});
 add({cat:'pdf',kinds:['pdf'],multi:1,nm:'Combine PDFs',ds:'Join several PDFs into one',kw:'merge combine join pdf',
-  more:'Joins your PDFs into a single file, in the order you pick them. Drop in more than one PDF to use this.',
+  more:'Joins the selected PDFs in their listed order.',
   run:async fs=>{ const onP=progress('Merging'); const m=await PDFDocument.create();
     for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); const d=await PDFDocument.load(await fs[i].arrayBuffer(), { ignoreEncryption: true });
       (await m.copyPages(d,d.getPageIndices())).forEach(p=>m.addPage(p)); }
@@ -1071,23 +1065,23 @@ add({cat:'pdf',kinds:['pdf'],multi:1,nm:'Combine PDFs',ds:'Join several PDFs int
 
 /* ---- DATA ---- */
 add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'CSV to JSON',ds:'Turn a spreadsheet into JSON',kw:'csv json convert data table',
-  more:'Turns a spreadsheet-style CSV into JSON. The first row becomes the field names.',
+  more:'Converts CSV rows to JSON objects.',
   fileToText:1, run:(text)=>showText(csvToJSON(text),'data.json')});
 add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'JSON to CSV',ds:'Turn JSON into a spreadsheet',kw:'json csv convert data table',
-  more:'Turns a JSON list into a CSV you can open in a spreadsheet. The field names become the top row.',
+  more:'Converts a JSON array of objects to CSV.',
   fileToText:1, run:(text)=>showText(jsonToCSV(text),'data.csv')});
 
 /* ---- DEV (text in / text out) ---- */
 
 
 add({cat:'dev',input:'text',rec:1,nm:'Make a QR Code',ds:'Turn a link or text into a QR code',kw:'qr code generate make url link create barcode',
-  more:'Type a web link or any text and get a QR code picture you can save or share. Pick a bigger size to make it easy to scan from far away.',
+  more:'Creates a QR image from text or a link.',
   opts:oSel('size',[['8','Medium'],['5','Small'],['13','Large']],'scale'),
   run:async (text,o)=>{ const t=(text||'').trim(); if(!t) throw new Error('Type a URL or some text first.');
     const QR=await qrGen(); const dataUrl=await QR.toDataURL(t,{margin:2,scale:+o.scale||8,errorCorrectionLevel:'M'});
     showResult(await (await fetch(dataUrl)).blob(),'qr.png',{note:'Scan to open: '+(t.length>60?t.slice(0,60)+'…':t)}); }});
 add({cat:'dev',kinds:['image'],nm:'Read a QR Code',ds:'Pull the link out of a QR code image',kw:'qr code read scan decode reverse barcode image',
-  more:'Drop in a photo or screenshot with a QR code and it shows you the link or text inside. This is the reverse of making a QR code.',
+  more:'Reads the text or link in a QR image.',
   run:async f=>{ const onP=progress('Reading QR'); onP(.3); const {img,url}=await toImage(f);
     const c=canvasOf(img,1600); const d=c.getContext('2d').getImageData(0,0,c.width,c.height); URL.revokeObjectURL(url);
     const jsQR=await qrDec(); const res=jsQR(d.data,c.width,c.height);
@@ -1097,7 +1091,7 @@ add({cat:'dev',kinds:['image'],nm:'Read a QR Code',ds:'Pull the link out of a QR
 
 /* ---- WEIRD ---- */
 add({cat:'weird',kinds:['any'],rec:1,nm:'Look Inside a File',ds:'Identify unknown files, including old .dat files',kw:'inspect identify type metadata dat skype unknown legacy magic recover',
-  more:'Checks file signatures and asks the local media engine to identify streams. A .dat extension can contain media, a database, or proprietary data. Unsupported files are reported honestly; originals are never changed.',
+  more:'Inspects the file signature and available media streams. Proprietary data may need its original application.',
   run:async f=>{ const onP=progress('Identifying file');onP(.1); const bytes=new Uint8Array(await f.slice(0,512).arrayBuffer()); const signature=JDMedia.identify(bytes);let media=null;
     if(await nativeFFAvailable()){const ctl=new AbortController();_jobCtl=ctl;try{const r=await fetch('/api/probe-media?ext='+encodeURIComponent(ext(f.name)),{method:'POST',body:f,signal:ctl.signal});if(!r.ok)throw new Error('Media inspection failed ('+r.status+')');media=await r.json();}finally{if(_jobCtl===ctl)_jobCtl=null;}}
     const report=['FILE REPORT','Name: '+f.name,'Size: '+fmt(f.size),'Signature: '+signature.label,'Media: '+(media?.recognized?media.summary:media?.reason||'Not identified as playable media.'),'',signature.note||'','',media?.recognized?'Use Convert Unknown Media to save the detected media in a common format.':'A file extension is not a format. Proprietary Skype SILK recordings and databases need a dedicated decoder or exporter; renaming the file will not convert it.'].join('\n');
@@ -1105,18 +1099,18 @@ add({cat:'weird',kinds:['any'],rec:1,nm:'Look Inside a File',ds:'Identify unknow
 
 /* ---- WEB / DOWNLOAD (link in, file out; needs the local server) ---- */
 add({cat:'web',input:'url',mode:'video',needs:'ytdlp',nm:'YouTube to Video',ds:'Save a video as an MP4 file',kw:'youtube download video mp4 vimeo twitch save',
-  more:'Paste a YouTube link and save the video to your computer as an MP4. Works with many other video sites too.'});
+  more:'Downloads video from a supported link. Requires an internet connection.'});
 add({cat:'web',input:'url',mode:'audio',needs:'ytdlp',nm:'YouTube to MP3',ds:'Save just the sound as an MP3',kw:'youtube download audio mp3 song music rip',
-  more:'Paste a video link and save only the sound as an MP3 file. Good for songs, talks, and podcasts.'});
+  more:'Downloads audio from a supported link. Requires an internet connection.'});
 
 add({cat:'video',kinds:['video','image'],rec:1,nm:'Convert Video',ds:'Make videos playable as MP4',kw:'convert mts m2ts avchd mp4 mov mkv webm avi vob mod tod mxf dv wmv flv ts legacy camcorder',
-  more:'Convert camera footage and older videos locally. Choose MP4 for broad compatibility, or another available output. The installed engine determines which codecs can be read. Originals stay untouched.',custom:f=>conversionPanel([f],'video')});
+  more:'Converts readable video to the selected format. Copies the first video and audio tracks.',custom:f=>conversionPanel([f],'video')});
 add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Convert Audio',ds:'Convert recordings or extract sound from a video',kw:'convert audio mp3 wav m4a aac flac opus ogg wma aiff amr ac3 ape caf au mp2',
-  more:'Save audio in a common or legacy format, or extract the first audio track from a video. Lossless output cannot restore detail already lost in the original.',custom:f=>conversionPanel([f],'audio')});
+  more:'Converts audio or extracts the first audio track from a video.',custom:f=>conversionPanel([f],'audio')});
 add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'HEIC, WebP, PNG and more to JPG or PNG',kw:'convert image jpg png webp heic heif avif jxl tiff bmp tga ppm pgm pcx exr jp2',
-  more:'Choose a format for your image. Transparency is retained only by formats that support it; animated inputs export their first frame. Camera RAW files have a separate conversion tool.',custom:f=>conversionPanel([f],'image')});
+  more:'Converts an image to the selected format. Transparency requires a supporting format.',custom:f=>conversionPanel([f],'image')});
 add({cat:'weird',kinds:['any'],nm:'Convert Unknown Media',ds:'Try readable media hidden in a .dat or unknown file',kw:'dat skype unknown convert recover recording legacy bin',
-  more:'The local engine reads the contents rather than trusting the extension. Works only when it recognizes actual media. Databases, encrypted files, and proprietary Skype SILK require dedicated exporters.',custom:f=>conversionPanel([f])});
+  more:'Tries the local media decoder on an unknown file. Databases and encrypted files need dedicated exporters.',custom:f=>conversionPanel([f])});
 
 async function conversionPanel(files,initial,preferred){
   if(!Array.isArray(files))files=[files];
@@ -1231,7 +1225,7 @@ function renderDrawerBrowser(selected){
     const c=CATS[selected], tools=T.filter(t=>t.cat===selected);
     const detail=el('div',{className:'drawer-detail'});
     const back=el('button',{className:'drawer-entry',style:'display:flex;width:100%;margin-bottom:4px'},[
-      el('span',{textContent:'◂'}),el('span',{className:'dn',textContent:'All drawers'})]);
+      el('span',{textContent:'◂'}),el('span',{className:'dn',textContent:'All tools'})]);
     back.onclick=()=>renderDrawerBrowser();
     detail.append(back,el('div',{className:'drawer-summary',textContent:`${c.label}: ${c.blurb}. ${tools.length} tool${tools.length===1?'':'s'}.`}));
     const list=el('div',{className:'drawer-tools'});
@@ -1344,22 +1338,29 @@ function renderText(t,prefill=''){ const color=CATS[t.cat].color; openStage();
 
 /* Manage storage, list installed downloadable AI models and let the user delete them to reclaim disk. */
 const MODEL_LABELS={
-  'ggml-base.bin':'Subtitles model, base (fast, good enough)',
-  'ggml-small.bin':'Subtitles model, small (more accurate)',
-  'ggml-medium.bin':'Subtitles model, medium (most accurate)',
+  'ggml-large-v3-turbo.bin':'Whisper turbo',
+  'ggml-base.bin':'Whisper base',
+  'ggml-small.bin':'Whisper small',
+  'ggml-medium.bin':'Whisper medium',
   'UVR-MDX-NET-Voc_FT.onnx':'Retired song separation model',
   'vits-piper-en_US-amy-medium':'Text-to-speech voice (Amy, en-US)',
 };
 async function renderStorage(){ openStage();
   const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.dev.color); $('#output').innerHTML=''; clearStatus();
   p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Manage storage'}),el('span',{className:'badge',textContent:'Storage'})]));
-  p.append(el('div',{className:'ds',textContent:'Downloadable AI models live on your computer. Delete any you don’t use to free up disk.'}));
+  p.append(el('div',{className:'ds',textContent:'Downloaded models are stored on this computer. You can remove them here.'}));
   const list=el('div',{className:'opts'}); p.append(list);
   const load=async()=>{
     list.innerHTML='';
     let j; try{ j=await (await fetch('/api/models')).json(); }
     catch{ list.append(el('div',{className:'ds',textContent:'This only works in the Junk Drawer desktop app, a plain browser tab has no models to manage.'})); return; }
-    const models=j.models||[]; let totalMB=0;
+    let totalMB=0;
+    try{const {packs}=await(await fetch('/api/model-packs')).json();for(const pack of packs){if(pack.ready)totalMB+=pack.sizeMB;
+      const button=el('button',{className:'btn ghost',textContent:pack.ready?'Remove':'Download',disabled:pack.downloading});
+      button.onclick=async()=>{button.disabled=true;try{if(pack.ready){const response=await fetch('/api/delete-model-pack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:pack.id})});if(!response.ok)throw Error('Could not remove model.');}else await ensureModelPack(pack.id);}catch(e){toast(e.message);}await load();};
+      list.append(el('div',{className:'integration-preference'},[el('div',{},[el('b',{textContent:pack.label}),el('small',{textContent:(pack.ready?'Installed · ':pack.downloading?'Downloading · ':'Not installed · ')+pack.sizeMB+' MB'})]),button]));
+    }}catch{}
+    const models=j.models||[];
     for(const m of models){
       const label=MODEL_LABELS[m.name]||m.name;
       const size=(m.sizeMB>=1000?(m.sizeMB/1000).toFixed(2)+' GB':m.sizeMB+' MB');
@@ -1930,7 +1931,7 @@ if(new URLSearchParams(location.search).has('quick'))document.body.classList.add
 
 
 async function renderDesktopIntegration(){
-  resetStage();openStage();const p=$('#panel');p.innerHTML='';p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Settings & quick access'})]),el('p',{className:'ds',textContent:'Use Junk Drawer without finding and opening the full app. Your default file viewers stay the same.'}));
+  resetStage();openStage();const p=$('#panel');p.innerHTML='';p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Settings & quick access'})]),el('p',{className:'ds',textContent:'Choose how to launch Junk Drawer and use selected files.'}));
   let current;try{current=await(await fetch('/api/desktop-integration')).json();}catch{current={available:false};}
   const preferences=el('div',{className:'integration-preferences'});p.append(preferences);
   const save=async change=>{const r=await fetch('/api/desktop-integration',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(change)});const j=await r.json();if(!r.ok)throw Error(j.detail||'Could not change this setting.');current=j;};

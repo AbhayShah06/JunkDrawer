@@ -9,7 +9,9 @@ const os = require('os');
 const { spawn, spawnSync } = require('child_process');
 const https = require('https');
 const { integrationCatalog } = require('./integrations');
-const { buildTwoPassArgs } = require('./compression');
+const {createModelPacks}=require('./model-packs');
+const {createJobQueue}=require('./job-queue');
+const compressionService = require('./compression-service');
 const mediaService = require('./media-service');
 let PKG = {}; try { PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')); } catch {}
 
@@ -75,7 +77,7 @@ function getSystemProfile(binDir, modelsDir) {
   return {
     platform: process.platform, arch: process.arch, logicalCpus: os.cpus().length,
     totalMemoryBytes: totalMemory, freeMemoryBytes: freeMemory,
-    engines: { ffmpeg: !!ffmpeg, whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), pdf: true, browser: true },
+    engines: { ffmpeg: !!ffmpeg, whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), qwen:!!toolBin(binDir,'speech','speech'), pdf: true, browser: true },
     ffmpegEncoders: encoders,
     models: {
       whisperBase: modelReady(modelsDir, 'ggml-base.bin'), whisperSmall: modelReady(modelsDir, 'ggml-small.bin'),
@@ -296,77 +298,7 @@ function handleFFmpeg(req, res, binDir) {
 
 // The hard-size video route owns its argv and temp-file lifecycle. Only the streamed input,
 // duration, target and opaque progress id cross the request boundary; no arbitrary FFmpeg argv.
-function handleVideoCompress(req, res, binDir) {
-  const reject = (obj, code) => { try { req.resume(); } catch {} return sendJSON(res, obj, code); };
-  req.on('error', () => {});
-  let meta;
-  try { meta = JSON.parse(new URLSearchParams(req.url.split('?')[1] || '').get('meta') || ''); }
-  catch { return reject({ error: 'bad-meta' }, 400); }
-  const id = new URLSearchParams(req.url.split('?')[1] || '').get('id') || '';
-  if (!/^[A-Za-z0-9-]{1,64}$/.test(id)) return reject({ error: 'bad-job-id' }, 400);
-  let plan;
-  try { plan = buildTwoPassArgs({ duration: meta && meta.duration, targetMb: meta && meta.targetMb }); }
-  catch (e) { return reject({ error: e.code || 'bad-compression-options', detail: e.message }, 400); }
-  let ffmpeg = findBin('ffmpeg', binDir);
-  if (!ffmpeg) return reject({ error: 'ffmpeg-missing' }, 501);
-  ffmpeg = path.resolve(ffmpeg);
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-video-'));
-  const inPath = path.join(tmp, 'input.bin'), outPath = path.join(tmp, 'output.mp4');
-  const ws = fs.createWriteStream(inPath);
-  let aborted = false, active = null;
-  const fail = (error, code=500, detail='') => {
-    if (aborted) return; aborted = true;
-    if (active) killTree(active);
-    try { ws.destroy(); } catch {}
-    ffProgress.delete(id); cleanup(tmp);
-    sendJSON(res, Object.assign({ error }, detail ? { detail: String(detail).slice(-2500) } : {}), code);
-  };
-  req.on('aborted', () => { if (!aborted) { aborted = true; if (active) killTree(active); try { ws.destroy(); } catch {} ffProgress.delete(id); cleanup(tmp); } });
-  res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; if (active) killTree(active); ffProgress.delete(id); cleanup(tmp); } });
-  ws.on('error', e => fail('write-failed', 500, e.message));
-  req.on('error', e => fail('upload-failed', 400, e.message));
-  req.pipe(ws);
-  ws.on('finish', async () => {
-    if (aborted) return;
-    const duration = Number(meta.duration);
-    const runPass = (args, passIndex) => new Promise((resolve, rejectPass) => {
-      if (aborted) return rejectPass(Object.assign(new Error('cancelled'), { jdAborted: true }));
-      const child = spawn(ffmpeg, args, { cwd: tmp, detached: true, stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
-      active = child;
-      let stderr = '';
-      child.stderr.on('data', data => {
-        const chunk = String(data); stderr += chunk; if (stderr.length > 12000) stderr = stderr.slice(-12000);
-        const match = /time=\s*(\d+):(\d\d):(\d\d(?:\.\d+)?)/.exec(chunk);
-        if (match && duration > 0) {
-          const seconds = +match[1] * 3600 + +match[2] * 60 + +match[3];
-          ffProgress.set(id, Math.min(0.999, passIndex * 0.5 + Math.max(0, seconds / duration) * 0.5));
-        }
-      });
-      child.on('error', error => { error.passIndex = passIndex; rejectPass(error); });
-      child.on('close', code => { if (active === child) active = null; code === 0 ? resolve() : rejectPass(Object.assign(new Error(stderr.slice(-2500) || `ffmpeg exit ${code}`), { passIndex })); });
-    });
-    ffProgress.set(id, 0);
-    try {
-      await runPass(plan.pass1, 0);
-      if (aborted) return;
-      await runPass(plan.pass2, 1);
-      if (aborted) return;
-      const stat = fs.statSync(outPath);
-      if (!stat.isFile() || stat.size === 0) return fail('no-output', 500);
-      ffProgress.set(id, 1);
-      res.statusCode = 200; res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Length', stat.size); res.setHeader('X-Filename', 'video-smaller.mp4');
-      res.setHeader('Access-Control-Expose-Headers', 'X-Filename');
-      const stream = fs.createReadStream(outPath);
-      stream.on('error', () => { try { res.destroy(); } catch {} ffProgress.delete(id); cleanup(tmp); });
-      stream.on('close', () => { ffProgress.delete(id); cleanup(tmp); });
-      stream.pipe(res);
-    } catch (e) {
-      if (aborted || e.jdAborted) return;
-      fail(e.passIndex === 0 ? 'pass1-failed' : 'pass2-failed', 500, e.message);
-    }
-  });
-}
+function handleVideoCompress(req,res,binDir){return compressionService.handle(req,res,findBin('ffmpeg',binDir),{progress:ffProgress,kill:killTree,cleanup});}
 
 // ---- update notifier: compare the local version to the latest GitHub release ----
 function ghRepo() {
@@ -579,7 +511,11 @@ function handleTool(req, res, binDir, modelsDir) {
   // the throwaway temp dir.
   let plan = null, outName = null, late = null;
   const pct = s => { const m = /(\d+(?:\.\d+)?)%/.exec(s); return m ? +m[1] / 100 : null; };
-  if (tool === 'whisper') {
+  if(tool==='qwen-asr'){
+    const packs=createModelPacks(modelsDir),bin=toolBin(binDir,'speech','speech'),model=packs.file('qwen3-asr-0.6b-q8.gguf'),vad=packs.file('silero-vad.gguf');
+    if(!bin)return reject({error:'tool-missing'},501);if(!model||!vad)return reject({error:'model-missing'},409);if(opts.fmt&&opts.fmt!=='txt')return reject({error:'text-only',detail:'Qwen3 transcription outputs text. Use Whisper for subtitles.'},400);
+    outName='out.txt';plan=[{bin,args:['asr',model,'--vad',vad,'--max-speech-duration-s','20','--device','cpu','--threads','4','--format','text',inName],stdout:outName}];
+  } else if (tool === 'whisper') {
     const bin = toolBin(binDir, 'whisper', 'whisper-cli');
     if (!bin) return reject({ error: 'tool-missing' }, 501);
     // Bigger models miss far fewer lines (esp. over music), at the cost of speed. The renderer
@@ -650,13 +586,15 @@ function handleTool(req, res, binDir, modelsDir) {
       }
       const { bin, args, prog, stdout } = plan[k];
       // detached → child leads its own process group, so a cancelled job can be killed as a tree
-      const child = spawn(bin, args, { cwd: tmp, detached: true });
+      const child = spawn(bin, args, { cwd: tmp, detached: true,windowsHide:true,env:{...process.env,SPEECH_NO_UPDATE_CHECK:'1',HF_HUB_OFFLINE:'1'} });
       curChild = child;
-      if (stdout) child.stdout.pipe(fs.createWriteStream(path.join(tmp, stdout)));
+      const stdoutDone=stdout?require('node:stream/promises').pipeline(child.stdout,fs.createWriteStream(path.join(tmp,stdout))):Promise.resolve();
+      stdoutDone.catch(()=>{});
       child.stderr.on('data', d => { const s = String(d); err += s; if (err.length > 20000) err = err.slice(-20000);
         if (id && prog) { const p = prog(s); if (p != null) ffProgress.set(id, Math.min(0.999, (k + Math.max(0, p)) / plan.length)); } });
       child.on('error', e => { if (aborted) return; if (id) ffProgress.delete(id); cleanup(tmp); sendJSON(res, { error: 'tool-failed', detail: String(e) }, 500); });
-      child.on('close', code => {
+      child.on('close', async code => {
+        try{await stdoutDone;}catch(e){if(!aborted){aborted=true;cleanup(tmp);sendJSON(res,{error:'write-failed'},500);}return;}
         if (aborted) return;
         if (code !== 0) { if (id) ffProgress.delete(id); const d = err.slice(-2500); cleanup(tmp); return sendJSON(res, { error: 'tool-failed', detail: d || (path.basename(bin) + ' exit ' + code) }, 500); }
         runStep(k + 1);
@@ -727,6 +665,8 @@ function handleImportCard(req, res) {
 function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegration) {
   // absolute: tool subprocesses run from throwaway temp cwds, so a relative path would break
   modelsDir = path.resolve(modelsDir || path.join(os.homedir(), '.junkdrawer', 'models'));
+  const modelPacks=createModelPacks(modelsDir);
+  const nativeJobs=createJobQueue();
   return new Promise(resolve => {
     let expectedHost = null;  // set once the ephemeral port is known (below)
     const rootResolved = path.resolve(appRoot);
@@ -747,7 +687,7 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
       if (url.startsWith('/api/') && !localOnly(req, expectedHost)) { res.statusCode = 403; return res.end('forbidden'); }
       if (url === '/api/check')
         return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir),
-          whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), whisperModel: modelReady(modelsDir, 'ggml-base.bin'),
+          whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), qwen:!!toolBin(binDir,'speech','speech'), whisperModel: modelReady(modelsDir, 'ggml-base.bin'),
           whisperSmall: modelReady(modelsDir, 'ggml-small.bin'), whisperMedium: modelReady(modelsDir, 'ggml-medium.bin'),
           whisperTurbo: modelReady(modelsDir, 'ggml-large-v3-turbo.bin'),
           raw: !!toolBin(binDir, 'libraw', 'dcraw_emu'),
@@ -765,6 +705,7 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
         let body='',tooLarge=false;req.on('data',chunk=>{if(tooLarge)return;body+=chunk;if(body.length>1024){tooLarge=true;sendJSON(res,{error:'bad-body'},413);}});
         req.on('end',async()=>{if(tooLarge)return;try{const j=JSON.parse(body);if(j.action==='startup-settings'){if(!desktopIntegration?.openStartupSettings)return sendJSON(res,{error:'desktop-only'},501);await desktopIntegration.openStartupSettings();return sendJSON(res,desktopIntegration.status());}if(typeof j.startup==='boolean'){if(!desktopIntegration?.setStartup)return sendJSON(res,{error:'desktop-only'},501);desktopIntegration.setStartup(j.startup);return sendJSON(res,desktopIntegration.status());}if(typeof j.enabled!=='boolean')throw Error('Choose enabled or disabled.');if(!desktopIntegration)return sendJSON(res,{error:'desktop-only'},501);sendJSON(res,desktopIntegration.setEnabled(j.enabled));}catch(e){sendJSON(res,{error:'integration-failed',detail:e.message},400);}});return;
       }
+      if (url === '/api/compression-capabilities') return sendJSON(res,compressionService.available(findBin('ffmpeg',binDir)));
       if (url === '/api/media-capabilities') return sendJSON(res, mediaService.capabilities(findBin('ffmpeg', binDir)));
       if (url === '/api/probe-media' && req.method === 'POST') return void mediaService.probe(req, res, findBin('ffmpeg', binDir));
       if (url === '/api/system-profile')
@@ -793,11 +734,12 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
       if (url === '/api/download' && req.method === 'POST') return handleDownload(req, res, binDir);
       if (url === '/api/ffmpeg-progress')
         return sendJSON(res, { percent: ffProgress.get(new URLSearchParams(req.url.split('?')[1] || '').get('id') || '') || 0 });
-      if (url === '/api/ffmpeg' && req.method === 'POST') return handleFFmpeg(req, res, binDir);
-      if (url === '/api/video-compress' && req.method === 'POST') return handleVideoCompress(req, res, binDir);
+      if (url === '/api/ffmpeg' && req.method === 'POST') return nativeJobs.enqueue(req,res,()=>handleFFmpeg(req,res,binDir));
+      if (url === '/api/video-compress' && req.method === 'POST') return nativeJobs.enqueue(req,res,()=>handleVideoCompress(req,res,binDir));
       if (url === '/api/ffmpeg-extra' && req.method === 'POST') return handleFFmpegExtra(req, res);
-      if (url === '/api/tool' && req.method === 'POST') return handleTool(req, res, binDir, modelsDir);
+      if (url === '/api/tool' && req.method === 'POST') return nativeJobs.enqueue(req,res,()=>handleTool(req,res,binDir,modelsDir));
       if (url === '/api/fetch-model' && req.method === 'POST') return handleFetchModel(req, res, modelsDir);
+      if(url.startsWith('/api/model-pack')||url==='/api/download-model-pack'||url==='/api/delete-model-pack'){void modelPacks.route(req,res).then(handled=>{if(!handled)sendJSON(res,{error:'not-found'},404);}).catch(()=>{if(!res.destroyed&&!res.writableEnded)sendJSON(res,{error:'model-file-unavailable'},404);});return;}
       if (url === '/api/models') return handleModels(res, modelsDir);
       if (url === '/api/delete-model' && req.method === 'POST') return handleDeleteModel(req, res, modelsDir);
       if (url === '/api/cards') {
@@ -818,6 +760,7 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
         res.end(data);
       });
     });
+    server.requestTimeout=0; // Local file jobs may wait behind an active encode.
     server.listen(0, '127.0.0.1', () => {
       const port = server.address().port;
       expectedHost = '127.0.0.1:' + port;

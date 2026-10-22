@@ -1,7 +1,7 @@
 {
   "name": "junk-drawer",
-  "version": "1.7.1",
-  "description": "Every annoying file tool in one place.",
+  "version": "1.8.0",
+  "description": "Local tools for converting and preparing files.",
   "author": "Abhay Shah",
   "license": "MIT",
   "repository": "github:AbhayShah06/JunkDrawer",
@@ -21,8 +21,9 @@
     "@ffmpeg/core-mt": "^0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
-    "@imgly/background-removal": "^1.4.5",
-    "@imgly/background-removal-data": "^1.4.5",
+    "@imgly/background-removal": "1.4.5",
+    "@imgly/background-removal-data": "1.4.5",
+    "@paddleocr/paddleocr-js": "0.4.2",
     "electron": "^44.4.3",
     "electron-builder": "^26.16.1",
     "esbuild": "^0.28.1",
@@ -46,7 +47,9 @@
       "vendor/**/*",
       "icon.ico",
       "package.json",
-      "branding/**/*"
+      "branding/**/*",
+      "CREDITS.md",
+      "resources/licenses/**/*"
     ],
     "mac": {
       "target": [
