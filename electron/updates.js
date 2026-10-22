@@ -1,5 +1,5 @@
 // Updates are optional; no network or installer error may prevent file tools from opening.
-function createUpdater(load, report = () => {}) {
+function createUpdater(load, report = () => {}, downloaded = () => {}) {
   let engine = null, checking = null, downloading = null;
   let state = {status:'idle', version:'', percent:0, error:''};
   const fail = error => {state={...state,status:'error',error:String(error?.message||error)};report(error);};
@@ -14,7 +14,7 @@ function createUpdater(load, report = () => {}) {
         candidate.on('update-available',info=>{if(!['downloading','ready'].includes(state.status))state={status:'available',version:info.version,percent:0,error:''};});
         candidate.on('update-not-available',()=>{if(!['downloading','ready'].includes(state.status))state={status:'none',version:'',percent:0,error:''};});
         candidate.on('download-progress',info=>{state={...state,status:'downloading',percent:Math.min(100,Math.max(0,Number(info.percent)||0)),error:''};});
-        candidate.on('update-downloaded',info=>{state={status:'ready',version:info.version,percent:100,error:''};});
+        candidate.on('update-downloaded',info=>{state={status:'ready',version:info.version,percent:100,error:''};try{downloaded(info);}catch(error){report(error);}});
         engine=candidate;updater.enabled=true;
       }catch(error){fail(error);}
     },

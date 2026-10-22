@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const { startServer } = require('./server');
 const { createUpdater } = require('./updates');
+const { createInstallerCleanup } = require('./installer-cleanup');
+let installerCleanup;
 const {createFileInbox,selectedPaths,createDesktopIntegration}=require('./desktop-integration');
 const fileInbox=createFileInbox();
 const {createQuickAccess}=require('./quick-access');
@@ -16,7 +18,7 @@ const updater = createUpdater(() => require('electron-updater').autoUpdater, err
   try {
     fs.appendFileSync(path.join(app.getPath('userData'), 'update-errors.log'), `${new Date().toISOString()} ${error?.stack || error}\n`);
   } catch {}
-});
+}, info => installerCleanup?.remember(info));
 // macOS uninstall — the analogue of the Windows NSIS uninstaller (Windows already has its
 // own in Add/Remove Programs). Confirms, then moves the .app to the Trash, clears the app's
 // saved data, and quits. User files are never touched.
@@ -77,6 +79,11 @@ function makeWindow(quick=false){
 function showMain(){if(!appOrigin)return;if(!win||win.isDestroyed())win=makeWindow();else showWindow(win);}
 function showQuick(){if(!appOrigin)return;if(!quickWin||quickWin.isDestroyed()){quickWin=makeWindow(true);}else showWindow(quickWin);const cursor=screen.getCursorScreenPoint(),area=screen.getDisplayNearestPoint(cursor).workArea,[width,height]=quickWin.getSize();quickWin.setPosition(Math.max(area.x,Math.min(cursor.x-width/2,area.x+area.width-width))|0,Math.max(area.y,Math.min(cursor.y+16,area.y+area.height-height))|0);}
 async function create(){
+  if(app.isPackaged&&process.platform==='win32'){
+    installerCleanup=createInstallerCleanup({cacheDir:path.join(process.env.LOCALAPPDATA||path.join(app.getPath('home'),'AppData','Local'),'junk-drawer-updater'),receiptPath:path.join(app.getPath('userData'),'installed-update.json'),currentVersion:app.getVersion()});
+    installerCleanup.cleanup();
+    setTimeout(()=>installerCleanup.cleanup(),15000).unref();
+  }
   if(process.platform==='darwin'&&app.isPackaged&&!app.isInApplicationsFolder()){
     const choice=dialog.showMessageBoxSync({type:'question',buttons:['Move to Applications','Not Now'],defaultId:0,cancelId:1,message:'Move Junk Drawer to Applications?',detail:'Keeps quick access available after you eject the disk image.'});
     if(choice===0){try{if(app.moveToApplicationsFolder())return;}catch{}}
