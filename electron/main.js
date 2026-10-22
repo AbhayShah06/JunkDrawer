@@ -3,29 +3,11 @@ const path = require('path');
 const fs = require('fs');
 const { startServer } = require('./server');
 const { createUpdater } = require('./updates');
+const {createFileInbox,selectedPaths,createDesktopIntegration}=require('./desktop-integration');
+const fileInbox=createFileInbox();
+const desktopIntegration=createDesktopIntegration({app,shell});
 
 let win, srv;
-
-// Files opened from the OS ("Open with → Junk Drawer" on a PDF/Markdown/text file).
-// We queue the absolute path; the local server hands its bytes to the renderer via
-// /api/opened-file, which loads it into the read-only viewer.
-let pendingOpenPath = null;
-const OPENABLE = /\.(pdf|md|markdown|txt|text|log|csv|json)$/i;
-const opener = { take: () => { const p = pendingOpenPath; pendingOpenPath = null; return p; } };
-function queueOpen(p) {
-  if (!p || !OPENABLE.test(p)) return;
-  try { if (!fs.existsSync(p)) return; } catch { return; }
-  pendingOpenPath = p;
-  if (win) { try { win.focus(); win.webContents.focus(); } catch {} }
-}
-// On Windows the opened file arrives as a command-line argument; pick the last real, openable path.
-function argvOpenPath(argv) {
-  for (let i = argv.length - 1; i >= 1; i--) {
-    const a = argv[i];
-    if (a && !a.startsWith('-') && OPENABLE.test(a)) { try { if (fs.existsSync(a)) return a; } catch {} }
-  }
-  return null;
-}
 
 // Resolve the optional updater only after the local window is ready.
 const updater = createUpdater(() => require('electron-updater').autoUpdater, error => {
@@ -89,18 +71,18 @@ async function create() {
     if (pick === 0) { try { if (app.moveToApplicationsFolder()) return; } catch {} }
   }
   buildAppMenu();
+  desktopIntegration.init();
+  fileInbox.queue(selectedPaths(process.argv));
   // Don't nag about updates while developing (npm start) — only the packaged app checks.
   process.env.JD_DEV = app.isPackaged ? '' : '1';
 
-  const { port, server } = await startServer(appRoot(), binDir(), updater, opener,
-    path.join(app.getPath('userData'), 'models')); // download-on-first-use models (whisper) live outside the app dir so updates don't re-download them
+  const { port, server } = await startServer(appRoot(), binDir(), updater, fileInbox,
+    path.join(app.getPath('userData'), 'models'), desktopIntegration); // download-on-first-use models (whisper) live outside the app dir so updates don't re-download them
   srv = server;
-  // Launched by opening a file? Queue it so the renderer picks it up on first load.
-  if (!pendingOpenPath) { const initial = argvOpenPath(process.argv); if (initial) pendingOpenPath = initial; }
 
   win = new BrowserWindow({
     width: 1180, height: 840, minWidth: 720, minHeight: 560,
-    title: 'Junk Drawer', backgroundColor: '#23262b', show: false,
+    title: 'Junk Drawer', backgroundColor: '#f7f8fa', show: false,
     icon: path.join(__dirname, '..', 'icon.ico'),
     // Pin the renderer-hardening flags explicitly so a future edit can't silently regress
     // the sandbox. The renderer processes untrusted file contents + pasted/dragged URLs.
@@ -143,13 +125,11 @@ app.on('web-contents-created', (_e, contents) => {
   contents.on('will-attach-webview', (e) => e.preventDefault());
 });
 
-// Single instance: a second "Open with → Junk Drawer" should focus this window and queue
-// the new file, not launch a duplicate app.
+// Keep one utility window per user.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', (_e, argv) => { const p = argvOpenPath(argv); if (p) queueOpen(p); else if (win) { try { win.focus(); } catch {} } });
-  app.on('open-file', (e, p) => { e.preventDefault(); queueOpen(p); });   // macOS delivers file-opens here
+  app.on('second-instance', (_event, argv) => { fileInbox.queue(selectedPaths(argv)); if (win) { if(win.isMinimized())win.restore();win.show();win.focus(); } });
   app.whenReady().then(create).catch(error => {
     try { fs.appendFileSync(path.join(app.getPath('userData'), 'startup-errors.log'), String(error?.stack || error) + '\n'); } catch {}
     dialog.showErrorBox('Junk Drawer could not start', String(error?.message || error));

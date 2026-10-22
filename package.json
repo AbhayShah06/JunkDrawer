@@ -1,6 +1,6 @@
 {
   "name": "junk-drawer",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Every annoying file tool in one place.",
   "author": "Abhay Shah",
   "license": "MIT",
@@ -34,36 +34,14 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.0.379",
     "qrcode": "^1.5.3",
-    "tesseract.js": "^7.0.0",
-    "web-audio-beat-detector": "^8.2.37"
+    "tesseract.js": "^7.0.0"
   },
   "build": {
     "appId": "com.abhayshah.junkdrawer",
     "productName": "Junk Drawer",
-    "fileAssociations": [
-      {
-        "ext": "pdf",
-        "name": "PDF Document",
-        "role": "Viewer"
-      },
-      {
-        "ext": "md",
-        "name": "Markdown Document",
-        "role": "Viewer"
-      },
-      {
-        "ext": "markdown",
-        "name": "Markdown Document",
-        "role": "Viewer"
-      },
-      {
-        "ext": "txt",
-        "name": "Text Document",
-        "role": "Viewer"
-      }
-    ],
     "files": [
       "index.html",
+      "app.css",
       "electron/**/*",
       "vendor/**/*",
       "icon.ico",
@@ -80,7 +58,9 @@
           "from": "resources/bin/mac",
           "to": "bin",
           "filter": [
-            "**/*"
+            "**/*",
+            "!esrgan{,/**}",
+            "!sherpa{,/**}"
           ]
         }
       ]
@@ -95,7 +75,9 @@
           "from": "resources/bin/win",
           "to": "bin",
           "filter": [
-            "**/*"
+            "**/*",
+            "!esrgan{,/**}",
+            "!sherpa{,/**}"
           ]
         }
       ]
@@ -109,7 +91,8 @@
       "uninstallDisplayName": "Junk Drawer ${version}",
       "deleteAppDataOnUninstall": false,
       "installerIcon": "icon.ico",
-      "uninstallerIcon": "icon.ico"
+      "uninstallerIcon": "icon.ico",
+      "include": "resources/installer.nsh"
     },
     "publish": [
       {

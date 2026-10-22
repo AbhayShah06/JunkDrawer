@@ -6,24 +6,6 @@
 <title>Junk Drawer · every annoying file tool in one place</title>
 <script>try{var t=localStorage.getItem('jd-theme')||'light';document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
-  :root{
-    --desk:#008080; --face:#c0c0c0; --faceD:#bcbcbc; --well:#ffffff;
-    --hi:#ffffff; --sh:#808080; --sh2:#3f3f3f; --ink:#0a0a0a; --ink2:#444444; --line:#808080;
-    --pdf:#a8200f; --img:#2f7d3a; --vid:#000087; --aud:#946000; --data:#46505c;
-    --dev:#5a3a9a; --arc:#a8531f; --weird:#7a2a68; --web:#117a78; --ok:#2f7a2f; --doc:#0a5a8a;
-    --title1:#000082; --title2:#1083d0; --titletx:#ffffff; --hover:#e8ebee;
-    --mono:"Lucida Console","Consolas","Courier New",monospace;
-    --sans:"MS Sans Serif","Tahoma","Segoe UI",Verdana,sans-serif;
-    --rb:var(--hi) var(--sh2) var(--sh2) var(--hi);  /* raised bevel */
-    --sb:var(--sh2) var(--hi) var(--hi) var(--sh2);  /* sunken bevel */
-  }
-  :root[data-theme="dark"]{
-    --desk:#0b3a3a; --face:#3a3d43; --faceD:#34373c; --well:#272a2e;
-    --hi:#5a606a; --sh:#202327; --sh2:#101214; --ink:#e9e6dd; --ink2:#a6a194; --line:#4a4e54;
-    --pdf:#cf6149; --img:#82a458; --vid:#6f8fd0; --aud:#bd942f; --data:#828c9a;
-    --dev:#8a83d0; --arc:#c8732f; --weird:#b06a98; --web:#46a0a7; --ok:#5b9a4c; --doc:#4fb3cf;
-    --title1:#0a2a6a; --title2:#1e5fa0; --titletx:#ffffff; --hover:#2f3339;
-  }
   *{box-sizing:border-box}
   html,body{margin:0; min-height:100%}
   body{min-height:100vh; display:grid; grid-template-rows:auto 1fr auto; font:13px/1.5 var(--sans); color:var(--ink); background:var(--desk);
@@ -52,27 +34,6 @@
   .toolsdd .mi:hover{background:var(--title1); color:#fff}
   .toolsdd .mi .dot{width:8px; height:8px; background:var(--c); border:1px solid var(--sh2); flex:none}
   .toolsdd .mi .cnt{margin-left:auto; font-size:11px; opacity:.7}
-  .workspacesdd{position:relative}
-  .workspace-menu{position:absolute;left:0;top:calc(100% + 4px);z-index:81;width:min(430px,92vw);background:var(--face);border:2px solid;border-color:var(--rb);box-shadow:3px 3px 0 #0005;padding:4px}
-  .workspace-menu[hidden]{display:none}.workspace-item{display:grid;grid-template-columns:1fr;gap:2px;width:100%;text-align:left;padding:6px 8px;border:0;background:transparent;color:var(--ink);font:12px var(--sans);cursor:pointer}
-  .workspace-item:hover,.workspace-item:focus{background:var(--title1);color:#fff;outline:0}.workspace-item small{grid-column:1;color:var(--ink2);font:11px var(--sans)}.workspace-item:hover small,.workspace-item:focus small{color:#fff}
-  .program-window{margin-top:12px;background:var(--faceD);border:2px solid;border-color:var(--rb)}
-  .program-title{min-height:24px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px;background:var(--title1);color:#fff;font:bold 12px var(--sans)}
-  .window-buttons{display:flex;gap:2px}.window-buttons i{display:grid;place-items:center;width:18px;height:17px;background:var(--face);color:#111;border:2px solid;border-color:var(--rb);font:normal 10px/1 var(--sans);font-style:normal}
-  .workspace-grid{display:grid;grid-template-columns:repeat(6,minmax(86px,1fr));gap:6px;padding:10px 8px 8px;min-height:104px;background:var(--well);border:2px solid;border-color:var(--sb)}
-  .workspace-launch{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;padding:5px 3px;background:transparent;color:var(--ink);border:1px solid transparent;cursor:pointer;font:11px var(--sans);text-align:center}
-  .workspace-launch:hover,.workspace-launch:focus{outline:1px dotted var(--ink);background:transparent}.workspace-launch:focus b,.workspace-launch:hover b{background:var(--title1);color:#fff}.workspace-launch b{display:block;max-width:100%;padding:1px 3px;font-size:11px;line-height:1.2}.workspace-launch small{display:none}
-  .workspace-icon{position:relative;display:grid;place-items:end center;width:34px;height:32px;background:var(--face);border:2px solid;border-color:var(--rb);color:#111;font:bold 10px/16px var(--mono);box-shadow:1px 1px 0 #0004}
-  .workspace-icon:before{content:"";position:absolute;left:2px;right:2px;top:2px;height:6px;background:var(--title1)}
-  .workspace-icon.video{background:#d8d8d8}.workspace-icon.photo{background:#d8d8d8}.workspace-icon.pdf{background:#fff}.workspace-icon.audio{background:#d8d8d8}.workspace-icon.download{background:#d8d8d8}.workspace-icon.dev{background:#111;color:#fff}
-  .workspace-view{display:none;flex:1;min-height:calc(100vh - 112px);background:var(--face);border:2px solid;border-color:var(--rb);padding:0;margin-bottom:8px}
-  .workspace-view .workspace-head{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;min-height:26px;background:var(--title1);color:#fff;padding:2px 4px;margin:2px}
-  .workspace-view .workspace-head h2{font:bold 13px var(--sans);margin:0;color:#fff}.workspace-view .workspace-head .ds{display:none}
-  .workspace-view .workspace-head .btn{grid-column:2;grid-row:1;padding:2px 8px;background:var(--face);color:#111}
-  .workspace-view>p,.workspace-view>.guide,.workspace-view>.filechip{margin-left:8px;margin-right:8px}
-  .workspace-view .workspace-tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));align-content:start;gap:1px;margin:8px;background:var(--line);border:2px solid;border-color:var(--sb);min-height:260px}
-  .workspace-view .workspace-tools .tool{min-height:46px;border:0;background:var(--well);padding:6px 8px;box-shadow:none}
-  .workspace-view .workspace-tools .tool:hover,.workspace-view .workspace-tools .tool:focus{background:var(--title1);color:#fff;outline:0}.workspace-view .workspace-tools .tool:hover .ds,.workspace-view .workspace-tools .tool:focus .ds{color:#fff}
   .toolsdd .toolslib{width:min(580px,92vw)}
   .toolsdd .lib-head{display:flex; align-items:center; gap:9px; padding:3px 3px 7px; border-bottom:1px solid var(--line); margin-bottom:7px}
   .toolsdd .lib-head b{font:bold 12px var(--sans)}
@@ -144,14 +105,12 @@
     padding:9px 10px; cursor:pointer}
   .tool:hover{background:var(--hover)}
   .tool:active{border-color:var(--sb)}
-  /* category color = a small beveled chip (a Win95-style icon swatch), not a side strip */
+  /* Category indicator */
   .tool .dot{display:block; flex:none; width:16px; height:16px; margin-top:1px; background:var(--c,#888);
     border:2px solid; border-color:var(--rb)}
   .tool .nm{font-weight:bold; font-size:12.5px}
   .tool .ds{color:var(--ink2); font-size:11px; line-height:1.3}
-  /* Home index: a Win95 file-manager pattern. Drawers are always visible, while only
-     one compact shortcut list is shown beside them. This keeps 67 tools findable
-     without turning the start screen into 67 cards. */
+  /* File task catalog */
   .home-index{display:none}
   .home-pane{min-width:0; background:var(--faceD); border:2px solid; border-color:var(--sb)}
   .home-pane-title{display:flex; align-items:center; justify-content:space-between; gap:8px;
@@ -164,9 +123,9 @@
     padding:6px 7px; border:0; background:var(--face); color:var(--ink); text-align:left; cursor:pointer;
     font:12px var(--sans)}
   .drawer-entry:hover,.drawer-entry:focus{background:var(--title1); color:#fff; outline:0}
-  .drawer-entry .folder95{position:relative; width:16px; height:11px; margin-top:3px; background:#d7b43a;
+  .drawer-entry .drawer-icon{position:relative; width:16px; height:11px; margin-top:3px; background:#d7b43a;
     border:1px solid #5d4b0e; box-shadow:inset 1px 1px #fff0a0}
-  .drawer-entry .folder95:before{content:""; position:absolute; left:1px; top:-4px; width:8px; height:4px;
+  .drawer-entry .drawer-icon:before{content:""; position:absolute; left:1px; top:-4px; width:8px; height:4px;
     background:#d7b43a; border:1px solid #5d4b0e; border-bottom:0}
   .drawer-entry .dn{font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .drawer-entry .dc{font:10px var(--mono); opacity:.75}
@@ -274,72 +233,24 @@
   .pdfedit-sigpad canvas{background:#fff; border:1px solid var(--line); width:100%; max-width:460px; height:160px; touch-action:none; cursor:crosshair; display:block}
   .pdfedit-tabs{display:flex; gap:6px; margin-bottom:8px}
   .pdfedit-tabs .on{outline:2px solid #2b6fd6}
-  /* Open & Preview viewer (read-only) */
-  .viewer{margin-top:10px}
-.viewer:fullscreen{background:var(--bg); overflow:auto; padding:14px 18px; margin:0}
-  .view-img{display:block; max-width:100%; max-height:64vh; margin:0 auto; border:2px solid; border-color:var(--sb); background:#fff}
-  .txt-view{background:var(--well); border:2px solid; border-color:var(--sb); padding:14px; max-height:64vh; overflow:auto;
-    font:12.5px/1.6 var(--mono); color:var(--ink); white-space:pre-wrap; word-break:break-word; margin:0}
-  .md-view{background:var(--well); border:2px solid; border-color:var(--sb); padding:18px 22px; max-height:64vh; overflow:auto;
-    color:var(--ink); font:14px/1.65 var(--sans)}
-  .md-view h1,.md-view h2,.md-view h3,.md-view h4{line-height:1.3; margin:18px 0 8px}
-  .md-view h1{font-size:23px; border-bottom:1px solid var(--line); padding-bottom:6px}
-  .md-view h2{font-size:18px; border-bottom:1px solid var(--line); padding-bottom:4px}
-  .md-view h3{font-size:15.5px} .md-view h4{font-size:14px}
-  .md-view p{margin:10px 0} .md-view a{color:var(--vid)}
-  .md-view code{font:12.5px var(--mono); background:var(--faceD); padding:1px 5px; border-radius:3px}
-  .md-view pre{background:var(--faceD); border:2px solid; border-color:var(--sb); padding:12px 14px; overflow:auto; margin:12px 0}
-  .md-view pre code{background:none; padding:0}
-  .md-view blockquote{margin:12px 0; padding:4px 14px; border-left:4px solid var(--line); color:var(--ink2)}
-  .md-view ul,.md-view ol{margin:10px 0; padding-left:26px} .md-view li{margin:4px 0}
-  .md-view img{max-width:100%} .md-view hr{border:none; border-top:1px solid var(--line); margin:18px 0}
-  /* Video Studio: Win95 chrome around a conventional NLE layout. */
-  .video-studio{display:grid;grid-template-rows:auto auto minmax(270px,1fr) minmax(190px,34vh);width:100%;height:calc(100vh - 116px);min-height:610px;background:var(--face);overflow:hidden}
-  .vs-title{display:flex;align-items:center;gap:8px;min-height:26px;padding:2px 4px;background:var(--title1);color:#fff;font:bold 12px var(--sans)}
-  .vs-title .vs-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vs-title .vs-spacer{flex:1}.vs-title .btn{padding:2px 9px;box-shadow:none}
-  .vs-menu{display:flex;align-items:center;gap:2px;padding:2px 4px;border-bottom:1px solid var(--sh);background:var(--face)}
-  .vs-menu button{border:0;background:transparent;color:var(--ink);padding:3px 8px;font:12px var(--sans);cursor:pointer}.vs-menu button:hover{background:var(--title1);color:#fff}.vs-menu .export{margin-left:auto;border:2px solid;border-color:var(--rb);background:var(--face);font-weight:bold;color:var(--ink)}
-  .vs-work{display:grid;grid-template-columns:70px minmax(170px,235px) minmax(260px,1fr) minmax(190px,250px);min-height:0;border-bottom:2px solid var(--sh2)}
-  .vs-rail{display:flex;flex-direction:column;background:var(--faceD);border-right:1px solid var(--sh);overflow:auto}
-  .vs-rail button{min-height:44px;padding:4px 2px;border:0;border-bottom:1px solid var(--sh);background:transparent;color:var(--ink);font:11px var(--sans);cursor:pointer}.vs-rail button.on,.vs-rail button:hover{background:var(--title1);color:#fff}
-  .vs-bin,.vs-inspector{min-width:0;padding:6px;background:var(--face);overflow:auto;border-right:2px solid var(--sh2)}
-  .vs-inspector{border-right:0;border-left:2px solid var(--hi)}.vs-pane-title{font:bold 11px var(--sans);padding:3px 4px 6px}
-  .vs-file{display:grid;grid-template-columns:66px 1fr;gap:7px;align-items:center;background:var(--well);border:2px solid;border-color:var(--sb);padding:5px;cursor:default}.vs-thumb{height:43px;background:#111;display:grid;place-items:center;color:#fff;font:10px var(--mono);overflow:hidden}.vs-thumb img{width:100%;height:100%;object-fit:cover}.vs-file b,.vs-file small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.vs-file b{font-size:11px}.vs-file small{font:10px var(--mono);color:var(--ink2)}
-  .vs-tool-list{display:grid;gap:3px}.vs-tool-list button,.vs-field button{width:100%;text-align:left;background:var(--face);color:var(--ink);border:2px solid;border-color:var(--rb);padding:5px 7px;font:11px var(--sans);cursor:pointer}.vs-tool-list button:active,.vs-field button:active{border-color:var(--sb)}
-  .vs-preview{display:grid;grid-template-rows:minmax(0,1fr) auto;min-width:0;min-height:0;background:#202020;padding:8px}
-  .vs-canvas{display:grid;place-items:center;min-width:0;min-height:0;overflow:hidden}.vs-canvas video{display:block;max-width:100%;max-height:100%;background:#000;box-shadow:0 0 0 1px #000}
-  .vs-transport{display:flex;align-items:center;justify-content:center;gap:5px;padding-top:7px;color:#fff}.vs-transport button{min-width:30px;background:var(--face);border:2px solid;border-color:var(--rb);padding:3px 7px;cursor:pointer}.vs-clock{min-width:118px;text-align:center;font:11px var(--mono)}
-  .vs-field{padding:6px 3px;border-bottom:1px solid var(--sh)}.vs-field label{display:block;margin-bottom:3px;font:10px var(--sans);color:var(--ink2)}.vs-field input{width:100%;background:var(--well);color:var(--ink);border:2px solid;border-color:var(--sb);padding:4px;font:11px var(--mono)}
-  .vs-timeline{display:grid;grid-template-rows:auto 24px 1fr;min-height:0;background:var(--face);padding:4px 6px 6px}.vs-tb{display:flex;align-items:center;gap:4px;min-height:28px}.vs-tb button{background:var(--face);color:var(--ink);border:2px solid;border-color:var(--rb);padding:3px 8px;font:11px var(--sans);cursor:pointer}.vs-tb .zoom{margin-left:auto;width:110px}
-  .vs-ruler{position:relative;margin-left:82px;background:var(--well);border:2px solid;border-color:var(--sb);overflow:hidden}.vs-ruler span{position:absolute;top:2px;font:9px var(--mono);color:var(--ink2);transform:translateX(-50%)}
-  .vs-tracks{position:relative;display:grid;grid-template-columns:76px 1fr;grid-template-rows:1fr 1fr;gap:2px 6px;min-height:0;overflow:hidden}.vs-track-name{display:grid;place-items:center;background:var(--faceD);border:2px solid;border-color:var(--rb);font:10px var(--sans)}.vs-lane{position:relative;background:#727272;border:2px solid;border-color:var(--sb);overflow:hidden;cursor:pointer}.vs-clip{position:absolute;left:0;top:4px;bottom:4px;width:100%;background:#425e9d;border:2px solid;border-color:#8ca8e8 #17274f #17274f #8ca8e8;color:#fff;padding:4px 7px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font:10px var(--sans)}.vs-audio{background:#38683d;border-color:#83b789 #18381c #18381c #83b789}.vs-playhead{position:absolute;top:0;bottom:0;left:82px;width:2px;background:#ef2525;z-index:5;pointer-events:none}.vs-playhead:before{content:"";position:absolute;top:0;left:-4px;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #ef2525}
-  .vs-empty{display:grid;place-content:center;justify-items:center;gap:12px;height:100%;min-height:420px;background:var(--face)}.vs-empty .btn{font-size:14px;padding:10px 24px}
-  @media(max-width:950px){.vs-work{grid-template-columns:62px minmax(150px,210px) 1fr}.vs-inspector{display:none}.video-studio{height:calc(100vh - 94px)}}
-  @media(max-width:680px){.video-studio{height:auto;min-height:calc(100vh - 70px);grid-template-rows:auto auto auto minmax(180px,34vh)}.vs-work{grid-template-columns:1fr;grid-template-rows:auto 150px minmax(250px,52vh)}.vs-rail{flex-direction:row;border-right:0;border-bottom:1px solid var(--sh);overflow-x:auto}.vs-rail button{min-width:68px;min-height:36px;border-bottom:0;border-right:1px solid var(--sh)}.vs-bin{border-right:0;border-bottom:2px solid var(--sh2)}.vs-preview{grid-row:3}.vs-file{grid-template-columns:58px 1fr}.vs-timeline{min-height:180px}.vs-ruler{margin-left:58px}.vs-tracks{grid-template-columns:52px 1fr}.vs-playhead{left:58px}}
-  @media(max-width:900px){.workspace-grid{grid-template-columns:repeat(3,minmax(86px,1fr))}.home-index{grid-template-columns:1fr}.workspace-view .workspace-tools{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}}
-  @media(max-width:620px){.topbar{gap:5px;padding:5px 6px}.brand small,.modewrap{display:none}.toolsbtn{padding:3px 8px}nav{display:none}main{padding:0 4px;margin:4px auto}.hero{padding:6px;min-height:calc(100vh - 70px)}.workspace-grid{grid-template-columns:repeat(3,minmax(70px,1fr));padding:7px 4px}.workspace-view{min-height:calc(100vh - 70px)}.workspace-view .workspace-tools{grid-template-columns:1fr;margin:5px}.result .row{flex-direction:column}.drawer-list{grid-template-columns:1fr}.home-index{min-height:0}.qtools{grid-template-columns:1fr}}
-  @media(max-width:390px){.workspace-grid{grid-template-columns:repeat(2,minmax(72px,1fr))}}
-  @media(max-height:650px){.hero,.workspace-view{min-height:0}}
 </style>
+<link rel="stylesheet" href="/app.css">
 </head>
 <body>
 <header><div class="topbar">
   <div class="brand" id="brandHome" title="Start over" style="cursor:pointer"><span class="mk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16"/><path d="M3 12h18M9.5 8h5M9.5 16h5"/></svg></span>Junk&nbsp;Drawer
-    <small>It just works</small></div>
+    <small>File tools. On your computer.</small></div>
   <div class="toolsdd" id="toolsDD">
-    <button class="toolsbtn" id="toolsBtn">Tools ▾</button>
+    <button class="toolsbtn" id="toolsBtn" aria-haspopup="true" aria-expanded="false">Tools ▾</button>
     <div class="dd" id="toolsMenu" hidden></div>
     <div class="dd toolslib" id="toolsLib" hidden></div>
   </div>
-  <div class="workspacesdd" id="workspacesDD"><button class="toolsbtn" id="workspacesBtn" aria-haspopup="true" aria-expanded="false">Workspaces ▾</button><div class="workspace-menu" id="workspacesMenu" hidden></div></div>
   <nav>
-    <a href="#" id="resetBtn" title="Clear everything and start over">↺ Reset</a>
+    <a href="#" id="resetBtn" title="Clear everything and start over">Home</a>
     <a href="#" id="themeToggle">Theme</a>
     <a href="#" id="navPrivacy">Privacy</a>
     <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">About</a>
   </nav>
-  <label class="modewrap" title="Pick who you are, the home screen shows your set">I'm here as
-    <select id="modeSel"></select></label>
 </div></header>
 
 <div id="updateBar" hidden>
@@ -351,10 +262,10 @@
 
 <main>
   <section class="hero" id="heroHome">
-    <div id="drop" tabindex="0">
+    <div id="drop" tabindex="0" role="button" aria-label="Choose files to process">
       <span class="open-icon" aria-hidden="true">↥</span>
-      <span class="big">Drop a file here</span>
-      <span class="sub">or click Open…</span>
+      <span class="big">What needs sorting out?</span>
+      <span class="sub">Drop files here, or choose files</span><span class="drop-note">Convert, compress, extract, and tidy up. Originals stay untouched.</span>
     </div>
     <input type="file" id="file" multiple hidden />
 
@@ -364,21 +275,19 @@
 
     <div class="cmd">
       <span class="pmt"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="7"/><path d="M21 21l-5.2-5.2"/></svg></span>
-      <input id="q" autocomplete="off" placeholder="Find a tool…" />
+      <input id="q" autocomplete="off" placeholder="Find a tool or format — MTS, compress PDF, extract audio…" aria-label="Search tools" />
       <div class="pal" id="pal"></div>
     </div>
 
-    <div id="workspaceLaunchers" hidden></div>
     <div class="home-index">
       <section class="home-pane shortcut-pane" aria-label="Quick actions and recent work"><div class="home-pane-title"><span>Quick actions</span><span>one-step jobs</span></div>
         <div class="quick qrow" id="recentRow"><span class="qlabel">Recent work</span><div id="recentPlaceholder" class="drawer-summary">Tools you use will appear here.</div><div class="qtools" id="recentTools"></div></div>
-        <div class="quick qrow"><span class="qlabel">Picked for you · <span id="modeLabel">Basics</span></span><div class="qtools" id="starTools"></div></div>
+        <div class="quick qrow"><span class="qlabel"><span id="modeLabel">File tasks</span></span><div class="qtools" id="starTools"></div></div>
       </section>
-      <section class="home-pane" aria-label="All tools"><div class="home-pane-title"><span>All tools</span><span>full catalog</span></div><div id="drawerBrowser"></div></section>
+      <section class="home-pane" aria-label="More tools"><details class="more-tools"><summary>More tools <span>Specialized file tasks</span></summary><div id="drawerBrowser"></div></details><div class="integration-home"><b>Start from your files</b><p>Right-click in Explorer → Send to → Junk Drawer.</p><button class="pastebtn" id="integrationHome">Desktop integration</button></div></section>
     </div>
   </section>
 
-  <section class="workspace-view" id="workspaceView" aria-live="polite"></section>
 
   <section id="receipt"></section>
   <section id="stage"><div class="panel" id="panel"></div><div id="status"></div><div id="output"></div></section>
@@ -388,8 +297,8 @@
 <footer><div class="wrap">
   <div>Built by <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">Abhay Shah</a>
     · <a href="https://x.com/AbhayShahCA" target="_blank" rel="noopener">@AbhayShahCA</a>
-    · <a href="#" id="manageStorage">Manage storage</a></div>
-  <div class="cr">Everything runs on your computer. Your files never leave it.
+    · <a href="#" id="manageStorage">Manage storage</a> · <a href="#" id="desktopIntegration">Desktop integration</a></div>
+  <div class="cr">Local processing · No account · No file uploads
     <details class="credits" style="margin-top:6px">
       <summary style="cursor:pointer; font-weight:bold; color:var(--ink)">Open-source credits</summary>
       Built with <a href="https://ffmpeg.org/" target="_blank" rel="noopener">FFmpeg</a>,
@@ -420,6 +329,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="/electron/compression.js"></script>
+<script src="/electron/media.js"></script>
 <script type="module">
 import { PDFDocument, degrees, rgb, StandardFonts } from "./vendor/pdf-lib.mjs";
 import * as pdfjsLib from "./vendor/pdfjs/pdf.min.mjs";
@@ -438,9 +348,9 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 const base = n => n.replace(/\.[^.]+$/,'');
 const toast = m => { const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1700); };
 
-const IMG=['png','jpg','jpeg','webp','gif','bmp','heic','heif','avif','jxl','tif','tiff','ico'];
-const VID=['mp4','mov','mkv','webm','avi','flv','wmv','m4v','3gp','mpeg','mpg','ts','m2ts','ogv'];
-const AUD=['mp3','wav','aac','m4a','flac','ogg','opus','wma','aiff','aif'];
+const IMG=JDMedia.inputs.image;
+const VID=JDMedia.inputs.video;
+const AUD=JDMedia.inputs.audio;
 const DAT=['csv','tsv','json','xml','yaml','yml','toml','xlsx','xls','ods'];
 const ARC=['zip','7z','rar','tar','gz','tgz','bz2','xz'];
 const RAW=['cr2','cr3','nef','nrw','arw','raf','dng','orf','rw2','pef','srw'];
@@ -511,13 +421,13 @@ async function nativeFFAvailable(){
   return _nativeFF;
 }
 async function runFF(file,outName,argsFn,label,extra){ // extra:{name,data:Blob}, a small companion file (e.g. subtitles)
-  if(file.size>500*1048576) throw new Error(`This video is ${Math.round(file.size/1048576)} MB, past the roughly 500 MB the app can handle in memory. Trim it to a shorter clip first, or export a smaller version from your phone or editor.`);
   const inName='in.'+ext(file.name);
   const args=argsFn(inName,outName);
   // Desktop app: run the bundled NATIVE ffmpeg (≈10× faster than wasm) through the
   // local server. Plain browser / dev server (no /api backend) falls back to the
   // in-browser wasm core below.
   if(await nativeFFAvailable()) return runFFNative(file,inName,outName,args,label,extra);
+  if(file.size>500*1048576) throw new Error('Large media files need the desktop media engine. Reinstall Junk Drawer to restore it.');
   const onP=progress(label); const ff=await getFF(onP); const { fetchFile }=await ffutil();
   await ff.writeFile(inName, await fetchFile(file));
   if(extra) await ff.writeFile(extra.name, await fetchFile(extra.data));
@@ -527,6 +437,7 @@ async function runFF(file,outName,argsFn,label,extra){ // extra:{name,data:Blob}
   if(extra) ff.deleteFile(extra.name).catch(()=>{});
   return new Blob([data.buffer],{type:mimeOf(outName)});
 }
+let conversionEpoch=0;
 let _jobCtl=null;  // in-flight ffmpeg/tool job; aborted when the user switches tools / resets / starts another
 async function runFFNative(file,inName,outName,args,label,extra){
   if(_jobCtl){ try{ _jobCtl.abort(); }catch{} }   // cancel any previous job (the SPA tool switch doesn't close the fetch on its own)
@@ -550,7 +461,6 @@ async function runFFNative(file,inName,outName,args,label,extra){
   finally { clearInterval(poll); }
 }
 async function runVideoCompress(file,duration,targetMb){
-  if(file.size>500*1048576) throw new Error(`This video is ${Math.round(file.size/1048576)} MB, past the roughly 500 MB the app can handle in memory. Trim it to a shorter clip first, or export a smaller version from your phone or editor.`);
   if(!await nativeFFAvailable()){
     const blob=await runFF(file,'out.mp4',(i,out)=>JDCompression.buildCompressionArgs({mode:'size',duration,targetMb,input:i,output:out}),'One-pass size estimate (browser fallback)');
     return {blob,native:false};
@@ -636,7 +546,7 @@ const blobOf=(c,t,q)=>new Promise(r=>c.toBlob(r,t,q));
 // 8-bit sRGB surface and the browser JPEG encoder forces 4:2:0 chroma. ffmpeg keeps the
 // ICC profile, bakes in EXIF rotation, and encodes JPEG at 4:4:4 with a real quantizer.
 // (WebP via ffmpeg drops the ICC profile, same as the canvas did, so no regression.)
-const FF_IMG_IN=['jpg','jpeg','png','webp','bmp','tif','tiff','avif','jxl','gif'];
+const FF_IMG_IN=JDMedia.inputs.image.filter(e=>!['heic','heif'].includes(e));
 const FF_IMG_OUT={'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/avif':'avif','image/jxl':'jxl'};
 async function imgFFOk(file,type){ return FF_IMG_IN.includes(ext(file.name)) && FF_IMG_OUT[type] && await nativeFFAvailable(); }
 function imgFFArgs({type,quality=.92,maxDim=0,scaleF=0,strip=false,sub=false}){
@@ -701,7 +611,7 @@ function csvToJSON(text){ const r=parseCSV(text); const h=r[0]; return JSON.stri
 function jsonToCSV(text){ const a=JSON.parse(text); if(!Array.isArray(a))throw new Error('JSON must be an array of objects');
   const keys=[...new Set(a.flatMap(o=>Object.keys(o)))]; const esc=v=>{ v=v==null?'':String(v);
     return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-  return [keys.join(','),...a.map(o=>keys.map(k=>esc(o[k])).join(','))].join('\n'); }
+  return [keys.map(esc).join(','),...a.map(o=>keys.map(k=>esc(o[k])).join(','))].join('\n'); }
 
 /* ---------------- progress + results ---------------- */
 function progress(label){ $('#status').innerHTML=`<div><span class="spin"></span>${label} …</div><div class="prog"><i id="bar"></i></div>`;
@@ -769,7 +679,7 @@ function showResult(blob,filename,{note}={}){
   const actions=el('div',{className:'actions'},[el('a',{className:'btn',href:url,download:filename,textContent:'Download'})]);
   // "Edit this", feed the result straight back in as if you'd just uploaded it, so you can
   // chain tools (e.g. burn captions, then edit the captioned video again).
-  const ed=el('button',{className:'btn ghost',textContent:'Edit this'});
+  const ed=el('button',{className:'btn ghost',textContent:'Use in another tool'});
   ed.onclick=()=>{ try{ intake([new File([blob],filename,{type:blob.type||''})]); }catch{ toast('Couldn’t reopen that result'); } };
   actions.append(ed);
   if(isImg){ const cp=el('button',{className:'btn ghost',textContent:'Copy'});
@@ -780,7 +690,7 @@ function showResult(blob,filename,{note}={}){
           c.getContext('2d').drawImage(bmp,0,0); bmp.close&&bmp.close(); png=await blobOf(c,'image/png'); }
         await navigator.clipboard.write([new ClipboardItem({'image/png':png})]); toast('Copied'); }
       catch{ toast('Copy not supported here. Use Download'); } }; actions.append(cp); }
-  const ag=el('button',{className:'btn ghost',textContent:'Home'}); ag.onclick=resetStage; actions.append(ag);
+  const ag=el('button',{className:'btn ghost',textContent:'Home'}); ag.onclick=()=>goHome(); actions.append(ag);
   right.append(actions);
   if(note) right.append(el('div',{className:'note',textContent:note}));
   row.append(right); box.append(row); out.append(box); out.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -796,21 +706,20 @@ function showText(str,filename){
   const dl=el('a',{className:'btn',textContent:'Download',download:filename,href:txtUrl});
   box.append(el('div',{className:'actions',style:'margin-top:10px'},[dl,cp])); out.append(box);
 }
-function showMulti(files,zipName,note){ const z=zipSync(Object.fromEntries(files.map(f=>[f.name,f.data])),{level:0});
+function showMulti(files,zipName,note){ const seen=new Set();const entries=files.map(f=>{let name=f.name,n=2;const dot=f.name.lastIndexOf('.'),stem=dot>0?f.name.slice(0,dot):f.name,suffix=dot>0?f.name.slice(dot):'';while(seen.has(name))name=stem+' ('+(n++)+')'+suffix;seen.add(name);return [name,f.data];});const z=zipSync(Object.fromEntries(entries),{level:0});
   showResult(new Blob([z],{type:'application/zip'}),zipName,{note:note||`${files.length} files, zipped.`}); }
 
 /* ================= TOOL REGISTRY ================= */
 const CATS = {
   image:{label:'Image', color:'var(--img)', icon:icon('img'),  blurb:'fix, convert, and shrink photos'},
   pdf:  {label:'PDF',   color:'var(--pdf)', icon:icon('doc'),   blurb:'sign, merge, split, shrink, and more'},
-  doc:  {label:'Open',  color:'var(--doc)', icon:icon('eye'),   blurb:'open and read PDFs, Markdown, and text'},
   video:{label:'Video', color:'var(--vid)', icon:icon('film'), blurb:'shrink, trim, convert, grab frames'},
   audio:{label:'Audio', color:'var(--aud)', icon:icon('music'),blurb:'convert, trim, even out, shrink'},
   web:  {label:'Download',color:'var(--web)',icon:icon('down'), blurb:'save video or sound from a link'},
   data: {label:'Data',  color:'var(--data)',icon:icon('grid'), blurb:'switch between spreadsheet and JSON'},
   arc:  {label:'Archive',color:'var(--arc)',icon:icon('box'),  blurb:'zip and unzip files'},
-  weird:{label:'Weird', color:'var(--weird)',icon:icon('star'),blurb:'the odd jobs'},
-  dev:  {label:'Dev',   color:'var(--dev)', icon:icon('code'), blurb:'code, data files, and QR codes'},
+  weird:{label:'File info', color:'var(--weird)',icon:icon('star'),blurb:'the odd jobs'},
+  dev:  {label:'Text & QR',   color:'var(--dev)', icon:icon('code'), blurb:'structured text and QR codes'},
 };
 const T = []; // tools
 const add = t => { T.push(t); return t; };
@@ -824,12 +733,7 @@ add({cat:'image',kinds:['image'],rec:1,nm:'Remove Background',ds:'Cut out the su
   more:'Cuts the subject out of a photo and gives you a see-through PNG. Great for product shots, profile pics, and stickers. The first run loads a small model from the app, then it works right away.',
   run:async f=>{ const onP=progress('Removing background (first run loads the model, a few seconds)'); const b=await bgRemove(f,onP);
     showResult(b,base(f.name)+'-nobg.png'); }});
-add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'Switch between PNG, JPG, WEBP, AVIF, and more',kw:'convert format png jpg jpeg webp heic avif jxl jpegxl modern',
-  more:'Change an image to another type. JPG for photos, PNG for a clear background, WEBP for websites, AVIF for the smallest files, JPEG-XL for photographers who want top quality.',
-  opts:oSel('to',[['image/png','PNG'],['image/jpeg','JPG'],['image/webp','WEBP'],['image/avif','AVIF, smallest'],['image/jxl','JPEG-XL, top quality']],'type'),
-  check:(f,o)=>{ const cur=ext(f.name), tgt=FF_IMG_OUT[o.type];
-    return (cur===tgt||(cur==='jpeg'&&tgt==='jpg')) ? {msg:`This picture is already a ${tgt.toUpperCase()}, so there’s nothing to change. Pick a different type, JPG for photos, PNG for a clear background, WEBP for websites.`} : null; },
-  run:async (f,o)=>{ showResult(await imgConvert(f,{type:o.type}),base(f.name)+'.'+FF_IMG_OUT[o.type]); }});
+
 add({cat:'image',kinds:['image','raw'],multi:true,rec:1,nm:'Batch Convert Images',ds:'Convert a whole folder of photos to one format',kw:'batch convert folder bulk many multiple mass heic raw jpg png webp shoot dump',
   more:'Drop a folder (or pick many files) and turn them all into the same format at once, HEIC, RAW, PNG, JPG, WEBP go in, you get a zip of converted images. Great for an iPhone dump or a photo shoot. Everything stays on your computer.',
   opts:oSel('convert all to',[['image/jpeg','JPG'],['image/png','PNG'],['image/webp','WEBP']],'type'),
@@ -979,149 +883,16 @@ add({cat:'image',kinds:['raw'],multi:true,rec:1,nm:'Camera RAW to JPG',ds:'Devel
     }
     if(out.length===1) showResult(new Blob([out[0].data],{type:mimeOf(out[0].name)}),out[0].name);
     else showMulti(out,'developed-photos.zip',`${out.length} photos developed with camera white balance.`); }});
-add({cat:'image',kinds:['image'],nm:'Upscale an Image (4×)',ds:'Make a small picture big and sharp',kw:'upscale enlarge enhance 4x ai bigger resolution old photo scan restore blurry',
-  more:'Blows a picture up to four times its size using a local AI model, great for old scans, small logos, and photos that are too tiny to print. Uses your graphics chip; most computers made in the last decade have one that works.',
-  opts:oSel('style',[['photo','Photo'],['anime','Art / anime']],'model'),
-  run:async (f,o)=>{ const info=await nativeInfo(); if(!info.upscale) return showGuide(needDesktop('Upscaling'));
-    let src=f; if(!['jpg','jpeg','png','webp'].includes(ext(f.name)))
-      src=new File([await imgConvert(f,{type:'image/png'})],'in.png',{type:'image/png'});
-    try{
-      const b=await runTool(src,'upscale',{model:o.model==='anime'?'anime':'photo'},'out.png','Upscaling (a big photo can take a minute)');
-      showResult(b,base(f.name)+'-4x.png');
-    }catch(e){
-      if(/vulkan|vk[A-Z]|gpu|device|instance/i.test(e.message||'')) return showGuide({title:'No compatible graphics chip',
-        msg:'Upscaling needs a graphics chip with Vulkan support and this computer’s doesn’t seem to have one. The rest of the app works fine without it.'});
-      throw e; } }});
+
 add({cat:'image',kinds:['image'],nm:'Grab Text from a Picture',ds:'Copy the words out of a screenshot or scan',kw:'ocr text extract screenshot scan read words copy grab recognize',
   more:'Reads the words in a screenshot, photo, or scan and hands you the text to copy or save. English works best. Runs entirely on your computer.',
   run:async f=>{ const onP=progress('Reading the picture (the first run loads the reader)'); onP(.05);
     const txt=(await ocrImage(f,onP)).trim();
     if(!txt) return showGuide({title:'No words found',msg:'Couldn’t make out any text in that picture. A sharper, straighter, better-lit shot usually does the trick.'});
     showText(txt,base(f.name)+'.txt'); }});
-/* ---- AI image check: provenance scan, fully local ----
-   What generators actually leave in the file (all plain bytes, so one latin1 scan finds them anywhere,
-   JPEG APP1, PNG iTXt, WebP/HEIC boxes, C2PA's CBOR all store these strings uncompressed):
-   · C2PA "Content Credentials" (ChatGPT/DALL·E, Adobe Firefly, Bing/Designer): a signed manifest naming the tool
-   · IPTC/XMP DigitalSourceType (Gemini/Imagen, Pixel Magic Editor): trainedAlgorithmicMedia = generated,
-     compositeWithTrainedAlgorithmicMedia = real image with AI edits; Google also writes "Made with Google AI"
-   · Stable Diffusion family: the whole prompt sits in PNG text chunks (parameters / ComfyUI workflow / NovelAI)
-   · Real cameras leave EXIF optics (exposure, aperture, GPS) that no generator bothers to fake
-   A screenshot or social-media re-encode redraws the pixels into a new file and wipes ALL of the above
-   (Google's SynthID pixel watermark survives but has no open reader), so "no tags" must mean "can't tell",
-   never "real", we detect the screenshot itself and say so honestly. */
-const latin1=b=>{ try{ return new TextDecoder('latin1').decode(b); }catch{ return ''; } };
-function pngTexts(u8){ // uncompressed tEXt/iTXt key→value pairs; the SD family writes its prompts here
-  const out={}; if(u8.length<16||u8[0]!==0x89||u8[1]!==0x50) return out;
-  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength); let p=8;
-  while(p+12<=u8.length){ const len=dv.getUint32(p), type=latin1(u8.subarray(p+4,p+8)), d=p+8;
-    if(len>u8.length-d) break;
-    if(type==='tEXt'||type==='iTXt'){ const seg=u8.subarray(d,d+len), z=seg.indexOf(0);
-      if(z>0){ let val=null;
-        if(type==='tEXt') val=latin1(seg.subarray(z+1));
-        else if(!seg[z+1]){ let q=seg.indexOf(0,z+3); if(q>=0)q=seg.indexOf(0,q+1); // skip lang + translated keyword
-          if(q>=0){ try{ val=new TextDecoder().decode(seg.subarray(q+1)); }catch{} } }
-        if(val!=null) out[latin1(seg.subarray(0,z)).toLowerCase()]=val.slice(0,4000); } }
-    if(type==='IEND') break; p=d+len+4; }
-  return out; }
-// exact device screens (both orientations), a PNG at exactly one of these with zero camera EXIF is a screenshot tell
-const SCREENS=new Set('640x1136 750x1334 828x1792 1080x1920 1080x2280 1080x2340 1080x2400 1125x2436 1170x2532 1179x2556 1206x2622 1242x2208 1242x2688 1284x2778 1290x2796 1320x2868 1440x3120 720x1600 1536x2048 1620x2160 1640x2360 1668x2388 2048x2732 2064x2752 1366x768 1536x864 1440x900 1680x1050 1920x1080 1920x1200 2256x1504 2560x1440 2560x1600 2560x1664 2736x1824 2880x1800 2880x1864 2880x1920 3024x1964 3456x2234 3840x2160 4480x2520 5120x2880'.split(' '));
-async function aiCheck(f){
-  const u8full=new Uint8Array(await f.arrayBuffer());
-  // metadata lives at the head (and C2PA sometimes at the tail), cap the scan so a 300MB scan PNG doesn't chew RAM
-  const u8=u8full.length>67108864?(()=>{ const a=new Uint8Array(36*1048576);
-    a.set(u8full.subarray(0,32*1048576)); a.set(u8full.subarray(u8full.length-4*1048576),32*1048576); return a; })():u8full;
-  const hay=latin1(u8).toLowerCase();
-  const ev=[], say=(lean,txt)=>ev.push({lean,txt});
-  // generator names precise enough not to hit ordinary words ("firefly" the insect, "imagen" is Spanish)
-  const GENS=[['chatgpt','ChatGPT'],['gpt-image','OpenAI'],['openai','OpenAI'],['dall-e','DALL·E'],['dall·e','DALL·E'],
-    ['adobe firefly','Adobe Firefly'],['firefly image','Adobe Firefly'],['midjourney','Midjourney'],
-    ['stable diffusion','Stable Diffusion'],['stablediffusion','Stable Diffusion'],['comfyui','ComfyUI'],
-    ['novelai','NovelAI'],['invokeai','InvokeAI'],['leonardo.ai','Leonardo AI'],['ideogram.ai','Ideogram'],
-    ['recraft.ai','Recraft'],['black forest labs','Flux (Black Forest Labs)'],['bing image creator','Bing Image Creator'],
-    ['microsoft designer','Microsoft Designer']];
-  const gen=GENS.find(([k])=>hay.includes(k))||null, named=gen?gen[1]:null;
-  const c2pa=hay.includes('c2pa.claim')||hay.includes('c2pa.assertions')||hay.split('c2pa').length>3;
-  const composite=hay.includes('compositewithtrainedalgorithmicmedia');
-  const trained=hay.replace(/compositewithtrainedalgorithmicmedia/g,'').includes('trainedalgorithmicmedia');
-  const gAI=hay.includes('made with google ai'), gEdit=hay.includes('edited with google ai');
-  const capture=hay.includes('digitalcapture');
-  const tx=pngTexts(u8full);
-  const sd=(tx.parameters&&/steps:\s*\d/i.test(tx.parameters))?['Stable Diffusion',tx.parameters]:
-    (tx.prompt&&tx.workflow)?['ComfyUI',null]:
-    (tx.software&&/novelai/i.test(tx.software))?['NovelAI',tx.comment||null]:
-    (tx.invokeai_metadata||tx['sd-metadata']||tx.sui_image_params)?['a Stable Diffusion app',null]:null;
-  let ex=null; try{ ex=readExif(u8full.buffer); }catch{}
-  const cam=!!(ex&&ex.Make&&ex.Model), optics=!!(ex&&(ex.Exposure!=null||ex.FNumber!=null||ex.ISO!=null||ex.Lens));
-  let w=0,h=0; try{ const bm=await createImageBitmap(f); w=bm.width; h=bm.height; bm.close&&bm.close(); }catch{}
-  const nameShot=/screen[\s_-]?shot|bildschirmfoto/i.test(f.name), tagShot=hay.includes('screenshot');
-  const sizeShot=!!(w&&(SCREENS.has(w+'x'+h)||SCREENS.has(h+'x'+w)));
-  const isPng=u8full[0]===0x89&&u8full[1]===0x50;
-  const shot=!cam&&(nameShot||tagShot||(isPng&&sizeShot&&!ex));
-  const expTxt=e=>e>=1?(+e.toFixed(1))+'s':'1/'+Math.round(1/e)+'s';
-  let score,verdict,sub=null;
-  if(sd){ score=98; verdict='AI-generated';
-    say('ai',`${sd[0]} saved its prompt inside the PNG${sd[1]?`: “${sd[1].slice(0,110).replace(/\s+/g,' ')}…”`:''}`); }
-  else if(trained||gAI){ score=97; verdict='AI-generated';
-    say('ai',gAI?'Tagged “Made with Google AI” (Gemini / Google AI)':'Carries the IPTC “trained algorithmic media” tag, the industry-standard marker for AI-generated images');
-    if(named) say('ai','Metadata names '+named); }
-  else if(gen&&c2pa){ score=97; verdict='AI-generated';
-    say('ai','Signed Content Credentials (C2PA) naming '+named); }
-  else if(gen){ score=90; verdict='Almost certainly AI';
-    say('ai','Metadata mentions '+named); }
-  else if(composite||gEdit){ score=72; verdict='Real photo, edited with AI';
-    say('ai',gEdit?'Tagged “Edited with Google AI”: Magic Editor or a similar tool touched it':'Tagged “composite with trained algorithmic media”: a real image with AI edits like generative fill'); }
-  else if(c2pa&&capture&&cam){ score=5; verdict='Real photo, signed by the camera';
-    say('real','Content Credentials mark this as a direct camera capture (C2PA “digital capture”)'); }
-  else if(c2pa){ score=70; verdict='Made with AI-era software';
-    say('ai','Has a signed Content Credentials (C2PA) manifest with no recognizable generator name; most tools that sign today are AI generators or Adobe apps'); }
-  else if(cam&&optics){ score=ex.GPS?4:9; verdict='Looks like a real photo'; }
-  else if(cam){ score=18; verdict='Leans real'; }
-  else if(shot){ score=50; verdict='Screenshot: origin unverifiable';
-    sub='A screenshot redraws the pixels into a brand-new file and wipes AI tags and camera info alike, so what it shows could be real or AI. Google’s SynthID watermark survives screenshots, but only Google can read it.'; }
-  else { score=50; verdict='No evidence either way';
-    sub='No AI tags, but no camera info either. Messengers and social sites strip metadata on upload, so a bare file like this could have started anywhere.'; }
-  if(cam&&score<70){ say('real',`Shot on ${ex.Make} ${ex.Model}${ex.Lens?' · '+ex.Lens:''}`);
-    if(optics){ const b=[]; if(ex.FNumber)b.push('ƒ/'+ex.FNumber); if(ex.Exposure)b.push(expTxt(ex.Exposure)); if(ex.ISO)b.push('ISO '+ex.ISO); if(ex.FocalLength)b.push(ex.FocalLength+'mm');
-      if(b.length) say('real','Real exposure settings: '+b.join(' · ')); }
-    if(ex.GPS) say('real','Has the GPS location of the shot');
-    if(ex.DateTaken) say('real','Date taken: '+ex.DateTaken); }
-  if(composite&&cam) say('real',`Underlying camera info survives: ${ex.Make} ${ex.Model}`);
-  if(shot){ if(nameShot)say('info','The filename says screenshot'); if(tagShot)say('info','Carries a “Screenshot” marker (Apple writes this)');
-    if(sizeShot)say('info',`Exactly a device screen size: ${w}×${h}`); }
-  else if((nameShot||sizeShot)&&score>=70) say('info','Also looks like a screenshot, but the AI tags above survived and still count');
-  if(c2pa&&score>=90&&!(gen&&c2pa)) say('ai','Signed Content Credentials (C2PA) manifest present');
-  if(!ev.length) say('info','The file has no metadata at all');
-  return {score,verdict,sub,evidence:ev};
-}
-function showAICheck(r,fname){
-  clearStatus(); const out=$('#output'); out.innerHTML=''; freeResUrls();
-  const box=el('div',{className:'result'});
-  box.append(el('h3',{textContent:'AI check · '+fname}));
-  const bar=el('div',{style:'position:relative;height:14px;margin:16px 2px 4px;border:2px solid;border-color:var(--sb);background:linear-gradient(90deg,var(--img) 0%,var(--face) 50%,var(--pdf) 100%)'});
-  bar.append(el('div',{style:`position:absolute;top:-5px;bottom:-5px;left:calc(${r.score}% - 2px);width:4px;background:var(--ink);outline:1px solid var(--hi)`}));
-  box.append(bar);
-  const lab=el('div',{style:'display:flex;justify-content:space-between;font:11px var(--mono);color:var(--ink2);margin:3px 2px 0'});
-  lab.append(el('span',{textContent:'camera photo'}),el('span',{textContent:'can’t tell'}),el('span',{textContent:'AI-made'}));
-  box.append(lab);
-  box.append(el('div',{style:'display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:12px 0 2px'},[
-    el('div',{style:'font:bold 15px var(--sans)',textContent:r.verdict}),
-    el('div',{style:'font:12px var(--mono);color:var(--ink2)',textContent:r.score+'/100 AI-likely'})]));
-  if(r.sub) box.append(el('div',{className:'note',textContent:r.sub}));
-  const ul=el('div',{style:'margin-top:10px;display:grid;gap:6px'});
-  r.evidence.forEach(e=>ul.append(el('div',{style:'display:flex;gap:8px;align-items:baseline;font:13px var(--sans)'},[
-    el('span',{style:`flex:none;width:9px;height:9px;background:${{ai:'var(--pdf)',real:'var(--img)',info:'var(--ink2)'}[e.lean]};border:1px solid var(--sh2)`}),
-    el('span',{textContent:e.txt})])));
-  box.append(ul);
-  box.append(el('div',{className:'note',style:'margin-top:12px',textContent:'Treat the rating as evidence. Anyone can strip these tags (a screenshot does it by accident), and a forger can write fake ones. A clean-looking file could still be AI.'}));
-  const ag=el('button',{className:'btn ghost',textContent:'Home'}); ag.onclick=resetStage;
-  box.append(el('div',{className:'actions',style:'margin-top:10px'},[ag]));
-  out.append(box); out.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-add({cat:'image',kinds:['image'],rec:1,nm:'AI Image Checker',ds:'Real photo or AI-made? Read the evidence',kw:'ai detect fake real photo authentic genuine original generated aigenerated synthetic checker check spot tell is this real photoshopped chatgpt dalle gemini imagen midjourney firefly dream stable diffusion sdxl flux deepfake verify verification provenance source c2pa content credentials origin screenshot watermark synthid',
-  more:'AI tools leave tags in the files they make: ChatGPT and Firefly sign their images (Content Credentials), Google writes “Made with Google AI”, Stable Diffusion saves its whole prompt in the PNG. This reads those tags, weighs them against real-camera evidence like exposure settings and GPS, and gives you a 0–100 rating with each clue listed. A screenshot or social-media re-upload strips the tags, and you get a straight “can’t tell” instead of a guess. Nothing leaves your computer.',
-  run:async f=>{ const onP=progress('Reading the file’s hidden tags'); onP(.3);
-    const r=await aiCheck(f); onP(1); showAICheck(r,f.name); }});
-add({cat:'arc',kinds:['archive'],rec:1,nm:'Open Any Archive',ds:'Unpack a RAR, 7z, ZIP, or TAR',kw:'unzip extract rar 7z zip tar gz archive open unpack attachment',
+add({cat:'arc',kinds:['any'],multi:true,nm:'Create a ZIP',ds:'Pack files together for sending or storage',kw:'zip create archive pack compress files bundle',
+  more:'Select files to bundle into a ZIP. Files with the same name get a numbered suffix so nothing is replaced. Your original files stay untouched.',run:async files=>{progress('Creating ZIP')(.3);showMulti(await Promise.all(files.map(async f=>({name:f.name,data:new Uint8Array(await f.arrayBuffer())}))),'files.zip');}});
+add({cat:'arc',kinds:['archive'],rec:1,nm:'Extract an Archive',ds:'Unpack a RAR, 7z, ZIP, or TAR',kw:'unzip extract rar 7z zip tar gz archive open unpack attachment',
   more:'Unpacks almost any archive, RAR, 7z, ZIP, TAR, and friends, and gives you the files inside as a plain ZIP your computer opens natively. Nothing gets uploaded.',
   run:async f=>{ const onP=progress('Unpacking'); onP(.2);
     const entries=await extractArchive(f); onP(.7);
@@ -1191,9 +962,7 @@ add({cat:'video',kinds:['video'],rec:1,nm:'Shrink a Video',ds:'Make a smaller co
 add({cat:'video',kinds:['video'],rec:1,nm:'Save the Audio as MP3',ds:'Pull the sound out as an MP3',kw:'extract audio mp3 sound from video',
   more:'Takes just the sound from a video and saves it as an MP3 file.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-acodec','libmp3lame','-q:a','2',out],'Extracting audio'),base(f.name)+'.mp3'); }});
-add({cat:'video',kinds:['video'],nm:'Make It an MP4',ds:'Change a video to MP4',kw:'convert mp4 h264 mov mkv webm',
-  more:'Changes a MOV, MKV, WEBM, or AVI video into an MP4 that plays almost anywhere.',
-  run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Converting to MP4'),base(f.name)+'.mp4'); }});
+
 add({cat:'video',kinds:['video'],nm:'Trim a Video',ds:'Keep just one part of the clip',kw:'trim cut clip shorten',
   more:'Keeps only the part between a start and end time and drops the rest. Times are in minutes and seconds.',
   opts:()=>{ const a=el('input',{type:'text',value:'00:00',placeholder:'mm:ss'}); const b=el('input',{type:'text',value:'00:10',placeholder:'mm:ss'});
@@ -1222,46 +991,13 @@ add({cat:'video',kinds:['video'],nm:'Save a Photo from a Video',ds:'Save one mom
   run:async (f,o)=>{ showResult(await runFF(f,'out.png',(i,out)=>['-ss',o.t,'-i',i,'-vframes','1','-update','1',out],'Grabbing frame'),base(f.name)+'-frame.png'); }});
 
 /* ---- AUDIO ---- */
-add({cat:'audio',kinds:['audio'],rec:1,nm:'Convert Audio',ds:'Switch between MP3, WAV, M4A, OGG, FLAC, AAC',kw:'convert audio mp3 wav m4a ogg flac',
-  more:'Turn a sound file into a different format. Pick the type you want and save the new file.',
-  opts:oSel('to',[['mp3','MP3'],['wav','WAV'],['m4a','M4A'],['ogg','OGG'],['flac','FLAC'],['aac','AAC']],'e'),
-  run:async (f,o)=>{ const c={mp3:['-acodec','libmp3lame','-q:a','2'],wav:[],m4a:['-acodec','aac'],ogg:['-acodec','libvorbis'],flac:['-acodec','flac'],aac:['-acodec','aac']}[o.e];
-    showResult(await runFF(f,'out.'+o.e,(i,out)=>['-i',i,...c,out],'Converting audio'),base(f.name)+'.'+o.e); }});
+
 add({cat:'audio',kinds:['audio'],nm:'Even Out Volume',ds:'Make quiet and loud parts match',kw:'normalize volume loudness level',
   more:'Levels out the loudness so soft and loud parts sound about the same. Good for voice memos and recordings.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-af','loudnorm','-acodec','libmp3lame','-q:a','2',out],'Normalizing'),base(f.name)+'-leveled.mp3'); }});
-add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Split a Song into Vocals & Instrumental',ds:'Pull the acapella and the karaoke track apart',kw:'stems separate vocals acapella instrumental karaoke split isolate remove voice uvr demix',
-  more:'Splits a song into two tracks, just the vocals, and everything else. DJs get an acapella, karaoke night gets a backing track. The first run downloads the separation model once (~64 MB). Heads up: a full song takes a few minutes.',
-  run:async f=>{ const info=await nativeInfo(); if(!info.stems) return showGuide(needDesktop('Splitting a song'));
-    if(!info.stemsModel) await ensureModel('UVR-MDX-NET-Voc_FT.onnx','stemsModel','Downloading the separation model (one time, ~64 MB)');
-    const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','44100','-ac','2','-c:a','pcm_s16le',out],'Getting the audio ready');
-    const zip=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'stems',{},'out.zip','Splitting (a full song takes a few minutes)');
-    const {unzipSync}=await import('./vendor/fflate.mjs');
-    const parts=unzipSync(new Uint8Array(await zip.arrayBuffer()));
-    const out=[]; const enc=async(name,label)=>{ if(!parts[name])return;
-      const mp3=await runFF(new File([parts[name].slice().buffer],name,{type:'audio/wav'}),'out.mp3',(i,o2)=>['-i',i,'-acodec','libmp3lame','-q:a','2',o2],label);
-      out.push({name:base(f.name)+'-'+name.replace('.wav','.mp3'),data:new Uint8Array(await mp3.arrayBuffer())}); };
-    await enc('vocals.wav','Saving the vocals');
-    await enc('instrumental.wav','Saving the instrumental');
-    if(!out.length) throw new Error('Separation produced no tracks');
-    showMulti(out,base(f.name)+'-stems.zip','Vocals + instrumental, as MP3s.'); }});
-add({cat:'audio',kinds:['audio','video'],nm:'Find the BPM',ds:'Work out a track’s tempo',kw:'bpm tempo beats per minute detect dj analyze speed',
-  more:'Listens to a track and works out its tempo in beats per minute. Handy for DJs building sets and producers matching samples. Steady electronic beats read best; live drummers wander.',
-  run:async f=>{ const onP=progress('Listening for the beat'); onP(.2);
-    const {guess}=await import('./vendor/beat.mjs');
-    const ac=new (window.AudioContext||window.webkitAudioContext)();
-    try{
-      const buf=await ac.decodeAudioData(await f.arrayBuffer()); onP(.6);
-      const {bpm}=await guess(buf); onP(1);
-      showGuide({title:`♩ ${bpm} BPM`,msg:`“${f.name}” sits at about ${bpm} beats per minute. If that feels half or double the real speed, it probably is, half/double-time readings are the classic gotcha.`});
-    }catch(e){ throw new Error('Couldn’t find a steady beat in that track. It works best on music with a clear drum beat.'); }
-    finally{ ac.close(); } }});
-add({cat:'audio',input:'text',nm:'Make a Voiceover',ds:'Turn typed words into natural speech',kw:'text to speech tts voiceover voice narrate speak read aloud audio',
-  more:'Types in, speech out, a natural-sounding voice reads your script and saves it as audio for slideshows and videos. English voice; the first run downloads it once (~64 MB). Everything happens on your computer.',
-  run:async txt=>{ const info=await nativeInfo(); if(!info.tts) return showGuide(needDesktop('Making a voiceover'));
-    if(!info.ttsModel) await ensureModel('vits-piper-en_US-amy-medium','ttsModel','Downloading the voice (one time, ~64 MB)');
-    const wav=await runTool(new File([txt.slice(0,5000)],'in.txt',{type:'text/plain'}),'tts',{},'out.wav','Reading it out');
-    showResult(wav,'voiceover.wav',{note:txt.length>5000?'That was a lot of text, the first ~5,000 characters were read.':''}); }});
+
+
+
 add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitles',ds:'Turn speech into text or an SRT caption file',kw:'transcribe transcription speech to text subtitles captions srt vtt whisper voice memo interview lecture auto',
   more:'Listens to a recording or video and writes out what was said, as plain text, or as an SRT subtitle file you can burn in with the captions tool. The first run downloads your chosen speech model once; after that it works fully offline. Handles most languages.',
   opts:()=>{ const fmt=el('select'); [['srt','Subtitles (SRT)'],['txt','Plain text'],['vtt','Web captions (VTT)']].forEach(([v,l])=>fmt.append(el('option',{value:v,textContent:l})));
@@ -1277,8 +1013,7 @@ add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitl
     const b=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt,model},'out.'+fmt,'Listening and writing (a long recording takes a while)');
     if(fmt==='txt') showText((await b.text()).trim(),base(f.name)+'.txt');
     else showResult(b,base(f.name)+'.'+fmt,{note:fmt==='srt'?'Pairs perfectly with “Burn In Subtitles”.':''}); }});
-add({cat:'video',kinds:['video','audio'],rec:1,custom:f=>captionStudio(f),nm:'Caption Studio',ds:'Auto-caption a video, then fix the words and timing',kw:'captions subtitles srt vtt whisper auto generate edit editor transcribe burn tiktok reels shorts timing sync',
-  more:'Listens to your video and writes captions automatically, then opens an editor: play the video, fix any words whisper got wrong, nudge the timing, add or delete lines. Export a clean SRT/VTT or burn the captions straight onto the video. The speech model runs on your machine, nothing is uploaded.'});
+
 add({cat:'audio',kinds:['audio','video'],nm:'Podcast Loudness Fix',ds:'Match the volume podcast apps expect',kw:'loudnorm lufs podcast loudness normalize level broadcast -16 episode',
   more:'Levels a recording to standard podcast loudness (-16 LUFS), so your episode isn’t quieter or louder than everyone else’s. Works on a video too, you get the leveled sound as an MP3.',
   run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-af','loudnorm=I=-16:TP=-1.5:LRA=11','-acodec','libmp3lame','-q:a','2',out],'Leveling loudness'),base(f.name)+'-podcast.mp3'); }});
@@ -1355,11 +1090,6 @@ add({cat:'pdf',kinds:['pdf'],multi:1,nm:'Combine PDFs',ds:'Join several PDFs int
       (await m.copyPages(d,d.getPageIndices())).forEach(p=>m.addPage(p)); }
     showResult(new Blob([await m.save()],{type:'application/pdf'}),'merged.pdf'); }});
 
-/* ---- OPEN / READ (read-only preview) ----
-   No longer a tool tile: the viewer (openViewer) is reached by right-clicking a PDF/MD/TXT
-   in the OS and choosing "Open with → Junk Drawer". main.js queues the file and index.html
-   loads it via /api/opened-file on startup/focus. */
-
 /* ---- DATA ---- */
 add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'CSV to JSON',ds:'Turn a spreadsheet into JSON',kw:'csv json convert data table',
   more:'Turns a spreadsheet-style CSV into JSON. The first row becomes the field names.',
@@ -1378,25 +1108,10 @@ add({cat:'dev',input:'text',nm:'Switch Between JSON and YAML',ds:'Turn JSON into
   opts:oSel('direction',[['j2y','JSON → YAML'],['y2j','YAML → JSON']],'d'),
   run:async (text,o)=>{ const YAML=await import("./vendor/js-yaml.mjs");
     if(o.d==='j2y') showText(YAML.dump(JSON.parse(text)),'out.yaml'); else showText(JSON.stringify(YAML.load(text),null,2),'out.json'); }});
-add({cat:'dev',input:'text',nm:'Scramble Text to Base64',ds:'Turn text into Base64 and back',kw:'base64 encode decode',
-  more:'Turns plain text into Base64, a scrambled form some apps and emails use, and turns Base64 back into normal text.',
-  opts:oSel('do',[['enc','Encode'],['dec','Decode']],'d'),
-  run:(text,o)=>showText(o.d==='enc'?btoa(unescape(encodeURIComponent(text))):decodeURIComponent(escape(atob(text.trim()))),'base64.txt')});
-add({cat:'dev',input:'text',nm:'Make Text Safe for a Web Link',ds:'Fix text so it works in a web link',kw:'url encode decode percent escape',
-  more:'Rewrites spaces and symbols so your text fits safely inside a web link, and turns an encoded link back into plain text.',
-  opts:oSel('do',[['enc','Encode'],['dec','Decode']],'d'),
-  run:(text,o)=>showText(o.d==='enc'?encodeURIComponent(text):decodeURIComponent(text),'url.txt')});
-add({cat:'dev',input:'text',nm:'Make a Text Fingerprint',ds:'Get a unique code for your text',kw:'hash sha256 sha1 checksum digest',
-  more:'Turns your text into a fixed string of letters and numbers that acts like a fingerprint. The same text always gives the same code, so you can check whether two things match.',
-  opts:oSel('algo',[['SHA-256','SHA-256'],['SHA-1','SHA-1'],['SHA-512','SHA-512']],'a'),
-  run:async (text,o)=>{ const buf=await crypto.subtle.digest(o.a,new TextEncoder().encode(text));
-    showText([...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''),'hash.txt'); }});
-add({cat:'dev',input:'text',nm:'Read a Computer Timestamp',ds:'Turn a number timestamp into a date and back',kw:'timestamp epoch unix date time convert',
-  more:'Computers often store time as a long count of seconds. Turn that number into a readable date, or a date back into the number.',
-  opts:oSel('dir',[['t2d','Timestamp → date'],['d2t','Date → timestamp']],'d'),
-  run:(text,o)=>{ const v=text.trim(); if(o.d==='t2d'){ const n=+v; if(!v||isNaN(n)) throw new Error('Enter a number timestamp, like 1700000000.'); const ms=v.length>11?n:n*1000;
-    showText(new Date(ms).toString()+'\n'+new Date(ms).toISOString(),'date.txt'); }
-    else { const ms=new Date(v).getTime(); if(isNaN(ms)) throw new Error('That is not a date I can read. Try like 2026-06-29.'); showText(String(Math.floor(ms/1000)),'epoch.txt'); } }});
+
+
+
+
 add({cat:'dev',input:'text',rec:1,nm:'Make a QR Code',ds:'Turn a link or text into a QR code',kw:'qr code generate make url link create barcode',
   more:'Type a web link or any text and get a QR code picture you can save or share. Pick a bigger size to make it easy to scan from far away.',
   opts:oSel('size',[['8','Medium'],['5','Small'],['13','Large']],'scale'),
@@ -1410,63 +1125,81 @@ add({cat:'dev',kinds:['image'],nm:'Read a QR Code',ds:'Pull the link out of a QR
     const jsQR=await qrDec(); const res=jsQR(d.data,c.width,c.height);
     if(!res||!res.data) throw new Error('No QR code found. Try a sharper image or crop closer to the code.');
     showText(res.data,'qr.txt'); }});
-add({cat:'dev',input:'text',nm:'Number Base Converter',ds:'Decimal, hex, binary, octal',kw:'base convert hex hexadecimal binary octal decimal radix base10 base16 base2',
-  more:'Convert a number from one base to another, like decimal to hexadecimal or binary to decimal. Pick what you are starting from and what you want out.',
-  opts:()=>{ const mk=()=>{ const s=el('select'); [['10','Decimal (base 10)'],['16','Hex (base 16)'],['2','Binary (base 2)'],['8','Octal (base 8)']].forEach(([v,l])=>s.append(el('option',{value:v,textContent:l}))); return s; };
-    const f=mk(), t=mk(); t.value='16';
-    return {node:el('div',{},[el('label',{},['from ',f]),el('label',{},['to ',t])]),get:()=>({from:+f.value,to:+t.value})}; },
-  run:(text,o)=>{ const v=text.trim().replace(/^0x/i,'').replace(/\s+/g,''); const n=parseInt(v,o.from);
-    if(v===''||isNaN(n))throw new Error('That is not a valid base-'+o.from+' number.');
-    showText(n.toString(o.to).toUpperCase(),'number.txt'); }});
-add({cat:'dev',input:'text',nm:'Text ↔ Binary',ds:'Turn text into binary and back',kw:'binary text convert bits ascii 8-bit ones zeros',
-  more:'Turn text into 8-bit binary, or decode binary back into text. When decoding, put a space between each 8-bit group.',
-  opts:oSel('direction',[['enc','Text → Binary'],['dec','Binary → Text']],'d'),
-  run:(text,o)=>{ let out;
-    if(o.d==='enc') out=[...text].map(c=>c.codePointAt(0).toString(2).padStart(8,'0')).join(' ');
-    else out=text.trim().split(/\s+/).filter(Boolean).map(b=>String.fromCodePoint(parseInt(b,2))).join('');
-    showText(out,'binary.txt'); }});
-const MORSE={A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..','0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.','.':'.-.-.-',',':'--..--','?':'..--..','/':'-..-.','@':'.--.-.','-':'-....-','=':'-...-'};
-const UNMORSE=Object.fromEntries(Object.entries(MORSE).map(([k,v])=>[v,k]));
-add({cat:'dev',input:'text',nm:'Morse Code',ds:'English ↔ Morse code',kw:'morse code translate dots dashes english sos',
-  more:'Turn text into Morse code, or decode Morse back into text. Letters are separated by spaces and words by a slash (/).',
-  opts:oSel('direction',[['enc','Text → Morse'],['dec','Morse → Text']],'d'),
-  run:(text,o)=>{ let out;
-    if(o.d==='enc') out=text.toUpperCase().trim().split(/\s+/).map(w=>[...w].map(c=>MORSE[c]||'').filter(Boolean).join(' ')).join(' / ');
-    else out=text.trim().split(/\s*\/\s*/).map(w=>w.split(/\s+/).map(s=>UNMORSE[s]||'').join('')).join(' ');
-    showText(out,'morse.txt'); }});
+
 
 /* ---- WEIRD ---- */
-add({cat:'weird',kinds:['any'],rec:1,nm:'Look Inside a File',ds:'See what a file really is',kw:'inspect identify type metadata what is detective info magic',
-  more:'Tells you what a file truly is, even when the name says otherwise, plus its size and a fingerprint no other file shares. The file stays on your computer.',
-  run:async f=>{ const onP=progress('Investigating'); onP(.3); const buf=new Uint8Array(await f.slice(0,16).arrayBuffer());
-    const hex=[...buf].map(b=>b.toString(16).padStart(2,'0')).join(' ');
-    const sig=magic(buf); let extra='';
-    if(kind(f)==='image'){ try{ const {img,url}=await toImage(f); extra=`dimensions   ${img.naturalWidth} × ${img.naturalHeight}px\n`; URL.revokeObjectURL(url);}catch{} }
-    if(kind(f)==='video'){ const d=await videoDuration(f); if(d)extra=`duration     ${d.toFixed(1)}s\n`; }
-    const full=new Uint8Array(await f.arrayBuffer()); const h=await crypto.subtle.digest('SHA-256',full);
-    const sha=[...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('');
-    showText(
-`FILE REPORT
-──────────────────────────────
-name         ${f.name}
-size         ${fmt(f.size)} (${f.size} bytes)
-ext claims   .${ext(f.name)}  →  ${kind(f)}
-true type    ${sig||'unknown / plain data'}
-mime (os)    ${f.type||'-'}
-${extra}magic bytes  ${hex}
-sha-256      ${sha}`, base(f.name)+'-report.txt'); }});
-add({cat:'weird',kinds:['video','image'],nm:'GIF to Video',ds:'Turn a GIF into a small video',kw:'gif to mp4 convert animation',
-  more:'Turns an animated GIF into a small MP4 you can share anywhere. Runs on your computer.',
-  run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-movflags','faststart','-pix_fmt','yuv420p','-vf','scale=trunc(iw/2)*2:trunc(ih/2)*2',out],'Converting'),base(f.name)+'.mp4'); }});
-add({cat:'weird',kinds:['image'],nm:'iPhone Photo to JPG',ds:'Change an iPhone HEIC photo to JPG',kw:'heic heif iphone jpg convert',
-  more:'Changes an iPhone HEIC photo into a normal JPG that opens on any device. The photo stays on your computer.',
-  run:async f=>{ showResult(await imgConvert(f,{type:'image/jpeg',quality:.92}),base(f.name)+'.jpg'); }});
+add({cat:'weird',kinds:['any'],rec:1,nm:'Look Inside a File',ds:'Identify unknown files, including old .dat files',kw:'inspect identify type metadata dat skype unknown legacy magic recover',
+  more:'Checks file signatures and asks the local media engine to identify streams. A .dat extension can contain media, a database, or proprietary data. Unsupported files are reported honestly; originals are never changed.',
+  run:async f=>{ const onP=progress('Identifying file');onP(.1); const bytes=new Uint8Array(await f.slice(0,512).arrayBuffer()); const signature=JDMedia.identify(bytes);let media=null;
+    if(await nativeFFAvailable()){const ctl=new AbortController();_jobCtl=ctl;try{const r=await fetch('/api/probe-media?ext='+encodeURIComponent(ext(f.name)),{method:'POST',body:f,signal:ctl.signal});if(!r.ok)throw new Error('Media inspection failed ('+r.status+')');media=await r.json();}finally{if(_jobCtl===ctl)_jobCtl=null;}}
+    const report=['FILE REPORT','Name: '+f.name,'Size: '+fmt(f.size),'Signature: '+signature.label,'Media: '+(media?.recognized?media.summary:media?.reason||'Not identified as playable media.'),'',signature.note||'','',media?.recognized?'Use Convert Unknown Media to save the detected media in a common format.':'A file extension is not a format. Proprietary Skype SILK recordings and databases need a dedicated decoder or exporter; renaming the file will not convert it.'].join('\n');
+    showText(report,base(f.name)+'-report.txt'); }});
 
 /* ---- WEB / DOWNLOAD (link in, file out; needs the local server) ---- */
 add({cat:'web',input:'url',mode:'video',needs:'ytdlp',nm:'YouTube to Video',ds:'Save a video as an MP4 file',kw:'youtube download video mp4 vimeo twitch save',
   more:'Paste a YouTube link and save the video to your computer as an MP4. Works with many other video sites too.'});
 add({cat:'web',input:'url',mode:'audio',needs:'ytdlp',nm:'YouTube to MP3',ds:'Save just the sound as an MP3',kw:'youtube download audio mp3 song music rip',
   more:'Paste a video link and save only the sound as an MP3 file. Good for songs, talks, and podcasts.'});
+
+add({cat:'video',kinds:['video','image'],rec:1,nm:'Convert Video',ds:'MTS, MOV, MKV, AVI and more to a playable format',kw:'convert mts m2ts avchd mp4 mov mkv webm avi vob mod tod mxf dv wmv flv ts legacy camcorder',
+  more:'Convert camera footage and older videos locally. Choose MP4 for broad compatibility, or another available output. The installed engine determines which codecs can be read. Originals stay untouched.',custom:f=>conversionPanel([f],'video')});
+add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Convert Audio',ds:'Convert recordings or extract sound from a video',kw:'convert audio mp3 wav m4a aac flac opus ogg wma aiff amr ac3 ape caf au mp2',
+  more:'Save audio in a common or legacy format, or extract the first audio track from a video. Lossless output cannot restore detail already lost in the original.',custom:f=>conversionPanel([f],'audio')});
+add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'Convert photos, scans, textures, and older image files',kw:'convert image jpg png webp heic heif avif jxl tiff bmp tga ppm pgm pcx exr jp2',
+  more:'Choose a format for your image. Transparency is retained only by formats that support it; animated inputs export their first frame. Camera RAW files have a separate conversion tool.',custom:f=>conversionPanel([f],'image')});
+add({cat:'weird',kinds:['any'],nm:'Convert Unknown Media',ds:'Try readable media hidden in a .dat or unknown file',kw:'dat skype unknown convert recover recording legacy bin',
+  more:'The local engine reads the contents rather than trusting the extension. Works only when it recognizes actual media. Databases, encrypted files, and proprietary Skype SILK require dedicated exporters.',custom:f=>conversionPanel([f])});
+add({cat:'video',kinds:['video','audio','image','other'],multi:true,nm:'Batch Convert Media',ds:'Convert several files, with a result for every file',kw:'batch bulk multiple mts m2ts convert queue audio video images',
+  more:'Choose an output and process files one at a time. Save each result as it finishes. Failures stay visible, and cancelling keeps completed results. Image output saves the first frame only.',custom:fs=>conversionPanel(fs)});
+async function conversionPanel(files,initial){
+  if(!Array.isArray(files))files=[files];
+  openStage(); const epoch=conversionEpoch; const host=$('#panel');host.innerHTML='';
+  host.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:files.length>1?'Convert files':'Convert file'})]));
+  const summary=el('p',{className:'ds',textContent:files.length===1?files[0].name:files.length+' files · processed one at a time'});
+  host.append(summary);
+  const hint=el('p',{className:'note',textContent:'Checking the local media engine…'});host.append(hint);
+  let formats=[];
+  try{const r=await fetch('/api/media-capabilities');if(!r.ok)throw Error();const j=await r.json();formats=j.formats||[];}catch{}
+  if(epoch!==conversionEpoch)return;
+  // Browser image conversion covers common formats and HEIC, even without native helpers.
+  const imageOnly=files.every(f=>kind(f)==='image');
+  if(imageOnly)for(const [ext,label] of [['jpg','JPG · photos'],['png','PNG · transparency'],['webp','WebP · smaller images']])if(!formats.some(f=>f.ext===ext))formats.push({ext,kind:'image',label});
+  if(!formats.length){hint.textContent='The media engine is missing. Reinstall the desktop app to restore conversion. Image, PDF, archive, and text tools remain available.';return;}
+  hint.textContent=files.some(f=>kind(f)==='other')?'Unknown files must contain readable media. Skype SILK and databases need a dedicated exporter.':'Originals stay untouched. Save the converted copies when they are ready.';
+  const group=el('select',{'aria-label':'Output type'});
+  const groups=initial?[initial]:imageOnly?['image']:['video','audio','image'];
+  groups.forEach(k=>group.append(el('option',{value:k,textContent:({video:'Video',audio:'Audio',image:'Image'})[k]})));
+  group.value=initial||(['video','audio','image'].includes(kind(files[0]))?kind(files[0]):'video');
+  const target=el('select',{'aria-label':'Output format'}), detail=el('p',{className:'note'});
+  const fill=()=>{target.innerHTML='';formats.filter(f=>f.kind===group.value).forEach(f=>target.append(el('option',{value:f.ext,textContent:f.label})));detail.textContent=group.value==='image'?'Saves a still image. JPG replaces transparency with a solid background.':group.value==='audio'?'Saves the first audio track. A silent video has no audio to extract.':'Saves the first video track and its first audio track, when present. Additional tracks and subtitles are not copied.';};
+  group.onchange=fill;fill();
+  host.append(el('div',{className:'opts'},[el('label',{},['Output type ',group]),el('label',{},['Save as ',target])]),detail);
+  const queue=el('div',{className:'conversion-queue'}); const rows=files.map(f=>{const status=el('span',{className:'queue-state',textContent:'Ready'});const row=el('div',{className:'queue-item'},[el('span',{textContent:f.name}),status]);queue.append(row);return {row,status};});host.append(queue);
+  const go=el('button',{className:'btn',textContent:files.length>1?'Convert '+files.length+' files':'Convert file'}),cancel=el('button',{className:'btn ghost',textContent:'Cancel',disabled:true});let stopped=false;
+  cancel.onclick=()=>{stopped=true;if(_jobCtl)_jobCtl.abort();};
+  host.append(el('div',{className:'runrow'},[go,cancel]));
+  go.onclick=async()=>{
+    if(!target.value)return;
+    const to=target.value;go.disabled=true;cancel.disabled=false;group.disabled=target.disabled=true;stopped=false;let completed=0,failed=0;
+    for(let i=0;i<files.length;i++){
+      if(stopped||epoch!==conversionEpoch){rows.slice(i).forEach(r=>r.status.textContent='Cancelled');break;}
+      const f=files[i],{row,status}=rows[i];status.textContent='Converting…';
+      try{
+        let blob;
+        if(kind(f)==='image'&&['jpg','png','webp'].includes(to))blob=await imgConvert(f,{type:({jpg:'image/jpeg',png:'image/png',webp:'image/webp'})[to]});
+        else blob=await runFF(f,'out.'+to,(input,output)=>JDMedia.plan(to,input,output),'Converting '+(i+1)+' of '+files.length);
+        if(epoch!==conversionEpoch)return;
+        if(stopped){status.textContent='Cancelled';continue;}
+        const url=URL.createObjectURL(blob);_resUrls.push(url);
+        const name=base(f.name)+'-converted.'+to;
+        status.textContent='Done · '+fmt(blob.size);row.querySelector('a')?.remove();row.append(el('a',{className:'btn ghost',href:url,download:name,textContent:'Save file'}));completed++;
+      }catch(e){if(epoch!==conversionEpoch)return;if(stopped||e.jdAborted||e.name==='AbortError')status.textContent='Cancelled';else{status.textContent='Could not convert. '+(/invalid data|could not find codec|error opening input|end of file/i.test(String(e.message||e))?'Try Look Inside a File to identify it.':friendly(e,null,f).msg);const details=el('details',{},[el('summary',{textContent:'Technical details'}),el('pre',{textContent:String(e.message||e)})]);status.append(details);failed++;}}
+    }
+    if(epoch!==conversionEpoch)return;
+    clearStatus();summary.textContent=completed+' converted · '+failed+' failed'+(stopped?' · cancelled':'');cancel.disabled=true;
+    go.textContent='Start another conversion';go.disabled=false;go.onclick=()=>{resetStage();conversionPanel(files,initial);};
+  };
+}
 
 /* magic byte sniffer */
 function magic(b){ const s=(...x)=>x.every((v,i)=>b[i]===v);
@@ -1479,7 +1212,7 @@ function magic(b){ const s=(...x)=>x.every((v,i)=>b[i]===v);
 
 /* ================= UI WIRING ================= */
 const state={ file:null, files:null, pending:null };
-let studioUrl=null;
+
 
 /* balloon-help tooltip */
 const tipEl=el('div',{className:'tip'}); document.body.append(tipEl);
@@ -1488,139 +1221,29 @@ function bindTip(node,text){ if(!text)return;
   node.addEventListener('mousemove',e=>{ tipEl.style.left=Math.min(e.clientX+14,innerWidth-296)+'px'; tipEl.style.top=(e.clientY+18)+'px'; });
   node.addEventListener('mouseleave',()=>{ tipEl.style.display='none'; }); }
 
-/* modes: who is using the app. The home screen shows only that person's hand-picked set,
-   nothing else, and search ranks their tools first (while still covering everything).
-   Remembered between sessions. Everything else lives behind the Tools dropdown. */
-const MODES={
-  basics: {label:'Junk Drawer Basics', tools:['iPhone Photo to JPG','Shrink File Size','Shrink a Video','Make It an MP4',
-    'Sign & Fill PDF','Combine PDFs','Open Any Archive','Remove Background']},
-  photo:  {label:'Photographer', tools:['Camera RAW to JPG','Upscale an Image (4×)','Change Image Type','Resize Image',
-    'Shrink File Size','Strip Location Only','Fix Photo Dates','Rename Photos by Date Taken','Remove Background','Picture to SVG','AI Image Checker']},
-  creator:{label:'Content Creator', tools:['Caption Studio','Transcribe to Text or Subtitles','Burn In Subtitles','Make a Voiceover',
-    'Fix Phone Video for Editing','Shrink a Video','Trim a Video','Video to GIF','Save a Photo from a Video','AI Image Checker']},
-  music:  {label:'Musician / DJ', tools:['Split a Song into Vocals & Instrumental','Find the BPM','Convert Audio',
-    'Cut Out Silence','Podcast Loudness Fix','Even Out Volume','Trim Audio','Save the Audio as MP3']},
-  paper:  {label:'Paperwork', tools:['Sign & Fill PDF','Combine PDFs','Shrink a PDF','PDF to Pictures',
-    'Split into Single Pages','Delete Pages','Add Page Numbers','Grab Text from a Picture']},
-  dev:    {label:'Developer', tools:['Tidy Up JSON','Switch Between JSON and YAML','CSV to JSON','JSON to CSV',
-    'Make a QR Code','Make a Text Fingerprint','Scramble Text to Base64','Look Inside a File']},
-};
-const MODE_MIGRATE={photos:'photo',video:'creator',odds:'dev'}; // pre-persona stored values
-const WORKSPACES=[
-  {id:'video',name:'Video Studio',desc:'Edit, caption, resize, and export video.',cats:['video']},
-  {id:'photo',name:'Photo Desk',desc:'Crop, convert, retouch, and prepare assets.',cats:['image']},
-  {id:'pdf',name:'PDF Desk',desc:'Read, sign, combine, split, and shrink documents.',cats:['pdf','doc']},
-  {id:'audio',name:'Audio Desk',desc:'Trim, convert, transcribe, and make voiceovers.',cats:['audio']},
-  {id:'download',name:'Download Desk',desc:'Save permitted media from supported links.',cats:['web']},
-  {id:'dev',name:'Developer Bench',desc:'Work with JSON, CSV, YAML, QR, and file utilities.',cats:['data','dev','arc','weird']},
-];
-function renderWorkspaceEntries(){
-  const launch=$('#workspaceLaunchers'), menu=$('#workspacesMenu'); if(!launch||!menu)return;
-  launch.innerHTML=''; menu.innerHTML='';
-  WORKSPACES.forEach(w=>{
-    const go=()=>openWorkspace(w.id);
-    launch.append(el('button',{className:'workspace-launch',onclick:go},[el('b',{textContent:w.name}),el('small',{textContent:w.desc})]));
-    menu.append(el('button',{className:'workspace-item',onclick:()=>{go();menu.hidden=true;$('#workspacesBtn').setAttribute('aria-expanded','false');}},[
-      el('span',{textContent:w.name}),el('small',{textContent:w.desc})]));
-  });
-  const btn=$('#workspacesBtn'), dd=$('#workspacesDD');
-  const close=()=>{menu.hidden=true;btn.setAttribute('aria-expanded','false');};
-  btn.onclick=()=>{menu.hidden=!menu.hidden;btn.setAttribute('aria-expanded',String(!menu.hidden));if(!menu.hidden)menu.querySelector('button')?.focus();};
-  dd.addEventListener('keydown',e=>{if(e.key==='Escape'){close();btn.focus();}});
-  document.addEventListener('click',e=>{if(!e.target.closest('#workspacesDD'))close();});
-}
-function openWorkspace(id){
-  const w=WORKSPACES.find(x=>x.id===id);if(!w)return;
-  resetStage();$('#heroHome').style.display='none';$('#workspaceView').style.display='block';$('#receipt').style.display='none';
-  const host=$('#workspaceView');host.innerHTML='';
-  if(id==='video'){ openVideoStudio(host); return; }
-  const back=el('button',{className:'btn ghost',textContent:'← Back to Junk Drawer',onclick:leaveWorkspace});
-  const head=el('div',{className:'workspace-head'},[back,el('div',{},[el('h2',{textContent:w.name}),el('div',{className:'ds',textContent:w.desc})])]);
-  host.append(head);
-  host.append(el('p',{textContent:'Choose a tool.'}));
-  const tools=T.filter(t=>w.cats.includes(t.cat));const grid=el('div',{className:'workspace-tools'});
-  tools.forEach(t=>grid.append(toolCard(t,CATS[t.cat].color)));host.append(grid);
-}
-
-function clockTime(n){ n=Math.max(0,Number(n)||0); const h=Math.floor(n/3600),m=Math.floor(n%3600/60),s=Math.floor(n%60),ms=Math.floor(n%1*10); return (h?String(h).padStart(2,'0')+':':'')+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+ms; }
-function toolByName(name){ return T.find(t=>t.nm===name); }
-function leaveStudioForTool(name,marks){
-  const t=toolByName(name); if(!t)return;
-  $('#workspaceView').style.display='none'; openTool(t);
-  if(name==='Trim a Video'&&marks){ const inputs=document.querySelectorAll('#panel .opts input'); if(inputs[0])inputs[0].value=clockTime(marks.a).replace(/\.\d$/,'');if(inputs[1])inputs[1].value=clockTime(marks.b).replace(/\.\d$/,''); }
-}
-function openVideoStudio(host){
-  if(studioUrl){URL.revokeObjectURL(studioUrl);studioUrl=null;}
-  const file=state.file&&kind(state.file)==='video'?state.file:null;
-  if(!file){
-    const empty=el('div',{className:'vs-empty'},[el('b',{textContent:'Video Studio'}),el('button',{className:'btn',textContent:'Open video…'})]);
-    empty.querySelector('button').onclick=()=>pickFiles(false,fs=>{state.file=fs[0];if(kind(state.file)!=='video'){toast('Pick a video file');state.file=null;return;}openWorkspace('video');});
-    host.append(empty);return;
-  }
-  studioUrl=URL.createObjectURL(file);
-  const studio=el('div',{className:'video-studio'});
-  const back=el('button',{className:'btn',textContent:'← Files',onclick:leaveWorkspace});
-  const title=el('div',{className:'vs-title'},[el('span',{textContent:'▣'}),el('span',{textContent:'Video Studio, '+file.name,className:'vs-name'}),el('span',{className:'vs-spacer'}),back]);
-  const openBtn=el('button',{textContent:'Open…',title:'Choose a different video'}), exportBtn=el('button',{textContent:'Export',title:'Save an MP4 copy',className:'export'});const menu=el('div',{className:'vs-menu'},[openBtn,exportBtn]);bindTip(openBtn,openBtn.title);bindTip(exportBtn,exportBtn.title);
-  const rail=el('div',{className:'vs-rail'}); const railHelp={Media:'Your files',Audio:'Sound, volume, and voiceover',Text:'Titles and words on screen',Captions:'Make or import subtitles',Transitions:'Changes between clips',Effects:'GIFs and still frames',Adjust:'Size, shape, and playback fixes'}; ['Media','Audio','Text','Captions','Transitions','Effects','Adjust'].forEach((name,i)=>rail.append(el('button',{textContent:name,title:railHelp[name],className:i?'':'on','data-pane':name.toLowerCase()})));
-  const bin=el('div',{className:'vs-bin'}); const paneTitle=el('div',{className:'vs-pane-title',textContent:'Media'}), paneBody=el('div'); bin.append(paneTitle,paneBody);
-  const thumb=el('div',{className:'vs-thumb',textContent:'VIDEO'}); const fileRow=el('div',{className:'vs-file'},[thumb,el('div',{},[el('b',{textContent:file.name}),el('small',{textContent:fmt(file.size)})])]);
-  const panels={
-    media:()=>[fileRow],
-    audio:()=>studioButtons([['Extract MP3','Save the Audio as MP3'],['Mute clip','Mute a Video'],['Voiceover','Make a Voiceover']]),
-    text:()=>studioButtons([['Add captions','Caption Studio'],['Burn subtitle file','Burn In Subtitles']]),
-    captions:()=>studioButtons([['Auto captions','Caption Studio'],['Transcribe','Transcribe to Text or Subtitles']]),
-    transitions:()=>[el('div',{className:'drawer-summary',textContent:'Add another clip to use transitions.'})],
-    effects:()=>studioButtons([['Make GIF','Video to GIF'],['Save frame','Save a Photo from a Video']]),
-    adjust:()=>studioButtons([['Shrink','Shrink a Video'],['Fix phone video','Fix Phone Video for Editing'],['Resize','Resize a Video']])
-  };
-  function studioButtons(items){const box=el('div',{className:'vs-tool-list'});items.forEach(([label,name])=>{const t=toolByName(name);if(!t)return;const b=el('button',{textContent:label,title:t.more||t.ds,onclick:()=>leaveStudioForTool(name)});bindTip(b,t.more||t.ds);box.append(b);});return[box];}
-  function showPane(name){rail.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.pane===name));paneTitle.textContent=name[0].toUpperCase()+name.slice(1);paneBody.innerHTML='';(panels[name]||panels.media)().forEach(x=>paneBody.append(x));}
-  rail.querySelectorAll('button').forEach(b=>b.onclick=()=>showPane(b.dataset.pane)); showPane('media');
-  const video=el('video',{src:studioUrl,preload:'metadata'}); const canvas=el('div',{className:'vs-canvas'},[video]);
-  const play=el('button',{textContent:'▶',title:'Play / pause'}), prev=el('button',{textContent:'|◀',title:'Start'}), next=el('button',{textContent:'▶|',title:'End'}), time=el('span',{className:'vs-clock',textContent:'00:00.0 / 00:00.0'});
-  const transport=el('div',{className:'vs-transport'},[prev,play,next,time]); const preview=el('div',{className:'vs-preview'},[canvas,transport]);
-  const inField=el('input',{value:'00:00.0'}),outField=el('input',{value:'00:00.0'}); let marks={a:0,b:0};
-  const inspector=el('div',{className:'vs-inspector'},[el('div',{className:'vs-pane-title',textContent:'Clip'}),
-    el('div',{className:'vs-field'},[el('label',{textContent:'Name'}),el('input',{value:file.name,readOnly:true})]),
-    el('div',{className:'vs-field'},[el('label',{textContent:'In'}),inField,el('button',{textContent:'Set to playhead'})]),
-    el('div',{className:'vs-field'},[el('label',{textContent:'Out'}),outField,el('button',{textContent:'Set to playhead'})]),
-    el('div',{className:'vs-field'},[el('button',{textContent:'Trim to In / Out'})])]);
-  const fields=inspector.querySelectorAll('.vs-field button'); fields[0].onclick=()=>{marks.a=Math.min(video.currentTime,marks.b||video.duration);inField.value=clockTime(marks.a);};fields[1].onclick=()=>{marks.b=Math.max(video.currentTime,marks.a);outField.value=clockTime(marks.b);};fields[2].onclick=()=>leaveStudioForTool('Trim a Video',marks);
-  const work=el('div',{className:'vs-work'},[rail,bin,preview,inspector]);
-  const toolbar=el('div',{className:'vs-tb'},[el('button',{textContent:'Mark in',title:'Set the trim start here'}),el('button',{textContent:'Trim',title:'Keep the part between In and Out'}),el('button',{textContent:'Shrink',title:'Make a smaller copy'}),el('input',{className:'zoom',type:'range',min:25,max:100,value:100,title:'Timeline zoom'})]);toolbar.querySelectorAll('button').forEach(b=>bindTip(b,b.title));
-  const ruler=el('div',{className:'vs-ruler'}); const tracks=el('div',{className:'vs-tracks'}), laneV=el('div',{className:'vs-lane'}),laneA=el('div',{className:'vs-lane'}),clipV=el('div',{className:'vs-clip',textContent:file.name}),clipA=el('div',{className:'vs-clip vs-audio',textContent:'Audio'}),head=el('div',{className:'vs-playhead'});laneV.append(clipV);laneA.append(clipA);tracks.append(el('div',{className:'vs-track-name',textContent:'Video 1'}),laneV,el('div',{className:'vs-track-name',textContent:'Audio 1'}),laneA,head);
-  const timeline=el('div',{className:'vs-timeline'},[toolbar,ruler,tracks]);
-  studio.append(title,menu,work,timeline);host.append(studio);
-  openBtn.onclick=()=>pickFiles(false,fs=>{if(kind(fs[0])!=='video'){toast('Pick a video file');return;}state.file=fs[0];openWorkspace('video');});exportBtn.onclick=()=>leaveStudioForTool('Make It an MP4'); toolbar.children[0].onclick=()=>{marks.a=video.currentTime;inField.value=clockTime(marks.a);toast('In: '+clockTime(marks.a));};toolbar.children[1].onclick=()=>leaveStudioForTool('Trim a Video',marks);toolbar.children[2].onclick=()=>leaveStudioForTool('Shrink a Video');
-  play.onclick=()=>video.paused?video.play():video.pause();prev.onclick=()=>{video.currentTime=0;};next.onclick=()=>{video.currentTime=video.duration||0;};video.onplay=()=>play.textContent='❚❚';video.onpause=()=>play.textContent='▶';
-  function seek(e){const r=e.currentTarget.getBoundingClientRect(),p=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));video.currentTime=p*(video.duration||0);}laneV.onclick=seek;laneA.onclick=seek;
-  video.onloadedmetadata=()=>{marks.b=video.duration||0;outField.value=clockTime(marks.b);ruler.innerHTML='';for(let i=0;i<=4;i++)ruler.append(el('span',{style:`left:${i*25}%`,textContent:clockTime((video.duration||0)*i/4).replace('.0','')}));};
-  video.ontimeupdate=()=>{const d=video.duration||0,p=d?video.currentTime/d:0;time.textContent=clockTime(video.currentTime)+' / '+clockTime(d);head.style.left=`calc(82px + (100% - 82px) * ${p})`;};
-  videoThumb(file).then(src=>{thumb.innerHTML='';thumb.append(el('img',{src,alt:''}));}).catch(()=>{});
-}
-let _systemProfile=null;
-async function systemProfile(){
-  if(_systemProfile)return _systemProfile;
-  try{const r=await fetch('/api/system-profile');if(!r.ok)return null;_systemProfile=await r.json();return _systemProfile;}catch{return null;}
-}
-let MODE=(()=>{ try{ let m=localStorage.getItem('jd-mode'); m=MODE_MIGRATE[m]||m; return MODES[m]?m:'basics'; }catch{ return 'basics'; } })();
-function setMode(m){ MODE=MODES[m]?m:'basics'; try{ localStorage.setItem('jd-mode',MODE); }catch{} renderQuick(); }
-function modeTools(){ return MODES[MODE].tools.map(nm=>T.find(t=>t.nm===nm)).filter(Boolean); }
 /* recent quick-access tools (no forced setup, recents fill in as you go) */
 function recentList(){ try{ return JSON.parse(localStorage.getItem('jd-recent')||'[]'); }catch{ return []; } }
 function pushRecent(nm){ let r=recentList().filter(x=>x!==nm); r.unshift(nm); try{ localStorage.setItem('jd-recent',JSON.stringify(r.slice(0,5))); }catch{} }
 function renderQuick(){
   const fill=(host,tools)=>{ if(!host)return 0; host.innerHTML=''; let n=0;
     tools.forEach(t=>{ if(t){ host.append(toolCard(t,CATS[t.cat].color)); n++; } }); return n; };
-  const lbl=$('#modeLabel'); if(lbl)lbl.textContent=MODES[MODE].label;
-  fill($('#starTools'),modeTools().slice(0,6));
-  const rr=$('#recentRow'), n=fill($('#recentTools'),recentList().map(nm=>T.find(x=>x.nm===nm))); if(rr) rr.hidden=false;
+  const lbl=$('#modeLabel'); if(lbl)lbl.textContent='File tasks';
+  const primary=$('#starTools');primary.innerHTML='';
+  const task=(name,description,action)=>{const card=el('button',{className:'tool',type:'button',onclick:action},[el('div',{},[el('div',{className:'nm',textContent:name}),el('div',{className:'ds',textContent:description})])]);primary.append(card);};
+  task('Convert files','Images, video, and audio. One file or a batch.',()=>pickFiles(true,files=>conversionPanel(files)));
+  task('Make files smaller','Compress an image, video, or PDF.',()=>pickFiles(false,files=>{state.file=files[0];const name=({image:'Shrink File Size',video:'Shrink a Video',pdf:'Shrink a PDF',audio:'Shrink Audio File'})[kind(files[0])];if(name)openTool(T.find(t=>t.nm===name));else showGuide({msg:'Choose an image, video, audio file, or PDF to compress.'});}));
+  task('PDF tools','Sign, merge, split, and prepare documents.',()=>showCategory('pdf'));
+  task('Image tools','Resize, clean up, and prepare pictures.',()=>showCategory('image'));
+  task('Archives','Pack files together or extract an archive.',()=>showCategory('arc'));
+  task('Identify a file','Find out what an old or unknown file contains.',()=>openTool(T.find(t=>t.nm==='Look Inside a File')));
+
+  const rr=$('#recentRow'), n=fill($('#recentTools'),recentList().map(nm=>T.find(x=>x.nm===nm))); if(rr) rr.hidden=!n;
   const placeholder=$('#recentPlaceholder');if(placeholder)placeholder.hidden=!!n;
 }
 
 /* Visible drawer index. The old Tools menu remains a compact route, but the home
    screen no longer makes people guess that the full catalog is hiding behind it. */
+function showCategory(category){const details=$('.more-tools');details.open=true;renderDrawerBrowser(category);$('#drawerBrowser').scrollIntoView({behavior:'smooth',block:'nearest'});}
 function renderDrawerBrowser(selected){
   const host=$('#drawerBrowser'); if(!host)return;
   host.innerHTML='';
@@ -1640,7 +1263,7 @@ function renderDrawerBrowser(selected){
   const list=el('div',{className:'drawer-list'});
   for(const id in CATS){ const c=CATS[id], count=T.filter(t=>t.cat===id).length; if(!count)continue;
     const b=el('button',{className:'drawer-entry',title:c.blurb},[
-      el('span',{className:'folder95','aria-hidden':'true'}),
+      el('span',{className:'drawer-icon','aria-hidden':'true'}),
       el('span',{className:'dn',textContent:c.label}),
       el('span',{className:'dc',textContent:String(count)})]);
     b.onclick=()=>renderDrawerBrowser(id); list.append(b); }
@@ -1649,13 +1272,10 @@ function renderDrawerBrowser(selected){
 /* The Tools dropdown (top bar): press → category list; press a category → its library;
    press outside or Esc → closed. Plus the mode picker on the right. */
 function buildTopbar(){
-  const sel=$('#modeSel'); if(sel){ sel.innerHTML='';
-    for(const k in MODES) sel.append(el('option',{value:k,textContent:MODES[k].label}));
-    sel.value=MODE; sel.onchange=()=>setMode(sel.value); }
   const dd=$('#toolsDD'), btn=$('#toolsBtn'), menu=$('#toolsMenu'), lib=$('#toolsLib');
   if(!dd) return;
-  const close=()=>{ dd.classList.remove('open'); menu.hidden=true; lib.hidden=true; };
-  const openMenu=()=>{ dd.classList.add('open'); lib.hidden=true; menu.hidden=false; };
+  const close=()=>{ dd.classList.remove('open'); menu.hidden=true; lib.hidden=true; btn.setAttribute('aria-expanded','false'); };
+  const openMenu=()=>{ dd.classList.add('open'); lib.hidden=true; menu.hidden=false; btn.setAttribute('aria-expanded','true'); };
   function showLib(id){
     const c=CATS[id], tools=T.filter(t=>t.cat===id);
     lib.innerHTML=''; lib.style.setProperty('--c',c.color);
@@ -1667,7 +1287,7 @@ function buildTopbar(){
     tools.forEach(t=>{ const card=toolCard(t,c.color); const open=card.onclick;
       card.onclick=()=>{ close(); open(); }; grid.append(card); });
     lib.append(grid);
-    dd.classList.add('open'); menu.hidden=true; lib.hidden=false;
+    dd.classList.add('open'); menu.hidden=true; lib.hidden=false; btn.setAttribute('aria-expanded','true'); btn.setAttribute('aria-expanded','true');
   }
   menu.innerHTML='';
   for(const id in CATS){ const c=CATS[id]; const n=T.filter(t=>t.cat===id).length; if(!n)continue;
@@ -1683,7 +1303,7 @@ function buildTopbar(){
   window.openToolLib=id=>{ if(CATS[id])showLib(id); }; // receipt can point people at a library
 }
 
-function toolCard(t,color){ const c=el('div',{className:'tool'}); c.style.setProperty('--c',color);
+function toolCard(t,color){ const c=el('button',{className:'tool',type:'button'}); c.style.setProperty('--c',color);
   const nm=el('div',{className:'nm',textContent:t.nm});
   if(t.input==='url') nm.append(el('span',{className:'wifi',title:'Needs an internet connection',textContent:' 🛜'}));
   c.append(el('span',{className:'dot'}), el('div',{},[nm,el('div',{className:'ds',textContent:t.ds})]));
@@ -1691,10 +1311,10 @@ function toolCard(t,color){ const c=el('div',{className:'tool'}); c.style.setPro
 
 /* open a tool */
 function openTool(t){
-  pushRecent(t.nm); renderQuick();
+  resetStage(); pushRecent(t.nm); renderQuick();
   if(t.input==='url'){ return renderUrl(t); }
   if(t.input==='text' && !t.fileToText){ return renderText(t); }
-  if(t.multi){ return pickFiles(true, fs=>renderRun(t,fs)); }
+  if(t.multi){ const use=fs=>t.custom?t.custom(fs):renderRun(t,fs); if(state.files&&state.files.every(f=>t.kinds.includes('any')||t.kinds.includes(kind(f))))return use(state.files); return pickFiles(true,use); }
   const f=state.file;
   const ok = f && (t.kinds.includes('any') || t.kinds.includes(kind(f)));
   if(t.fileToText){ if(ok){ f.text().then(txt=>renderText(t,txt)); return; } return renderText(t); }
@@ -1747,7 +1367,7 @@ const MODEL_LABELS={
   'ggml-base.bin':'Subtitles model, base (fast, good enough)',
   'ggml-small.bin':'Subtitles model, small (more accurate)',
   'ggml-medium.bin':'Subtitles model, medium (most accurate)',
-  'UVR-MDX-NET-Voc_FT.onnx':'Split song into stems (vocals model)',
+  'UVR-MDX-NET-Voc_FT.onnx':'Retired song separation model',
   'vits-piper-en_US-amy-medium':'Text-to-speech voice (Amy, en-US)',
 };
 async function renderStorage(){ openStage();
@@ -1866,8 +1486,8 @@ async function postDownload(url,mode){
   showResult(blob, fn);
 }
 
-function openStage(){ $('#stage').style.display='block'; $('#stage').scrollIntoView({behavior:'smooth',block:'start'}); }
-function resetStage(){ if(_dlCtl){ try{ _dlCtl.abort(); }catch{} _dlCtl=null; } if(_jobCtl){ try{ _jobCtl.abort(); }catch{} _jobCtl=null; } jdFreeCap(); $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; freeResUrls(); }
+function openStage(){ $('#heroHome').style.display='none'; $('#stage').style.display='block'; $('#stage').scrollIntoView({behavior:'smooth',block:'start'}); }
+function resetStage(){ conversionEpoch++; if(_dlCtl){ try{ _dlCtl.abort(); }catch{} _dlCtl=null; } if(_jobCtl){ try{ _jobCtl.abort(); }catch{} _jobCtl=null; } $('#stage').style.display='none'; $('#panel').innerHTML=''; clearStatus(); $('#output').innerHTML=''; freeResUrls(); }
 
 /* receipt after a file is dropped */
 function showReceipt(file){
@@ -1879,16 +1499,11 @@ function showReceipt(file){
   card.querySelector('.clearbtn').onclick=()=>{clearAll();$('#heroHome').style.display='';};
   r.append(card);
   if(k==='image'||k==='video') addPreview(card,file,k);
-  if(k==='video'){
-    const rr=el('div',{className:'recos'});
-    const edit=reco('Edit video',()=>openWorkspace('video')); edit.classList.add('primary');edit.title='Open the timeline, preview, captions, audio, and export controls';bindTip(edit,edit.title);rr.append(edit);
-    [['Shrink','Shrink a Video'],['Trim','Trim a Video'],['Captions','Caption Studio'],['Convert','Make It an MP4']].forEach(([label,name])=>{const t=toolByName(name);const b=reco(label,()=>leaveStudioForTool(name));b.title=t.more||t.ds;bindTip(b,b.title);rr.append(b);});
-    card.append(el('div',{className:'want',textContent:'Choose'}),rr);
-  }
   meta(file,k).then(m=>{ const md=el('div',{className:'meta'}); md.innerHTML=m; card.insertBefore(md,card.children[1]||null);
-    const recos=k==='video'?[]:T.filter(t=>t.rec && (t.kinds&&(t.kinds.includes(k)||t.kinds.includes('any'))));
+    const primary=k==='video'?'Convert Video':k==='audio'?'Convert Audio':k==='image'?'Change Image Type':k==='other'?'Convert Unknown Media':null;
+    const recos=T.filter(t=>t.kinds&&(t.kinds.includes(k)||t.kinds.includes('any'))).sort((a,b)=>Number(b.nm===primary)-Number(a.nm===primary));
     if(recos.length){ card.append(el('div',{className:'want',textContent:'Choose'}));
-      const rr=el('div',{className:'qtools'}); recos.slice(0,8).forEach(t=>rr.append(toolCard(t,CATS[t.cat].color))); card.append(rr); }
+      const rr=el('div',{className:'qtools'}); recos.forEach(t=>rr.append(toolCard(t,CATS[t.cat].color))); card.append(rr); }
     // Scroll only AFTER the async meta + recommendations have expanded the receipt,
     // and on the next frame so layout has settled, otherwise (e.g. right after a tool result
     // collapsed #stage) the smooth-scroll targets stale geometry and the new receipt lands
@@ -1934,7 +1549,7 @@ async function meta(file,k){ let extra='';
 /* file intake */
 function intake(list){ const fs=[...list]; if(!fs.length)return;
   if(fs.length===1){ showReceipt(fs[0]); } else { multiReceipt(fs); } }
-function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
+function multiReceipt(fs){ state.files=fs; state.file=null; resetStage(); $('#heroHome').style.display='none';
   const allPdf=fs.every(f=>ext(f.name)==='pdf'), allImg=fs.every(f=>kind(f)==='image');
   const r=$('#receipt'); r.style.display='block'; r.innerHTML=''; document.querySelectorAll('.quick').forEach(qq=>qq.style.display='none');
   const card=el('div',{className:'receipt'});
@@ -1943,6 +1558,7 @@ function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
   card.querySelector('.clearbtn').onclick=clearAll;
   card.append(el('div',{className:'meta',innerHTML:fs.map(f=>`<div>${esc(f.name)} <span class="k">(${fmt(f.size)})</span></div>`).join('')}));
   const rr=el('div',{className:'recos'});
+  if(fs.every(f=>['video','audio','image','other'].includes(kind(f))))rr.append(reco('Convert files',()=>conversionPanel(fs)));
   const allConv=fs.every(f=>kind(f)==='image'||kind(f)==='raw');
   if(allPdf) rr.append(reco('Merge PDFs',()=>{ const t=T.find(x=>x.nm==='Combine PDFs'); renderRun(t,fs); $('#panel .btn').click(); }));
   if(allConv) rr.append(reco('Batch convert…',()=>{ const t=T.find(x=>x.nm==='Batch Convert Images'); renderRun(t,fs); }));
@@ -1952,224 +1568,8 @@ function multiReceipt(fs){ state.files=fs; state.file=null; resetStage();
 }
 const reco=(label,fn)=>{ const b=el('button',{className:'reco',textContent:label}); b.onclick=fn; return b; };
 
-/* ===== Open & Preview (read-only viewer for PDF / Markdown / text) ===== */
-const MDEXT=['md','markdown','mdown','mkd','mdx'];
-// Render a safe subset of Markdown. All text is HTML-escaped first and every URL is
-// scheme-checked, so untrusted file contents can never inject markup or javascript:.
-function mdToHtml(src){
-  const escTxt=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const escAttr=u=>String(u).replace(/"/g,'%22');
-  const safeUrl=u=>{ u=(u||'').trim();
-    if(/^(https?:|mailto:)/i.test(u))return u;          // safe absolute links
-    if(/^data:image\//i.test(u))return u;               // inline images only
-    if(/^[a-z][\w+.-]*:/i.test(u))return '#';           // block javascript:, file:, etc.
-    return u; };                                        // relative paths + #anchors pass through
-  const inline=raw=>{ let t=escTxt(raw);
-    t=t.replace(/!\[([^\]]*)\]\(\s*([^)\s]+)[^)]*\)/g,(m,a,u)=>`<img alt="${escAttr(a)}" src="${escAttr(safeUrl(u))}">`);
-    t=t.replace(/\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g,(m,a,u)=>`<a href="${escAttr(safeUrl(u))}" target="_blank" rel="noopener">${a}</a>`);
-    t=t.replace(/`([^`]+)`/g,(m,c)=>`<code>${c}</code>`);
-    t=t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
-    t=t.replace(/__([^_]+)__/g,'<strong>$1</strong>');
-    t=t.replace(/\*([^*\n]+)\*/g,'<em>$1</em>');
-    t=t.replace(/~~([^~]+)~~/g,'<del>$1</del>');
-    return t; };
-  const lines=String(src).replace(/\r\n?/g,'\n').split('\n'); const out=[]; let i=0;
-  const isSpecial=l=>/^(#{1,6})\s|^```|^>\s?|^\s*[-*+]\s+|^\s*\d+[.)]\s+/.test(l);
-  while(i<lines.length){ const line=lines[i]; let m;
-    if(/^```/.test(line)){ const buf=[]; i++; while(i<lines.length&&!/^```/.test(lines[i])){ buf.push(lines[i]); i++; } i++;
-      out.push(`<pre><code>${escTxt(buf.join('\n'))}</code></pre>`); continue; }
-    if((m=line.match(/^(#{1,6})\s+(.*)$/))){ const n=Math.min(m[1].length,4); out.push(`<h${n}>${inline(m[2])}</h${n}>`); i++; continue; }
-    if(/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)){ out.push('<hr>'); i++; continue; }
-    if(/^>\s?/.test(line)){ const buf=[]; while(i<lines.length&&/^>\s?/.test(lines[i])){ buf.push(lines[i].replace(/^>\s?/,'')); i++; }
-      out.push(`<blockquote>${inline(buf.join(' '))}</blockquote>`); continue; }
-    if(/^\s*[-*+]\s+/.test(line)){ const it=[]; while(i<lines.length&&/^\s*[-*+]\s+/.test(lines[i])){ it.push(lines[i].replace(/^\s*[-*+]\s+/,'')); i++; }
-      out.push('<ul>'+it.map(x=>`<li>${inline(x)}</li>`).join('')+'</ul>'); continue; }
-    if(/^\s*\d+[.)]\s+/.test(line)){ const it=[]; while(i<lines.length&&/^\s*\d+[.)]\s+/.test(lines[i])){ it.push(lines[i].replace(/^\s*\d+[.)]\s+/,'')); i++; }
-      out.push('<ol>'+it.map(x=>`<li>${inline(x)}</li>`).join('')+'</ol>'); continue; }
-    if(/^\s*$/.test(line)){ i++; continue; }
-    const buf=[]; while(i<lines.length&&!/^\s*$/.test(lines[i])&&!isSpecial(lines[i])){ buf.push(lines[i]); i++; }
-    out.push(`<p>${inline(buf.join('\n')).replace(/\n/g,'<br>')}</p>`); }
-  return out.join('\n');
-}
-async function readTextCapped(file){ const CAP=4*1048576;
-  const txt=await (file.size>CAP?file.slice(0,CAP):file).text(); return {txt,truncated:file.size>CAP}; }
-async function viewPDF(file,host){ const onP=progress('Opening PDF'); onP(.1);
-  const doc=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
-  const scroll=el('div',{className:'pdfedit-scroll'}); const stack=el('div',{className:'pdfedit-stack'});
-  // Create cheap placeholders immediately, then render only pages near the viewport. The old
-  // eager loop decoded every page before the viewer became usable and retained every canvas.
-  const slots=[];
-  for(let i=1;i<=doc.numPages;i++){
-    const slot=el('div',{style:'min-height:1060px;display:flex;align-items:center;justify-content:center',textContent:`Page ${i}`});
-    slot.dataset.page=String(i); slots.push(slot); stack.append(slot);
-  }
-  scroll.append(stack); host.append(scroll); clearStatus();
-  let rendered=0;
-  const renderPage=async slot=>{
-    if(slot.dataset.rendering)return; slot.dataset.rendering='1';
-    try{ const pg=await doc.getPage(+slot.dataset.page); const vp1=pg.getViewport({scale:1}); const scale=Math.min(2,820/vp1.width); const vp=pg.getViewport({scale});
-      const cv=el('canvas',{className:'pdfedit-page'}); cv.width=Math.ceil(vp.width); cv.height=Math.ceil(vp.height);
-      slot.textContent=''; slot.style.minHeight=Math.ceil(vp.height)+'px'; slot.append(cv);
-      await pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise; rendered++; onP(.1+.9*rendered/doc.numPages);
-    }catch{ slot.textContent='Could not render this page.'; }
-  };
-  if('IntersectionObserver' in window){
-    const observer=new IntersectionObserver(entries=>entries.forEach(e=>{ if(e.isIntersecting){ observer.unobserve(e.target); renderPage(e.target); } }),
-      {root:scroll,rootMargin:'800px 0px'});
-    slots.forEach(slot=>observer.observe(slot));
-  }else slots.forEach(renderPage);
-  host.append(el('div',{className:'note'},`${doc.numPages} page${doc.numPages>1?'s':''} · read-only preview.`)); }
-async function viewMarkdown(file,host){ const {txt,truncated}=await readTextCapped(file); clearStatus();
-  const md=el('div',{className:'md-view'}); md.innerHTML=mdToHtml(txt); host.append(md);
-  if(truncated) host.append(el('div',{className:'note'},'Large file, showing the first 4 MB.')); }
-async function viewText(file,host){ const {txt,truncated}=await readTextCapped(file); clearStatus();
-  host.append(el('pre',{className:'txt-view',textContent:txt}));
-  if(truncated) host.append(el('div',{className:'note'},'Large file, showing the first 4 MB.')); }
-async function openViewer(file){
-  openStage(); const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.doc.color); $('#output').innerHTML=''; clearStatus();
-  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Open & Preview'}),el('span',{className:'badge',textContent:'Open'})]));
-  p.append(el('div',{className:'filechip'},[svg(icon('clip')), `${file.name} · ${fmt(file.size)}`]));
-  const ch=el('button',{className:'btn ghost',textContent:'Open another file'}); ch.onclick=()=>pickFiles(false,fs=>openViewer(fs[0]));
-  const fu=el('button',{className:'btn ghost',textContent:'Fullscreen'});
-  const dw=el('button',{className:'btn ghost',textContent:'Home'}); dw.onclick=()=>{ if(document.fullscreenElement)document.exitFullscreen().catch(()=>{}); resetStage(); };
-  p.append(el('div',{className:'runrow'},[ch,fu,dw]));
-  const host=el('div',{className:'viewer'}); p.append(host);
-  fu.onclick=()=>{ if(document.fullscreenElement)document.exitFullscreen().catch(()=>{}); else host.requestFullscreen().catch(()=>{}); };
-  const onFs=()=>{ if(!document.body.contains(host)){ document.removeEventListener('fullscreenchange',onFs); return; }
-    fu.textContent=document.fullscreenElement?'Exit fullscreen':'Fullscreen'; };
-  document.addEventListener('fullscreenchange',onFs);
-  const e=ext(file.name);
-  try{
-    if(e==='pdf') await viewPDF(file,host);
-    else if(MDEXT.includes(e)) await viewMarkdown(file,host);
-    else if(IMG.includes(e)){ const {img}=await toImage(file); img.className='view-img'; host.append(img); clearStatus(); }
-    else await viewText(file,host);
-  }catch(err){ fail(err); }
-}
-/* ===== PDF Sign & Fill (interactive editor) ===== */
-/* ===== Caption Studio, auto-generate subtitles, edit words + timing, export or burn in ===== */
-function jdParseTs(str){ const parts=String(str).trim().replace(/,/g,'.').split(':'); if(!parts.length) return null;  // accept SRT-style comma decimals
-  let s=0; for(const p of parts){ const n=parseFloat(p); if(isNaN(n)) return null; s=s*60+n; } return s; }
-function jdFmtTs(sec,sep){ let t=Math.round(Math.max(0,sec||0)*1000);  // round to ms FIRST, then decompose, so ms can't overflow to 1000
-  const ms=t%1000; t=(t-ms)/1000; const s=t%60; t=(t-s)/60; const m=t%60; const h=(t-m)/60;
-  const p=(n,w)=>String(n).padStart(w||2,'0'); return p(h)+':'+p(m)+':'+p(s)+sep+p(ms,3); }
-function jdParseSrt(str){ const cues=[]; const blocks=String(str).replace(/\r/g,'').trim().split(/\n\n+/);
-  for(const b of blocks){ const lines=b.split('\n'); if(lines.length<2) continue;
-    let i=0; if(/^\d+$/.test(lines[0].trim())) i=1;
-    const m=(lines[i]||'').match(/(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)/); if(!m) continue;
-    const t=(h,mi,s,ms)=>(+h)*3600+(+mi)*60+(+s)+(+ms)/1000;
-    cues.push({start:t(m[1],m[2],m[3],m[4]), end:t(m[5],m[6],m[7],m[8]), text:lines.slice(i+1).join('\n').trim()}); }
-  return cues; }
-function jdSrtOf(cues){ return cues.map((c,i)=>(i+1)+'\n'+jdFmtTs(c.start,',')+' --> '+jdFmtTs(c.end,',')+'\n'+(c.text||'')).join('\n\n')+'\n'; }
-function jdVttOf(cues){ return 'WEBVTT\n\n'+cues.map(c=>jdFmtTs(c.start,'.')+' --> '+jdFmtTs(c.end,'.')+'\n'+(c.text||'')).join('\n\n')+'\n'; }
+/* ===== Subtitle helpers ===== */
 function jdCapStyle(size,pos){ const fs=/^\d+$/.test(String(size))?size:'28'; return 'FontName=Arial,FontSize='+fs+',Outline=1'+(pos==='top'?',Alignment=8':''); }
-let _capUrl=null;  // Caption Studio's media object URL, tracked so we can revoke it (memory) on exit
-function jdFreeCap(){ if(_capUrl){ try{ URL.revokeObjectURL(_capUrl); }catch{} _capUrl=null; } }
-
-async function captionStudio(file){
-  if(_jobCtl){ try{ _jobCtl.abort(); }catch{} _jobCtl=null; }  // custom tools bypass resetStage, cancel any in-flight job so its late result can't scribble here
-  if(_dlCtl){ try{ _dlCtl.abort(); }catch{} _dlCtl=null; }
-  jdFreeCap();
-  openStage();
-  const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.video.color); $('#output').innerHTML=''; clearStatus();
-  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Caption Studio'}),el('span',{className:'badge',textContent:'Video'})]));
-  p.append(el('div',{className:'ds',textContent:'Auto-generate captions, fix the words and timing, then export an SRT/VTT or burn them onto the video. Nothing leaves your machine.'}));
-
-  let info=await nativeInfo();
-  if(!info.whisper){ showGuide(needDesktop('Captions')); return; }
-  const isVideo=kind(file)==='video';
-  const MODELS=[
-    {id:'base',   file:'ggml-base.bin',   flag:'whisperModel', label:'Fast',     size:'~140 MB', note:'quickest, fine for clear speech'},
-    {id:'small',  file:'ggml-small.bin',  flag:'whisperSmall', label:'Balanced', size:'~465 MB', note:'much better'},
-    {id:'medium', file:'ggml-medium.bin', flag:'whisperMedium',label:'Accurate', size:'~1.5 GB', note:'strong but slow'},
-    {id:'turbo',  file:'ggml-large-v3-turbo.bin', flag:'whisperTurbo', label:'Best', size:'~1.5 GB', note:'recommended for important recordings'},
-  ];
-
-  function picker(){
-    p.querySelectorAll('.jd-cap').forEach(n=>n.remove());
-    const box=el('div',{className:'jd-cap',style:'border:2px solid;border-color:var(--sb);background:var(--well);padding:12px;margin:8px 0'});
-    box.append(el('div',{className:'want',textContent:'caption quality'}));
-    const sel=el('select',{style:'font:13px var(--sans);padding:4px;margin:4px 0;max-width:100%'});
-    MODELS.forEach(m=>sel.append(el('option',{value:m.id,textContent:`${m.label} (${m.size}), ${m.note}${info[m.flag]?'  ✓ ready':''}`})));
-    sel.value='turbo';
-    const go=el('button',{className:'btn',textContent:'Generate captions'});
-    go.onclick=()=>{ const m=MODELS.find(x=>x.id===sel.value); go.disabled=true; generate(m); };
-    box.append(el('div',{},[sel]),go,
-      el('div',{className:'note',style:'margin-top:6px',textContent:'A bigger model is slower but misses fewer lines, especially over music. It downloads once, then works offline.'}));
-    p.append(box);
-  }
-
-  async function generate(m){
-    let cues=[];
-    try{
-      if(!info[m.flag]) await ensureModel(m.file,m.flag,`Downloading the ${m.label.toLowerCase()} speech model (one time, ${m.size})`);
-      info=await nativeInfo();
-      const wav=await runFF(file,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
-      const srtBlob=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt:'srt',model:m.id},'out.srt',`Listening and writing captions with the ${m.label.toLowerCase()} model (a long clip takes a while)`);
-      cues=jdParseSrt(await srtBlob.text());
-    }catch(e){ fail(e); return; }
-    clearStatus();
-    if(!cues.length) cues=[{start:0,end:2,text:''}];
-    editor(cues);
-  }
-
-  function editor(cues){
-    p.querySelectorAll('.jd-cap').forEach(n=>n.remove());
-    const wrap=el('div',{className:'jd-cap'});
-    jdFreeCap(); const mediaUrl=_capUrl=URL.createObjectURL(file);
-    const media=el(isVideo?'video':'audio',{src:mediaUrl,controls:true,
-      style:isVideo?'display:block;max-width:100%;max-height:320px;margin:8px auto;background:#000;border:2px solid;border-color:var(--sb)':'display:block;width:100%;margin:8px 0'});
-    wrap.append(media);
-    const list=el('div',{style:'max-height:340px;overflow:auto;border:2px solid;border-color:var(--sb);background:var(--well);padding:6px;margin:8px 0'});
-    wrap.append(list);
-    const rows=[];
-    function render(){ list.innerHTML=''; rows.length=0;
-      cues.forEach(c=>{
-        const row=el('div',{style:'display:flex;gap:6px;align-items:flex-start;padding:5px 4px;border-bottom:1px solid var(--line)'});
-        const jump=el('button',{className:'btn ghost',textContent:'▶',title:'Jump here',style:'padding:2px 8px;flex:0 0 auto'});
-        jump.onclick=()=>{ media.currentTime=c.start; if(media.play) media.play(); };
-        const times=el('div',{style:'flex:0 0 100px;display:flex;flex-direction:column;gap:3px'});
-        const st=el('input',{value:jdFmtTs(c.start,'.'),title:'start',style:'width:100px;font:11px var(--mono);padding:2px'});
-        const en=el('input',{value:jdFmtTs(c.end,'.'),title:'end',style:'width:100px;font:11px var(--mono);padding:2px'});
-        st.onchange=()=>{ const v=jdParseTs(st.value); if(v==null){ st.value=jdFmtTs(c.start,'.'); return; } c.start=v; };
-        en.onchange=()=>{ const v=jdParseTs(en.value); if(v==null){ en.value=jdFmtTs(c.end,'.'); return; } c.end=v; };
-        times.append(st,en);
-        const ta=el('textarea',{value:c.text,rows:2,style:'flex:1;min-width:0;resize:vertical;font:13px var(--sans);padding:4px;background:#fff;color:#111;border:1px solid var(--line)'});
-        ta.oninput=()=>{ c.text=ta.value; };
-        const del=el('button',{className:'btn ghost',textContent:'✕',title:'Delete line',style:'padding:2px 8px;flex:0 0 auto'});
-        del.onclick=()=>{ const k=cues.indexOf(c); if(k>=0) cues.splice(k,1); render(); };
-        row.append(jump,times,ta,del); list.append(row); rows.push({cue:c,node:row});
-      });
-    }
-    render();
-    media.addEventListener('timeupdate',()=>{ const t=media.currentTime; rows.forEach(r=>{ const on=t>=r.cue.start&&t<r.cue.end; r.node.style.background=on?'color-mix(in srgb, var(--c) 22%, transparent)':''; }); });
-    const addBtn=el('button',{className:'btn ghost',textContent:'+ Add line'});
-    addBtn.onclick=()=>{ const at=media.currentTime||0; cues.push({start:at,end:at+2,text:''}); cues.sort((a,b)=>a.start-b.start); render(); };
-    const regen=el('button',{className:'btn ghost',textContent:'Regenerate…'});
-    regen.onclick=()=>{ jdFreeCap(); picker(); };
-    const dlSrt=el('button',{className:'btn',textContent:'Download .srt'});
-    dlSrt.onclick=()=>showResult(new Blob([jdSrtOf(cues)],{type:'text/plain'}),base(file.name)+'.srt',{note:'Edited captions, pairs with Burn In Subtitles too.'});
-    const dlVtt=el('button',{className:'btn ghost',textContent:'Download .vtt'});
-    dlVtt.onclick=()=>showResult(new Blob([jdVttOf(cues)],{type:'text/plain'}),base(file.name)+'.vtt');
-    const capSize=el('select'); [['18','Small'],['28','Medium'],['40','Large']].forEach(([v,l])=>capSize.append(el('option',{value:v,textContent:l}))); capSize.value='28';
-    const capPos=el('select'); [['bottom','Bottom'],['top','Top']].forEach(([v,l])=>capPos.append(el('option',{value:v,textContent:l})));
-    const capOpts=el('div',{style:'display:flex;gap:8px;align-items:center'},[el('label',{},['size ',capSize]),el('label',{},['position ',capPos])]);
-    if(!isVideo) capOpts.style.display='none';
-    const burn=el('button',{className:'btn',textContent:'Burn into video'});
-    if(!isVideo) burn.style.display='none';
-    burn.onclick=async()=>{ burn.disabled=true;
-      try{ const srt=new Blob([jdSrtOf(cues)],{type:'text/plain'});
-        const fstyle=jdCapStyle(capSize.value,capPos.value);
-        const out=await runFF(file,'out.mp4',(i,o)=>['-i',i,'-vf',`subtitles=subs.srt:force_style='${fstyle}'`,'-c:v','libx264','-pix_fmt','yuv420p','-crf','21','-preset','veryfast','-c:a','aac','-b:a','192k','-movflags','+faststart',o],'Burning in captions',{name:'subs.srt',data:srt});
-        showResult(out,base(file.name)+'-captioned.mp4',{note:'Captions burned onto the video.'});
-      }catch(e){ fail(e); } finally{ burn.disabled=false; } };
-    wrap.append(el('div',{className:'runrow'},[dlSrt,dlVtt,capOpts,burn,addBtn,regen]));
-    p.append(wrap);
-  }
-
-  picker();
-}
-
 async function pdfSignFill(file){
   openStage();
   const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.pdf.color); $('#output').innerHTML=''; clearStatus();
@@ -2395,7 +1795,7 @@ async function imagesToPdf(fs){ openStage(); const onP=progress('Building PDF');
   try{ for(let i=0;i<fs.length;i++){ onP((i+1)/fs.length); const png=await imgConvert(fs[i],{type:'image/png'});
     const im=await pdf.embedPng(await png.arrayBuffer()); pdf.addPage([im.width,im.height]).drawImage(im,{x:0,y:0,width:im.width,height:im.height}); }
     showResult(new Blob([await pdf.save()],{type:'application/pdf'}),'images.pdf'); }catch(e){fail(e);} }
-function clearAll(){ state.file=state.files=null; $('#receipt').style.display='none'; $('#receipt').innerHTML=''; document.querySelectorAll('.quick').forEach(qq=>qq.style.display=''); resetStage(); }
+function clearAll(){ $('#heroHome').style.display=''; state.file=state.files=null; $('#receipt').style.display='none'; $('#receipt').innerHTML=''; document.querySelectorAll('.quick').forEach(qq=>qq.style.display=''); resetStage(); }
 
 /* ---- tool search ---- */
 const q=$('#q'), pal=$('#pal'); let palItems=[],palSel=0;
@@ -2405,14 +1805,10 @@ function search(input){ const raw=input.trim(); const str=raw.toLowerCase(); if(
   // surface the download tools when a link is in the box
   if(/youtu\.?be|youtube\.com/i.test(raw)) items=[T.find(x=>x.nm==='YouTube to Video'),T.find(x=>x.nm==='YouTube to MP3'),...items];
   items=[...new Set(items.filter(Boolean))].slice(0,7);
-  const needsStudio=/\b(edit|timeline|combine clips|add music|overlay|transitions|multiple parts)\b/i.test(raw)
-    && /\b(video|clip|movie|footage)\b/i.test(raw);
-  palItems=needsStudio?[null,...items]:items; palSel=0;
+  palItems=items; palSel=0;
   pal.innerHTML='';
-  if(needsStudio){ const row=el('button',{className:'row',type:'button'},[el('div',{},[el('div',{className:'nm',textContent:'This needs Video Studio'}),el('div',{className:'ds',textContent:'It changes multiple parts of the video. Open the workspace and keep your selected file with you.'})]),el('span',{className:'tag',textContent:'Studio'})]);
-    row.onclick=()=>{pal.classList.remove('show');openWorkspace('video');};pal.append(row); }
-  if(!items.length&&!needsStudio){ pal.innerHTML=`<div class="row"><span class="ds">no tool matches “${esc(str)}”. try a file type or action</span></div>`; pal.classList.add('show'); return; }
-  items.forEach((t,i)=>{ const selectedIndex=i+(needsStudio?1:0);const row=el('div',{className:'row'+(selectedIndex===palSel?' sel':'')});
+  if(!items.length){ pal.innerHTML=`<div class="row"><span class="ds">no tool matches “${esc(str)}”. try a file type or action</span></div>`; pal.classList.add('show'); return; }
+  items.forEach((t,i)=>{ const selectedIndex=i;const row=el('div',{className:'row'+(selectedIndex===palSel?' sel':'')});
     row.append(el('div',{},[el('div',{className:'nm',textContent:t.nm}),el('div',{className:'ds',textContent:t.ds})]));
     const tag=el('span',{className:'tag',textContent:CATS[t.cat].label}); tag.style.background=CATS[t.cat].color; row.append(tag);
     row.onclick=()=>{ pal.classList.remove('show'); q.value='';
@@ -2424,13 +1820,12 @@ function search(input){ const raw=input.trim(); const str=raw.toLowerCase(); if(
 }
 function scoreTool(t,str){ const hay=(t.nm+' '+t.ds+' '+(t.kw||'')+' '+CATS[t.cat].label).toLowerCase(); let s=0;
   str.split(/\s+/).forEach(w=>{ if(!w)return; if(t.nm.toLowerCase().includes(w))s+=3; else if(hay.includes(w))s+=1; });
-  if(s>0&&MODES[MODE].tools.includes(t.nm))s+=2; // the current persona's tools rank first
   return s; }
 q.addEventListener('input',e=>search(e.target.value));
 q.addEventListener('keydown',e=>{ if(!pal.classList.contains('show'))return;
   if(e.key==='ArrowDown'){ e.preventDefault(); palSel=Math.min(palSel+1,palItems.length-1); markSel(); }
   else if(e.key==='ArrowUp'){ e.preventDefault(); palSel=Math.max(palSel-1,0); markSel(); }
-  else if(e.key==='Enter'){ e.preventDefault(); if(palItems[palSel]===null&&palItems.length){pal.classList.remove('show');openWorkspace('video');return;} const t=palItems[palSel]; if(t){ const raw=q.value.trim(); pal.classList.remove('show'); q.value='';
+  else if(e.key==='Enter'){ e.preventDefault(); const t=palItems[palSel]; if(t){ const raw=q.value.trim(); pal.classList.remove('show'); q.value='';
     if(/^https?:\/\//i.test(raw)&&t.input==='url') state.pendingUrl=raw; openTool(t); } }
   else if(e.key==='Escape'){ pal.classList.remove('show'); } });
 function markSel(){ [...pal.children].forEach((r,i)=>r.classList.toggle('sel',i===palSel)); }
@@ -2532,7 +1927,7 @@ function svg(path){ const ns='http://www.w3.org/2000/svg'; const s=document.crea
   const p=document.createElementNS(ns,'path'); p.setAttribute('d',path); s.append(p); return s; }
 
 buildTopbar();
-renderWorkspaceEntries();
+
 renderQuick();
 renderDrawerBrowser();
 
@@ -2565,25 +1960,22 @@ async function pollCards(){
 pollCards(); setInterval(pollCards,8000);
 // Always-available reset: the brand logo and the "↺ Reset" nav link both clear everything
 // and return to the start screen, from anywhere in the app.
-const goHome=e=>{ if(e)e.preventDefault(); clearAll(); $('#heroHome').style.display=''; $('#workspaceView').style.display='none'; window.scrollTo(0,0); };
-function leaveWorkspace(){
-  $('#workspaceView').style.display='none';$('#heroHome').style.display='';
-  const receipt=$('#receipt');receipt.style.display=state.file?'block':'none';
-  document.querySelectorAll('.quick').forEach(row=>row.style.display=state.file?'none':'');
-  window.scrollTo(0,0);
-}
+const goHome=e=>{ if(e)e.preventDefault(); clearAll(); $('#heroHome').style.display=''; window.scrollTo(0,0); };
 $('#resetBtn').onclick=goHome; $('#brandHome').onclick=goHome;
 
-// Opened from the OS ("Open with → Junk Drawer" on a PDF/MD/TXT): main.js queues the file
-// and exposes it at /api/opened-file. Pull it on startup and whenever the window regains
-// focus (a second "Open with" while we're already running focuses us and re-queues).
-async function checkOpenedFile(){
-  try{ const r=await fetch('/api/opened-file'); if(r.status===204||!r.ok)return;
-    const name=decodeURIComponent(r.headers.get('X-Filename')||'opened-file');
-    openViewer(new File([await r.blob()],name)); }catch{}
+
+async function renderDesktopIntegration(){
+  resetStage();openStage();const p=$('#panel');p.innerHTML='';p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Start from your files'})]),el('p',{textContent:'Select files in Explorer, right-click, then choose Send to → Junk Drawer. On Windows 11 you may need Show more options first. This opens file actions and keeps your default viewers.'}));
+  let current;try{current=await(await fetch('/api/desktop-integration')).json();}catch{current={available:false};}
+  const message=el('p',{className:'note',textContent:current.note||'Available in the Windows desktop build.'});const button=el('button',{className:'btn',disabled:!current.available,textContent:current.enabled?'Remove Send to shortcut':'Add Send to shortcut'});
+  button.onclick=async()=>{button.disabled=true;try{const r=await fetch('/api/desktop-integration',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!current.enabled})});const j=await r.json();if(!r.ok)throw Error(j.detail||'Could not update the shortcut.');current=j;button.textContent=current.enabled?'Remove Send to shortcut':'Add Send to shortcut';message.textContent=current.enabled?'Ready. You can process selected files without opening the home screen.':'Shortcut removed. Your default file apps stay the same.';}catch(e){message.textContent=e.message;}finally{button.disabled=!current.available;}};
+  p.append(message,button);
 }
-window.addEventListener('focus', checkOpenedFile);
-checkOpenedFile();
+$('#desktopIntegration').onclick=e=>{e.preventDefault();renderDesktopIntegration();};$('#integrationHome').onclick=renderDesktopIntegration;
+let readingInbox=false;
+async function checkIncomingFiles(){if(readingInbox)return;readingInbox=true;try{const r=await fetch('/api/inbox-files');if(!r.ok)return;const {files}=await r.json();if(!files?.length)return;const picked=[];for(const selected of files){const r=await fetch('/api/inbox-file?token='+encodeURIComponent(selected.token));if(!r.ok){toast('A selected file is no longer available. Select it again in Explorer.');continue;}picked.push(new File([await r.blob()],selected.name));}if(!picked.length)return;intake(picked);if(picked.every(f=>['image','video','audio','other'].includes(kind(f))))conversionPanel(picked);}catch{toast('Could not read the selected files. Select them again in Explorer.');}finally{readingInbox=false;}}
+window.addEventListener('focus',checkIncomingFiles);checkIncomingFiles();
+
 console.log('%cJunk Drawer ready · '+T.length+' tools','color:#000080;font-weight:bold');
 </script>
 </body>

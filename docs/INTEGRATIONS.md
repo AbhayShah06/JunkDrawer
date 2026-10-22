@@ -1,41 +1,21 @@
-# Junk Drawer integration architecture
+# Utility engine boundaries
 
-Junk Drawer is a local workbench, not a collection of copied applications. Each UI
-workflow asks for a capability, while a provider adapter owns the external engine.
-This keeps the simple drop-file experience even as the underlying open-source tools
-change.
+Junk Drawer processes files locally. A workflow should produce a concrete file or useful inspection result, with a visible failure when its engine cannot handle the input.
 
-## OpenCut Next
+- `electron/media.js` shares input families, output presets, signature identification, and FFmpeg argument construction between browser and server tests.
+- `GET /api/media-capabilities` checks the installed FFmpeg encoder and muxer lists and returns available presets. Results are cached for the process lifetime. Native hardware/software decoder support and corrupt input are still checked when the job executes.
+- `POST /api/probe-media?ext=mts` streams a user-selected file into an isolated temporary directory and identifies streams with native FFmpeg. The optional suffix is restricted to alphanumeric characters. Filenames are never treated as proof of format. Probe processes have a timeout and are killed on disconnect; temporary files are removed.
+- `POST /api/ffmpeg` runs local conversions. The renderer's output choices use the shared preset contract. The existing endpoint retains its argument validation for the other media utilities, restricts native input protocols to local files/pipes, and streams input/output through temporary disk storage.
+- `POST /api/video-compress` retains the existing two-pass size-target pipeline.
+- `/api/tool` supports Whisper transcription, LibRaw development, ExifTool metadata operations, and VTracer tracing. Retired voice, song separation, and upscaling execution routes are removed.
+- PDF.js/pdf-lib, fflate/libarchive, QR, OCR, background removal, and text libraries remain local, lazily loaded browser engines.
 
-OpenCut's current repository is a ground-up rewrite that promises a public Editor API,
-plugin-first architecture, a shared Rust core, headless rendering, and desktop/browser
-clients. Junk Drawer should integrate that public API after it is released and versioned.
-It should not import private modules whose shape may change during the rewrite.
+There is no planned or active editor integration. No OpenCut or CapCut project/API dependency is part of the app.
 
-The user-facing editor is a dedicated Junk Drawer Studio workspace, not the normal
-one-tool panel and not an embedded copy of OpenCut's UI. See `VIDEO_EDITOR_PLAN.md`.
+The integration catalog at `/api/integrations` describes installed utility engines. It is a contract/availability summary, not proof that every input/output combination has been exercised. Downloaded legacy voice/stem models remain manageable in storage but cannot be downloaded again through a retired workflow.
 
-The intended boundary supports:
+Native conversion avoids the old 500 MB renderer rejection. Browser fallback remains bounded, and final browser download blobs still consume memory: native streaming is not a promise of unlimited-size files.
 
-- opening a local video or audio file in an embedded editor;
-- returning an edited file to Junk Drawer's existing “Edit this” chain;
-- saving and reopening an OpenCut project without uploading media;
-- headless rendering for repeatable and batch workflows;
-- progress, cancellation, low-disk, missing-codec, corrupt-project, and render-failure
-  reporting through Junk Drawer's normal error UI.
+## Explorer handoff
 
-Until the Editor API is stable, `opencut-next` remains visible to diagnostics as planned
-and unavailable. This prevents a placeholder from pretending to work.
-
-## Provider rules
-
-Every provider declares capabilities and must check availability, input, output,
-cancellation, and disk space. Providers add checks that matter to their domain, such as
-model readiness, codec support, networking, encryption, or GPU support.
-
-The first catalog includes OpenCut Next, FFmpeg, whisper.cpp, Real-ESRGAN, yt-dlp,
-libarchive.js, and the PDF.js/pdf-lib pair. OpenCut is therefore one provider in the
-video workflow rather than the architecture of Junk Drawer itself.
-
-The catalog is exposed at `GET /api/integrations` and carries a contract version so a
-future renderer or provider adapter can reject incompatible versions cleanly.
+`electron/desktop-integration.js` creates a Windows SendTo shortcut for the packaged executable with `--process-files`. No extension associations are registered. Explicit selections are queued in the main process; `/api/inbox-files` returns names and opaque tokens and `/api/inbox-file` consumes a token once. Tokens expire after 15 minutes. The renderer cannot submit arbitrary filesystem paths. `/api/desktop-integration` exposes the shortcut setting; opt-out survives restarts. The NSIS uninstall hook removes the shortcut.

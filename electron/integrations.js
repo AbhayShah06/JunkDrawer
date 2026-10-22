@@ -17,18 +17,6 @@ const REQUIRED_CHECKS = Object.freeze([
 
 const DEFINITIONS = Object.freeze([
   {
-    id: 'opencut-next',
-    name: 'OpenCut Next',
-    role: 'video-editor',
-    stage: 'planned',
-    source: 'https://github.com/OpenCut-app/OpenCut',
-    license: 'MIT',
-    transport: 'editor-api',
-    capabilities: ['edit-video', 'timeline', 'render', 'headless-render'],
-    checks: [...REQUIRED_CHECKS, 'api-version', 'project-format'],
-    note: 'Upstream is being rewritten. Connect through its public Editor API when that API is released and versioned.',
-  },
-  {
     id: 'ffmpeg',
     name: 'FFmpeg',
     role: 'media-engine',
@@ -45,15 +33,6 @@ const DEFINITIONS = Object.freeze([
     transport: 'process',
     capabilities: ['transcribe', 'subtitle-timing'],
     checks: [...REQUIRED_CHECKS, 'model-ready', 'audio-decode'],
-  },
-  {
-    id: 'realesrgan',
-    name: 'Real-ESRGAN',
-    role: 'image-engine',
-    stage: 'active',
-    transport: 'process',
-    capabilities: ['upscale-image'],
-    checks: [...REQUIRED_CHECKS, 'gpu-support'],
   },
   {
     id: 'yt-dlp',
@@ -92,7 +71,7 @@ function integrationCatalog(availability = {}) {
       capabilities: [...definition.capabilities],
       checks: [...definition.checks],
       available: definition.stage === 'planned' ? false : availability[definition.id] !== false,
-      blockedBy: definition.id === 'opencut-next' ? 'upstream-editor-api' : null,
+      blockedBy: null,
     })),
   };
 }

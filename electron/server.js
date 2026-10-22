@@ -10,6 +10,7 @@ const { spawn, spawnSync } = require('child_process');
 const https = require('https');
 const { integrationCatalog } = require('./integrations');
 const { buildTwoPassArgs } = require('./compression');
+const mediaService = require('./media-service');
 let PKG = {}; try { PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')); } catch {}
 
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript',
@@ -79,7 +80,6 @@ function getSystemProfile(binDir, modelsDir) {
     models: {
       whisperBase: modelReady(modelsDir, 'ggml-base.bin'), whisperSmall: modelReady(modelsDir, 'ggml-small.bin'),
       whisperMedium: modelReady(modelsDir, 'ggml-medium.bin'), whisperTurbo: modelReady(modelsDir, 'ggml-large-v3-turbo.bin'),
-      voiceAmy: modelReady(modelsDir, 'vits-piper-en_US-amy-medium'), stemsVocals: modelReady(modelsDir, 'UVR-MDX-NET-Voc_FT.onnx'),
     },
     recommendation: { tier, reason: tier === 'limited' ? 'Free memory is low right now; avoid running several demanding jobs at once.' : tier === 'compatibility' ? 'This machine is below the 16 GB design baseline; normal file tools remain available.' : tier === 'standard' ? '16 GB is the standard baseline; normal quality and export settings remain available.' : 'This machine has extra room for demanding local workflows.' },
   };
@@ -265,7 +265,7 @@ function handleFFmpeg(req, res, binDir) {
       }
     }
     // detached → child leads its own process group, so we can kill ffmpeg (and any children) as a tree
-    const child = spawn(ffmpeg, args, { cwd: tmp, detached: true });
+    const child = spawn(ffmpeg, ['-nostdin', '-y', '-protocol_whitelist', 'file,pipe', ...args], { cwd: tmp, detached: true, windowsHide: true });
     let err = '', durSec = 0;
     // If the client goes away mid-job (tool switch / reset), kill the tree so ffmpeg isn't left orphaned.
     res.on('close', () => { if (!res.writableEnded && !aborted) { aborted = true; killTree(child); if (id) ffProgress.delete(id); cleanup(tmp); } });
@@ -474,8 +474,8 @@ const MODELS = { // downloadable-on-first-use models, pinned by URL + expected d
   'ggml-small.bin': { url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin', size: 487601967 },
   'ggml-medium.bin': { url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin', size: 1533763059 },
   'ggml-large-v3-turbo.bin': { url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin', size: 1624555275 },
-  'UVR-MDX-NET-Voc_FT.onnx': { url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/source-separation-models/UVR-MDX-NET-Voc_FT.onnx', size: 66762795 },
-  'vits-piper-en_US-amy-medium': { url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-medium.tar.bz2', size: 67223746,
+  'UVR-MDX-NET-Voc_FT.onnx': { retired: true, url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/source-separation-models/UVR-MDX-NET-Voc_FT.onnx', size: 66762795 },
+  'vits-piper-en_US-amy-medium': { retired: true, url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-medium.tar.bz2', size: 67223746,
     archive: true, ready: path.join('vits-piper-en_US-amy-medium', 'en_US-amy-medium.onnx') },
 };
 function modelPath(modelsDir, name) { return path.join(modelsDir, name); }
@@ -503,6 +503,7 @@ function handleFetchModel(req, res, modelsDir) {
     const name = j.name;
     if (!Object.hasOwn(MODELS, name)) return sendJSON(res, { error: 'unknown-model' }, 400);
     const m = MODELS[name];
+    if (m.retired) return sendJSON(res, { error: 'retired-feature' }, 410);
     if (modelReady(modelsDir, name)) return sendJSON(res, { ok: true, ready: true });
     try { fs.mkdirSync(modelsDir, { recursive: true }); } catch {}
     const dest = modelPath(modelsDir, name), part = dest + '.part';
@@ -603,11 +604,6 @@ function handleTool(req, res, binDir, modelsDir) {
       { bin: path.resolve(ffmpeg), args: ['-hide_banner', '-y', '-i', 'mid.tiff', '-frames:v', '1', '-update', '1',
         ...(png ? [] : ['-c:v', 'mjpeg', '-q:v', '2', '-pix_fmt', 'yuvj444p']), outName], prog: () => 0.9 },
     ];
-  } else if (tool === 'upscale') {
-    const bin = toolBin(binDir, 'esrgan', 'realesrgan-ncnn-vulkan');
-    if (!bin) return reject({ error: 'tool-missing' }, 501);
-    outName = 'out.png';
-    plan = [{ bin, args: ['-i', inName, '-o', outName, '-n', opts.model === 'anime' ? 'realesrgan-x4plus-anime' : 'realesrgan-x4plus'], prog: pct }];
   } else if (tool === 'exif') {
     const bin = toolBin(binDir, 'exiftool', 'exiftool');
     if (!bin) return reject({ error: 'tool-missing' }, 501);
@@ -623,36 +619,11 @@ function handleTool(req, res, binDir, modelsDir) {
       outName = 'out.json';
       plan = [{ bin, args: ['-j', '-DateTimeOriginal', '-CreateDate', '-Model', inName], stdout: outName }];
     } else return reject({ error: 'unknown-op' }, 400);
-  } else if (tool === 'tts') {
-    const bin = toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-tts');
-    if (!bin) return reject({ error: 'tool-missing' }, 501);
-    if (!modelReady(modelsDir, 'vits-piper-en_US-amy-medium')) return reject({ error: 'model-missing' }, 409);
-    const v = path.join(modelsDir, 'vits-piper-en_US-amy-medium');
-    outName = 'out.wav';
-    plan = [{ bin, args: ['--vits-model=' + path.join(v, 'en_US-amy-medium.onnx'), '--vits-tokens=' + path.join(v, 'tokens.txt'),
-      '--vits-data-dir=' + path.join(v, 'espeak-ng-data'), '--output-filename=' + outName, '@TEXT@'],
-      prog: s => { const m = /progress=([0-9.]+)/.exec(s); return m ? +m[1] : null; } }];
-    late = inPath => { // the uploaded file IS the text to speak
-      let t = ''; try { t = fs.readFileSync(inPath, 'utf8').slice(0, 5000).trim(); } catch {}
-      if (!t) return 'empty-text';
-      plan[0].args = plan[0].args.map(a => a === '@TEXT@' ? t : a);
-    };
   } else if (tool === 'vtracer') {
     const bin = toolBin(binDir, 'vtracer', 'vtracer');
     if (!bin) return reject({ error: 'tool-missing' }, 501);
     outName = 'out.svg';
     plan = [{ bin, args: ['--input', inName, '--output', outName] }];
-  } else if (tool === 'stems') {
-    const bin = toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-source-separation');
-    if (!bin) return reject({ error: 'tool-missing' }, 501);
-    if (!modelReady(modelsDir, 'UVR-MDX-NET-Voc_FT.onnx')) return reject({ error: 'model-missing' }, 409);
-    outName = 'out.zip';
-    plan = [
-      { bin, args: ['--uvr-model=' + modelPath(modelsDir, 'UVR-MDX-NET-Voc_FT.onnx'), '--num-threads=4',
-        '--input-wav=' + inName, '--output-vocals-wav=vocals.wav', '--output-accompaniment-wav=instrumental.wav'], prog: () => 0.6 },
-      // bsdtar (ships with Win10+ and macOS) infers zip format from the extension
-      { bin: bsdtar(), args: ['-a', '-cf', outName, 'vocals.wav', 'instrumental.wav'], prog: () => 0.95 },
-    ];
   } else return reject({ error: 'unknown-tool' }, 400);
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-tool-'));
@@ -758,7 +729,7 @@ function handleImportCard(req, res) {
   });
 }
 
-function startServer(appRoot, binDir, updater, opener, modelsDir) {
+function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegration) {
   // absolute: tool subprocesses run from throwaway temp cwds, so a relative path would break
   modelsDir = path.resolve(modelsDir || path.join(os.homedir(), '.junkdrawer', 'models'));
   return new Promise(resolve => {
@@ -784,17 +755,29 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
           whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), whisperModel: modelReady(modelsDir, 'ggml-base.bin'),
           whisperSmall: modelReady(modelsDir, 'ggml-small.bin'), whisperMedium: modelReady(modelsDir, 'ggml-medium.bin'),
           whisperTurbo: modelReady(modelsDir, 'ggml-large-v3-turbo.bin'),
-          raw: !!toolBin(binDir, 'libraw', 'dcraw_emu'), upscale: !!toolBin(binDir, 'esrgan', 'realesrgan-ncnn-vulkan'),
+          raw: !!toolBin(binDir, 'libraw', 'dcraw_emu'),
           exif: !!toolBin(binDir, 'exiftool', 'exiftool'), vtracer: !!toolBin(binDir, 'vtracer', 'vtracer'),
-          tts: !!toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-tts'), ttsModel: modelReady(modelsDir, 'vits-piper-en_US-amy-medium'),
-          stems: !!toolBin(binDir, 'sherpa', 'sherpa-onnx-offline-source-separation'), stemsModel: modelReady(modelsDir, 'UVR-MDX-NET-Voc_FT.onnx') });
+          });
+      if (url === '/api/inbox-files') return sendJSON(res, {files:inbox?.take()||[]});
+      if (url === '/api/inbox-file') {
+        const token=new URL(req.url,'http://localhost').searchParams.get('token');
+        const selected=inbox?.resolve(token);if(!selected)return sendJSON(res,{error:'selection-expired'},404);
+        try{const stat=fs.statSync(selected);res.setHeader('Content-Type','application/octet-stream');res.setHeader('Content-Length',stat.size);const stream=fs.createReadStream(selected);stream.on('error',()=>res.destroy());res.on('close',()=>stream.destroy());return stream.pipe(res);}catch{return sendJSON(res,{error:'file-unavailable'},404);}
+      }
+      if (url === '/api/desktop-integration') {
+        if(req.method==='GET')return sendJSON(res,desktopIntegration?.status()||{available:false,enabled:false,note:'Use the packaged Windows app.'});
+        if(req.method!=='POST')return sendJSON(res,{error:'method-not-allowed'},405);
+        let body='',tooLarge=false;req.on('data',chunk=>{if(tooLarge)return;body+=chunk;if(body.length>1024){tooLarge=true;sendJSON(res,{error:'bad-body'},413);}});
+        req.on('end',()=>{if(tooLarge)return;try{const j=JSON.parse(body);if(typeof j.enabled!=='boolean')throw Error('Choose enabled or disabled.');if(!desktopIntegration)return sendJSON(res,{error:'desktop-only'},501);sendJSON(res,desktopIntegration.setEnabled(j.enabled));}catch(e){sendJSON(res,{error:'integration-failed',detail:e.message},400);}});return;
+      }
+      if (url === '/api/media-capabilities') return sendJSON(res, mediaService.capabilities(findBin('ffmpeg', binDir)));
+      if (url === '/api/probe-media' && req.method === 'POST') return void mediaService.probe(req, res, findBin('ffmpeg', binDir));
       if (url === '/api/system-profile')
         return sendJSON(res, getSystemProfile(binDir, modelsDir));
       if (url === '/api/integrations')
         return sendJSON(res, integrationCatalog({
           ffmpeg: have('ffmpeg', binDir),
           'whisper-cpp': !!toolBin(binDir, 'whisper', 'whisper-cli'),
-          realesrgan: !!toolBin(binDir, 'esrgan', 'realesrgan-ncnn-vulkan'),
           'yt-dlp': have('yt-dlp', binDir),
           // These providers are bundled JavaScript modules and are available with the app shell.
           libarchive: true,
@@ -827,24 +810,6 @@ function startServer(appRoot, binDir, updater, opener, modelsDir) {
         return;
       }
       if (url === '/api/import-card' && req.method === 'POST') return handleImportCard(req, res);
-      // A file the user opened from the OS ("Open with → Junk Drawer"). main.js queues its
-      // absolute path; we read it once and hand the renderer the bytes for the viewer. The
-      // path is set only by main.js from OS open events — never from client input.
-      if (url === '/api/opened-file') {
-        const p = opener && opener.take && opener.take();
-        if (!p) { res.statusCode = 204; return res.end(); }
-        try {
-          const stat = fs.statSync(p);
-          const name = path.basename(p);
-          res.statusCode = 200;
-          res.setHeader('Content-Type', 'application/octet-stream');
-          res.setHeader('Content-Length', stat.size);
-          res.setHeader('X-Filename', encodeURIComponent(name));
-          const rs = fs.createReadStream(p);
-          rs.on('error', () => { try { res.destroy(); } catch {} });
-          return rs.pipe(res);
-        } catch { res.statusCode = 204; return res.end(); }
-      }
       // Static files, confined to appRoot. Reject backslashes/NUL (Windows traversal),
       // then require the resolved path to sit on a separator boundary inside the root
       // (so a sibling like app.asar.unpacked can't satisfy a loose prefix match).

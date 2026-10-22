@@ -66,31 +66,16 @@ test('the friendly error layer covers core failure families', () => {
 test('the home screen exposes drawers instead of hiding the catalog', () => {
   assert.match(source, /id="drawerBrowser"/);
   assert.match(source, /function renderDrawerBrowser\(selected\)/);
-  assert.match(source, /modeTools\(\)\.slice\(0,6\)/);
+  assert.ok(source.includes("task('Convert files'"));
+  assert.ok(source.includes("task('Make files smaller'"));
+  assert.ok(source.includes('id="integrationHome"'));
   assert.match(source, /e\.key\.toLowerCase\(\)==='k'/);
   assert.doesNotMatch(source, /linear-gradient\(90deg,var\(--title1\),var\(--title2\)\)/);
 });
 
-test('workspace navigation remains discoverable and Video Studio is a working editor shell', () => {
-  for (const id of ['workspacesBtn', 'workspacesMenu', 'workspaceLaunchers', 'workspaceView', 'drawerBrowser'])
-    assert.ok(source.includes(`id="${id}"`), `missing navigation surface ${id}`);
-  for (const name of ['Video Studio', 'Photo Desk', 'PDF Desk', 'Audio Desk', 'Download Desk', 'Developer Bench'])
-    assert.ok(source.includes(`name:'${name}'`), `missing workspace ${name}`);
-  assert.match(source, /function openVideoStudio\(host\)/);
-  assert.match(source, /className:'vs-preview'/);
-  assert.match(source, /className:'vs-timeline'/);
-  assert.match(source, /video\.ontimeupdate/);
-  assert.match(source, /leaveStudioForTool\('Trim a Video',marks\)/);
-  assert.match(source, /leaveStudioForTool\('Shrink a Video'\)/);
-  assert.match(source, /reco\('Edit video'/);
-  assert.doesNotMatch(source, /Project editing/);
-  assert.match(source, /function leaveWorkspace\(\)/);
-  assert.match(source, /const receipt=\$\('#receipt'\);receipt\.style\.display=state\.file\?'block':'none'/);
-  assert.match(source, /const needsStudio=/);
-  assert.match(source, /openWorkspace\('video'\)/);
-  assert.match(source, /aria-expanded/);
-  assert.match(source, /async function systemProfile\(\)/);
-  assert.match(source, /fetch\('\/api\/system-profile'\)/);
-  assert.doesNotMatch(source, /profileLine|profile-line|wstatus|status:'(?:LIGHT|ADAPTS|MODEL)'/);
-  assert.match(source, /name:'Video Studio',desc:[^\n]+cats:\['video'\]/);
+test('file tools replace editor and viewer entry points', () => {
+  assert.doesNotMatch(source, /function openVideoStudio|function openViewer|openWorkspace\(/);
+  for (const name of ['Convert Video', 'Convert Audio', 'Convert Unknown Media', 'Batch Convert Media']) assert.ok(source.includes("nm:'"+name+"'"));
+  const pkg=JSON.parse(fs.readFileSync(path.join(__dirname,'..','package.json'),'utf8'));
+  assert.equal(pkg.build.fileAssociations,undefined);
 });

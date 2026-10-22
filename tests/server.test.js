@@ -8,15 +8,14 @@ const { startServer, recommendTier } = require('../electron/server');
 
 let server;
 let origin;
-let queuedOpen = null;
+
 let missingServer;
 let missingOrigin;
 let missingBinDir;
 
 test.before(async () => {
   const root = path.join(__dirname, '..');
-  const opener = { take: () => { const value = queuedOpen; queuedOpen = null; return value; } };
-  const started = await startServer(root, path.join(root, 'resources', 'bin', 'win'), null, opener);
+  const started = await startServer(root, path.join(root, 'resources', 'bin', 'win'), null, null);
   server = started.server;
   origin = `http://127.0.0.1:${started.port}`;
 
@@ -56,7 +55,7 @@ test('system profile reports machine capacity and safe operating recommendation'
   assert.ok(profile.totalMemoryBytes > 0);
   assert.ok(profile.freeMemoryBytes > 0);
   assert.ok(['limited', 'compatibility', 'standard', 'full'].includes(profile.recommendation.tier));
-  for (const model of ['whisperBase', 'whisperSmall', 'whisperMedium', 'whisperTurbo', 'voiceAmy', 'stemsVocals'])
+  for (const model of ['whisperBase', 'whisperSmall', 'whisperMedium', 'whisperTurbo'])
     assert.equal(typeof profile.models[model], 'boolean');
   assert.equal(typeof profile.engines.ffmpeg, 'boolean');
   assert.ok(Array.isArray(profile.ffmpegEncoders));
@@ -126,20 +125,13 @@ test('card polling returns a JSON array', async () => {
   assert.ok(Array.isArray(body.cards));
 });
 
-test('integration catalog is versioned and prepares for OpenCut Next', async () => {
-  const response = await fetch(origin + '/api/integrations');
-  assert.equal(response.status, 200);
-  const body = await response.json();
-  assert.equal(body.contractVersion, 1);
-  assert.ok(body.providers.length > 1, 'OpenCut must be one provider, not the whole architecture');
-  const openCut = body.providers.find(provider => provider.id === 'opencut-next');
-  assert.ok(openCut);
-  assert.equal(openCut.stage, 'planned');
-  assert.equal(openCut.available, false);
-  assert.equal(openCut.blockedBy, 'upstream-editor-api');
-  for (const check of ['availability', 'input', 'output', 'cancel', 'disk-space']) {
-    assert.ok(openCut.checks.includes(check), `OpenCut is missing the ${check} error check`);
-  }
+test('integration catalog contains utility engines without a planned editor', async () => {
+  const response=await fetch(origin+'/api/integrations');
+  assert.equal(response.status,200);
+  const body=await response.json();
+  assert.equal(body.contractVersion,1);
+  assert.ok(body.providers.some(p=>p.id==='ffmpeg'));
+  assert.ok(!body.providers.some(p=>p.role==='video-editor'));
 });
 
 test('backend features reject malformed requests with structured errors', async () => {
@@ -163,7 +155,7 @@ test('backend features reject malformed requests with structured errors', async 
 
 test('every native engine fails clearly when its dependency is unavailable', async () => {
   const headers = { Origin: missingOrigin, 'Content-Type': 'application/octet-stream' };
-  const engines = ['whisper', 'raw', 'upscale', 'exif', 'tts', 'vtracer', 'stems'];
+  const engines = ['whisper', 'raw', 'exif', 'vtracer'];
   for (const tool of engines) {
     const meta = encodeURIComponent(JSON.stringify({ tool, inName: 'input.bin', opts: {} }));
     const response = await fetch(`${missingOrigin}/api/tool?meta=${meta}`, {
@@ -237,13 +229,11 @@ test('API rejects cross-site and traversal requests', async () => {
   assert.equal(traversalStatus, 400);
 });
 
-test('opened files stream once without base64 expansion', async () => {
-  queuedOpen = path.join(__dirname, '..', 'README.md');
-  const response = await fetch(origin + '/api/opened-file');
-  assert.equal(response.status, 200);
-  assert.equal(decodeURIComponent(response.headers.get('x-filename')), 'README.md');
-  assert.match(await response.text(), /Junk Drawer/i);
+test('removed OS viewer route is unavailable', async () => {const r=await fetch(origin+'/api/opened-file');assert.equal(r.status,404);});
 
-  const second = await fetch(origin + '/api/opened-file');
-  assert.equal(second.status, 204);
+test('retired models cannot be downloaded again', async () => {
+  for (const name of ['UVR-MDX-NET-Voc_FT.onnx','vits-piper-en_US-amy-medium']) {
+    const r=await fetch(origin+'/api/fetch-model',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({name})});
+    assert.equal(r.status,410);assert.equal((await r.json()).error,'retired-feature');
+  }
 });

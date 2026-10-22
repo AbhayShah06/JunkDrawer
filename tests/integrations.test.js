@@ -16,5 +16,5 @@ test('runtime availability is reported without changing the provider contract', 
   const catalog = integrationCatalog({ ffmpeg: false, 'yt-dlp': true });
   assert.equal(catalog.providers.find(provider => provider.id === 'ffmpeg').available, false);
   assert.equal(catalog.providers.find(provider => provider.id === 'yt-dlp').available, true);
-  assert.equal(catalog.providers.find(provider => provider.id === 'opencut-next').available, false);
+  assert.ok(!catalog.providers.some(provider => provider.role === 'video-editor'));
 });

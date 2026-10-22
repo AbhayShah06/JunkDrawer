@@ -1,68 +1,71 @@
 # Junk Drawer
 
-Every annoying file job in one place. Convert an image, sign a PDF, shrink a video, pull audio off a link, make a QR code. Your files stay on your computer. Nothing gets uploaded to a server.
+Local tools for the file jobs that get in the way: convert an old recording, shrink a video, sign a PDF, extract an archive, or clean up a folder of photos. No account and no file uploads.
 
-## Get it
+Drop files, choose an action, and save the result. Your originals stay untouched. The home screen has six task entry points; specialized jobs are under More tools. Search understands format names such as MTS.
 
-Download the latest version from the [Releases page](https://github.com/AbhayShah06/JunkDrawer/releases/latest):
+## Start from Explorer
 
-- **Mac:** open the `.dmg` and drag Junk Drawer into Applications.
-- **Windows:** run the `.exe`. *(coming soon)*
+In the Windows desktop build, select files, then right-click → **Send to → Junk Drawer** (Windows 11 may require **Show more options**). Media opens directly in conversion; other files show matching actions. Default PDF, photo, and video viewers stay the same.
 
-The app does not carry a paid developer certificate, so the first launch triggers a warning about an unknown developer. On Mac, right-click the app, pick Open, then Open again. On Windows you get a "Windows protected your PC" box: click More info, then Run anyway. Your computer remembers the choice, so this happens once.
-
-## Updates
-
-When a newer version ships, the app shows a slim bar across the top with a Download button. Click it, grab the new version, drag it over the old one. Anyone running the app sees this, including a friend you sent it to.
+The shortcut is created when the packaged app first runs. Use **Desktop integration** to remove or restore it. The Windows uninstaller removes the shortcut.
 
 ## What's inside
 
-Drop a file and the matching tools open. Search by name if you know what you want. Or open a drawer and browse.
+- **Media conversion:** individual files or a sequential batch, with a save button and status for each file. MTS/M2TS/AVCHD camera footage is recognized as video.
+- **Video:** convert, compress, trim, mute, extract audio, save a frame, make a GIF, burn existing subtitles, or fix variable frame rate.
+- **Audio:** convert, trim, reduce bitrate, normalize loudness, remove silence, and transcribe speech locally.
+- **Images:** convert, resize, rotate, compress, remove backgrounds, OCR, develop camera RAW, inspect/remove metadata, fix dates, rename photos, create icons, trace to SVG, and export PDFs.
+- **PDF:** sign/fill, merge, split, compress, rotate, number, watermark, delete pages, and export page images.
+- **Archives and data:** create/extract ZIPs, extract supported RAR/7z/TAR archives, CSV/JSON/YAML conversion, QR codes, and structured data cleanup.
+- **File identification:** inspect the signature and native media streams of an unknown file.
+- **Downloads:** save supported media from a URL. This feature needs the internet; file processing stays local.
 
-- **Image**: remove a background, convert formats, compress to a target size, resize, rotate, strip location data, build a favicon set
-- **PDF**: sign & fill, merge, split, compress, rotate, number pages, watermark, delete pages, export pages as images
-- **Video**: make a GIF, compress to a size, extract the audio, trim, mute, grab a frame
-- **Audio**: convert, normalize, trim, lower the bitrate
-- **Data**: CSV to JSON and back
-- **Dev**: format JSON, JSON ⇄ YAML, Base64, URL encoding, hashes, timestamps, QR code generator and reader
-- **Download**: save a YouTube video as MP4, or just the sound as MP3
-- **Archive**: zip and unzip
-- **Weird**: find out what a file really is, GIF to MP4, HEIC to JPG
+There is no video editing suite, timeline, project manager, general document viewer, or file-association registration.
 
-### Sign & Fill a PDF
+## Conversion coverage
 
-Open a PDF and add your signature: draw it with the trackpad, type your name, or upload a photo of one. Drop in text boxes and today's date, drag each piece where it belongs, then export. The signed copy saves to your machine and the original never moves.
+The app lists outputs supported by the **installed FFmpeg encoders and muxers**. Capability discovery prevents an unavailable encoder from appearing as a working option.
 
-### Make and read QR codes
+| Family | Output presets (when installed) |
+| --- | --- |
+| Video | MP4, MKV, WebM, MOV, AVI, MPEG |
+| Audio | MP3, WAV, FLAC, M4A, AAC, OGG, Opus, AIFF, AC3, WMA, AU, MP2 |
+| Image | PNG, JPG, WebP, TIFF, BMP, TGA, PPM, PGM, AVIF, JPEG XL |
 
-Type a URL or any text to get a QR image you can download, copy, or drag straight out. Feed the reader a photo or screenshot of a QR code and it reads the link back to you.
+Inputs include common formats plus older camera/video/audio/image families. Recognition of an extension is not a guarantee that every codec, damaged file, or proprietary variant can be decoded. Image conversion saves the first frame. Video output uses the first video stream and optional first audio stream; extra tracks/subtitles are not copied. Audio output uses the first audio stream. Lossless output does not restore lost source quality.
 
-## A couple of notes
+**Old `.dat` files:** use **Look Inside a File**, then **Convert Unknown Media** if it contains readable media. A WAV or MPEG stream stored as `.dat` can work. A Skype database, encrypted file, or raw SILK recording needs a dedicated exporter/decoder. Junk Drawer reports these limits instead of pretending that changing an extension converts a file.
 
-The video tools, background remover, and QR tools fetch a small engine the first time you run each one, then keep it on hand. Stay online for that first use. The transcriber, voiceover, and song-splitter each download their model once on first use (~64–140 MB) and are fully offline after that.
+HEIC decoding and common browser image outputs have a fallback. RAW development uses LibRaw. FFmpeg handles other supported image formats locally.
 
-For important recordings, the transcriber offers Whisper large-v3-turbo as its recommended quality setting. It is a one-time download of about 1.5 GB and then runs entirely on the computer.
+## Get it and develop
 
-### Batch transcription
+Published installers are on the [Releases page](https://github.com/AbhayShah06/JunkDrawer/releases/latest). Source changes on `main` can precede a published installer.
 
-The desktop build can turn a folder of audio/video recordings into individual TXT/SRT files and one timestamped Markdown document:
+```sh
+npm install
+npm run vendor
+npm start
+```
+
+Windows native engines: `npm run fetch-bins:win`. macOS: `bash scripts/fetch-bins-mac.sh` (see the script's build prerequisites). See [BUILD-WINDOWS.md](BUILD-WINDOWS.md) for Windows packaging.
+
+```sh
+npm test
+npm run dist:win
+# macOS build machine:
+npm run dist:mac
+```
+
+Native engines and browser libraries ship inside desktop builds. Background removal uses a local model; transcription downloads the selected model once, then runs offline. Downloads, model acquisition, and update checks require a network connection. Retired voice/stem models are preserved locally and can be removed through Manage storage.
+
+Batch transcription remains available:
 
 ```sh
 npm run transcribe:batch -- --input "path/to/recordings" --output "path/to/transcripts" --title "Project name"
 ```
 
-By default this uses the large-v3-turbo model downloaded by Junk Drawer. Use `--model "path/to/model.bin"` to select another local Whisper model.
+The product audit, feature decisions, validation evidence, and next release gates are in [docs/PRODUCT_RESET.md](docs/PRODUCT_RESET.md). The conversion contract is in [electron/media.js](electron/media.js).
 
-## Building the macOS `.dmg`
-
-On the Mac build machine, after `git pull`:
-
-```
-npm install
-bash scripts/fetch-bins-mac.sh   # fetches/builds the bundled engines into resources/bin/mac/
-npm run dist:mac
-```
-
-The fetch script needs `cmake` (for whisper-cli) and the Xcode command-line tools; everything else downloads official prebuilt binaries. `ffmpeg` and `yt-dlp` are assumed to already be in `resources/bin/mac/` from previous builds. The Windows equivalent is documented in `BUILD-WINDOWS.md`.
-
-Built by Abhay Shah. If you find it useful, connect on [LinkedIn](https://www.linkedin.com/in/abhay-shah1/) or follow on [X](https://x.com/AbhayShahCA).
+Built by Abhay Shah. [LinkedIn](https://www.linkedin.com/in/abhay-shah1/) · [X](https://x.com/AbhayShahCA)

@@ -30,18 +30,6 @@ chmod +x "$OUT/libraw/dcraw_emu"
 draw_out="$("$OUT/libraw/dcraw_emu" 2>&1 || true)"
 case "$draw_out" in *dcraw*) printf '%s\n' "$draw_out" | head -2 ;; *) echo "dcraw_emu failed to run — check dylib paths (otool -L $OUT/libraw/dcraw_emu)"; exit 1 ;; esac
 
-echo "==> Real-ESRGAN ncnn-vulkan (official macOS build)"
-curl -sL -o "$TMP/esrgan.zip" "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-macos.zip"
-unzip -q "$TMP/esrgan.zip" -d "$TMP/esrgan"
-mkdir -p "$OUT/esrgan/models"
-cp "$(find "$TMP/esrgan" -name realesrgan-ncnn-vulkan -type f | head -1)" "$OUT/esrgan/"
-for m in realesrgan-x4plus realesrgan-x4plus-anime; do
-  cp "$(find "$TMP/esrgan" -name "$m.bin"   | head -1)" "$OUT/esrgan/models/"
-  cp "$(find "$TMP/esrgan" -name "$m.param" | head -1)" "$OUT/esrgan/models/"
-done
-chmod +x "$OUT/esrgan/realesrgan-ncnn-vulkan"
-xattr -dr com.apple.quarantine "$OUT/esrgan" 2>/dev/null || true
-
 echo "==> whisper.cpp v1.9.4 (built from source as a universal binary — needs cmake)"
 command -v cmake >/dev/null || { echo "cmake not found. brew install cmake, then re-run."; exit 1; }
 git clone --depth 1 --branch v1.9.4 https://github.com/ggml-org/whisper.cpp "$TMP/whisper"
@@ -63,17 +51,6 @@ cp -R "$SRC/lib" "$OUT/exiftool/lib"
 chmod +x "$OUT/exiftool/exiftool"
 "$OUT/exiftool/exiftool" -ver
 
-echo "==> sherpa-onnx v1.13.3 (universal2 — text-to-speech + stem separation)"
-curl -sL -o "$TMP/sherpa.tar.bz2" "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.3/sherpa-onnx-v1.13.3-osx-universal2-shared.tar.bz2"
-mkdir -p "$TMP/sherpa" && tar -xjf "$TMP/sherpa.tar.bz2" -C "$TMP/sherpa"
-rm -rf "$OUT/sherpa" && mkdir -p "$OUT/sherpa"
-SBIN="$(find "$TMP/sherpa" -name sherpa-onnx-offline-tts -type f | head -1)"
-cp "$SBIN" "$(dirname "$SBIN")/sherpa-onnx-offline-source-separation" "$OUT/sherpa/"
-# the shared build needs its dylibs beside the exes
-find "$TMP/sherpa" \( -name "*.dylib" \) -exec cp {} "$OUT/sherpa/" \;
-chmod +x "$OUT/sherpa/"sherpa-onnx-offline-*
-xattr -dr com.apple.quarantine "$OUT/sherpa" 2>/dev/null || true
-
 echo "==> VTracer 0.6.4 (universal via lipo from the two official arch builds)"
 curl -sL -o "$TMP/vt-arm.tar.gz" "https://github.com/visioncortex/vtracer/releases/download/0.6.4/vtracer-aarch64-apple-darwin.tar.gz"
 curl -sL -o "$TMP/vt-x64.tar.gz" "https://github.com/visioncortex/vtracer/releases/download/0.6.4/vtracer-x86_64-apple-darwin.tar.gz"
@@ -85,5 +62,5 @@ chmod +x "$OUT/vtracer/vtracer"
 xattr -dr com.apple.quarantine "$OUT/vtracer" 2>/dev/null || true
 
 echo
-echo "Done. resources/bin/mac/ now has whisper/, libraw/, esrgan/, exiftool/, sherpa/, vtracer/ alongside ffmpeg + yt-dlp."
+echo "Done. resources/bin/mac/ now has whisper/, libraw/, exiftool/, vtracer/ alongside ffmpeg + yt-dlp."
 echo "Next: npm run dist:mac"
