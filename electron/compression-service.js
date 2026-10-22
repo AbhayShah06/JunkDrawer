@@ -47,7 +47,7 @@ async function handle(req,res,binary,{progress,kill,cleanup}){
    note='Size limit checked after encoding.';
   }else{
    let encoder=software[options.codec];
-   if(options.speed==='fast'&&!info.hdr&&!info.tenBit){const key=binary+':'+options.codec;let selected=hardwareCache.get(key);if(selected===undefined){selected=null;for(const suffix of ['nvenc','qsv','amf']){const candidate=(options.codec==='hevc'?'hevc':options.codec)+'_'+suffix;const trial=await run(['-f','lavfi','-i','color=s=64x64:d=0.1','-frames:v','1','-c:v',candidate,'-f','null','-'],0,0,7000);if(trial.code===0){selected=candidate;break;}}hardwareCache.set(key,selected);}if(selected)encoder=selected;else note='Hardware encoding unavailable; used the CPU.';}
+   if(options.speed==='fast'&&!info.hdr&&!info.tenBit){const key=binary+':'+options.codec;let selected=hardwareCache.get(key);if(selected===undefined){selected=null;for(const suffix of ['nvenc','qsv','amf']){const candidate=(options.codec==='hevc'?'hevc':options.codec)+'_'+suffix;const trial=await run(['-f','lavfi','-i','color=s=256x256:d=0.1','-frames:v','1','-c:v',candidate,'-f','null','-'],0,0,7000);if(trial.code===0){selected=candidate;break;}}hardwareCache.set(key,selected);}if(selected)encoder=selected;else note='Hardware encoding unavailable; used the CPU.';}
    let result=await run(qualityArgs({codec:options.codec,encoder,info,fast:options.speed==='fast'}));if(aborted)return;
    if(result.code!==0&&encoder!==software[options.codec]){note='Hardware encoding failed; used the CPU.';result=await run(qualityArgs({codec:options.codec,info,fast:true}));}
    if(result.code!==0)throw Object.assign(Error(result.stderr),{code:'encode-failed'});
