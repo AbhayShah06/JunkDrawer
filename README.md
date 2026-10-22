@@ -4,11 +4,13 @@ Local tools for the file jobs that get in the way: convert an old recording, shr
 
 Drop files, choose an action, and save the result. Your originals stay untouched. The home screen has six task entry points; specialized jobs are under More tools. Search understands format names such as MTS.
 
-## Start from Explorer
+## Quick access
+
+Click the tray icon or press **Ctrl+Alt+J** (Mac: **Command+Option+J**) for a compact file panel. The tray also opens the full workspace. Closing the window keeps quick access ready; choose Quit from the tray menu to exit. **Start with Windows** is optional under Desktop integration.
 
 In the Windows desktop build, select files, then right-click → **Send to → Junk Drawer** (Windows 11 may require **Show more options**). Media opens directly in conversion; other files show matching actions. Default PDF, photo, and video viewers stay the same.
 
-The shortcut is created when the packaged app first runs. Use **Desktop integration** to remove or restore it. The Windows uninstaller removes the shortcut.
+The Send to shortcut is created when the packaged app first runs. Use **Desktop integration** to remove or restore it. The Windows uninstaller removes the shortcut.
 
 ## What's inside
 
@@ -22,6 +24,10 @@ The shortcut is created when the packaged app first runs. Use **Desktop integrat
 - **Downloads:** save supported media from a URL. This feature needs the internet; file processing stays local.
 
 There is no video editing suite, timeline, project manager, general document viewer, or file-association registration.
+
+## Updates
+
+The installed app checks at startup, every 15 minutes, and when you return after a minute. Use **Check for updates** at any time. Download progress, retry and Restart & install are shown in the banner. Installation requires an explicit click. A source push alone does not notify installed copies: a published release must contain the installer, blockmap and matching latest.yml.
 
 ## Conversion coverage
 
@@ -69,3 +75,5 @@ npm run transcribe:batch -- --input "path/to/recordings" --output "path/to/trans
 The product audit, feature decisions, validation evidence, and next release gates are in [docs/PRODUCT_RESET.md](docs/PRODUCT_RESET.md). The conversion contract is in [electron/media.js](electron/media.js).
 
 Built by Abhay Shah. [LinkedIn](https://www.linkedin.com/in/abhay-shah1/) · [X](https://x.com/AbhayShahCA)
+
+The logo master is [branding/mark.svg](branding/mark.svg). Rebuild the PNG and multi-size ICO using `node scripts/render-branding.mjs` with Chrome installed (or set CHROME_PATH).

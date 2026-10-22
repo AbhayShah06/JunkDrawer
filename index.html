@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Junk Drawer · every annoying file tool in one place</title>
+<title>Junk Drawer · local file tools</title>
+<link rel="icon" href="/icon.ico">
 <script>try{var t=localStorage.getItem('jd-theme')||'light';document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
   *{box-sizing:border-box}
@@ -237,9 +238,26 @@
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
+<aside class="sidebar" aria-label="Main navigation">
+  <button class="brand" id="brandHome" title="Home"><img src="/branding/mark.svg" alt=""/>Junk Drawer</button>
+  <div class="sidebar-label">WORKSPACE</div>
+  <nav class="side-nav">
+    <button data-nav="home" class="active"><span>⌂</span>Home</button>
+    <button data-nav="convert"><span>⇄</span>Convert files</button>
+    <button data-nav="compress"><span>↙</span>Make smaller</button>
+    <button data-nav="pdf"><span>▤</span>PDF tools</button>
+    <button data-nav="image"><span>▧</span>Image tools</button>
+    <button data-nav="arc"><span>▣</span>Archives</button>
+    <button data-nav="identify"><span>⌕</span>Identify a file</button>
+  </nav>
+  <div class="sidebar-bottom"><div class="sidebar-label">ALWAYS CLOSE BY</div><button id="sidebarIntegration">Quick access <kbd>Ctrl Alt J</kbd></button><p>From Explorer, the tray, or a shortcut.</p><span class="app-version">Junk Drawer 1.7</span></div>
+</aside>
 <header><div class="topbar">
-  <div class="brand" id="brandHome" title="Start over" style="cursor:pointer"><span class="mk"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16"/><path d="M3 12h18M9.5 8h5M9.5 16h5"/></svg></span>Junk&nbsp;Drawer
-    <small>File tools. On your computer.</small></div>
+  <div class="cmd">
+      <span class="pmt"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="7"/><path d="M21 21l-5.2-5.2"/></svg></span>
+      <input id="q" autocomplete="off" placeholder="Find a tool or format — MTS, compress PDF, extract audio…" aria-label="Search tools" />
+      <div class="pal" id="pal"></div>
+    </div><div class="header-context"><span>Workspace</span><b>File tools, within reach.</b></div>
   <div class="toolsdd" id="toolsDD">
     <button class="toolsbtn" id="toolsBtn" aria-haspopup="true" aria-expanded="false">Tools ▾</button>
     <div class="dd" id="toolsMenu" hidden></div>
@@ -247,25 +265,25 @@
   </div>
   <nav>
     <a href="#" id="resetBtn" title="Clear everything and start over">Home</a>
-    <a href="#" id="themeToggle">Theme</a>
+    <a href="#" id="themeToggle">Theme</a><button class="nav-update" id="checkUpdates">Check for updates</button>
     <a href="#" id="navPrivacy">Privacy</a>
     <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">About</a>
   </nav>
 </div></header>
 
-<div id="updateBar" hidden>
+<div id="updateBar" role="status" aria-live="polite" hidden>
   <span class="ub-txt"></span>
-  <a href="#" class="ub-get" target="_blank" rel="noopener">Download update</a>
-  <a href="#" class="ub-x" title="Dismiss until the next version">✕</a>
+  <button class="ub-get" type="button">Download update</button>
+  <button class="ub-x" type="button" aria-label="Dismiss update message">×</button>
 </div>
 <div id="cardBar" hidden></div>
 
 <main>
-  <section class="hero" id="heroHome">
+  <section class="hero" id="heroHome"><div class="hero-intro"><span class="eyebrow">A little less file friction</span><h1>Small jobs. Sorted.</h1><p>Convert it. Shrink it. Get on with your day.</p></div>
     <div id="drop" tabindex="0" role="button" aria-label="Choose files to process">
-      <span class="open-icon" aria-hidden="true">↥</span>
-      <span class="big">What needs sorting out?</span>
-      <span class="sub">Drop files here, or choose files</span><span class="drop-note">Convert, compress, extract, and tidy up. Originals stay untouched.</span>
+      <span class="open-icon" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15V3m-4 4 4-4 4 4M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg></span>
+      <span class="big">Drop your files here</span>
+      <span class="sub">or browse files</span><span class="drop-note">Images, videos, audio, PDFs, and the odd unknown file.</span>
     </div>
     <input type="file" id="file" multiple hidden />
 
@@ -273,18 +291,14 @@
       <button class="pastebtn" id="pasteBtn">Paste image</button>
     </div>
 
-    <div class="cmd">
-      <span class="pmt"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="7"/><path d="M21 21l-5.2-5.2"/></svg></span>
-      <input id="q" autocomplete="off" placeholder="Find a tool or format — MTS, compress PDF, extract audio…" aria-label="Search tools" />
-      <div class="pal" id="pal"></div>
-    </div>
+
 
     <div class="home-index">
-      <section class="home-pane shortcut-pane" aria-label="Quick actions and recent work"><div class="home-pane-title"><span>Quick actions</span><span>one-step jobs</span></div>
+      <section class="home-pane shortcut-pane" aria-label="Quick actions and recent work"><div class="home-pane-title"><span>What would you like to do?</span><span>Choose a task</span></div>
         <div class="quick qrow" id="recentRow"><span class="qlabel">Recent work</span><div id="recentPlaceholder" class="drawer-summary">Tools you use will appear here.</div><div class="qtools" id="recentTools"></div></div>
         <div class="quick qrow"><span class="qlabel"><span id="modeLabel">File tasks</span></span><div class="qtools" id="starTools"></div></div>
       </section>
-      <section class="home-pane" aria-label="More tools"><details class="more-tools"><summary>More tools <span>Specialized file tasks</span></summary><div id="drawerBrowser"></div></details><div class="integration-home"><b>Start from your files</b><p>Right-click in Explorer → Send to → Junk Drawer.</p><button class="pastebtn" id="integrationHome">Desktop integration</button></div></section>
+      <section class="home-pane" aria-label="More tools"><details class="more-tools"><summary>More tools <span>The rest of your drawer</span></summary><div id="drawerBrowser"></div></details><div class="integration-home"><span class="integration-badge">QUICK ACCESS</span><b>A drawer, not a destination.</b><p>Use Explorer’s Send to menu, the tray icon, or Ctrl+Alt+J.</p><button class="pastebtn" id="integrationHome">Desktop integration</button></div></section>
     </div>
   </section>
 
@@ -330,6 +344,7 @@
 
 <script src="/electron/compression.js"></script>
 <script src="/electron/media.js"></script>
+<script src="/electron/update-banner.js"></script>
 <script type="module">
 import { PDFDocument, degrees, rgb, StandardFonts } from "./vendor/pdf-lib.mjs";
 import * as pdfjsLib from "./vendor/pdfjs/pdf.min.mjs";
@@ -1410,30 +1425,10 @@ $('#manageStorage').onclick=(e)=>{ e.preventDefault(); renderStorage(); };
 let backend={ ok:{ytdlp:false,spotdl:false,ffmpeg:false}, up:false };
 fetch('/api/check').then(r=>r.ok?r.json():null).then(j=>{ if(j){ backend.ok=j; backend.up=true; } }).catch(()=>{});
 
-/* update notifier, checks GitHub releases, shows an out-of-the-way banner if a newer version exists */
-fetch('/api/update-check').then(r=>r.ok?r.json():null).then(j=>{
-  if(!j || !j.hasUpdate) return;
-  if(localStorage.getItem('jd-skip-update')===j.latest) return;   // user dismissed this exact version
-  const bar=$('#updateBar'); if(!bar) return;
-  const txt=bar.querySelector('.ub-txt'), get=bar.querySelector('.ub-get');
-  txt.textContent=`Junk Drawer ${j.latest} is available. You have ${j.current}.`;
-  bar.querySelector('.ub-x').onclick=(e)=>{ e.preventDefault(); localStorage.setItem('jd-skip-update',j.latest); bar.hidden=true; };
-  if(j.canAutoUpdate){
-    // Windows: download and install inside the app, no browser, no manual download.
-    get.textContent=`Update to ${j.latest}`; get.href='#'; get.removeAttribute('target');
-    let timer=null;
-    const poll=async()=>{ let s; try{ s=await (await fetch('/api/update-state')).json(); }catch{ return; }
-      if(s.status==='downloading'){ get.textContent=`Downloading ${Math.round(s.percent||0)}%`; }
-      else if(s.status==='ready'){ clearInterval(timer); txt.textContent=`Junk Drawer ${j.latest} is ready to install.`;
-        get.textContent='Restart & install'; get.onclick=(e)=>{ e.preventDefault(); get.textContent='Installing…'; fetch('/api/update-apply',{method:'POST'}).catch(()=>{}); }; }
-      else if(s.status==='error'){ clearInterval(timer); timer=null; get.textContent='Update failed, retry'; } };
-    get.onclick=(e)=>{ e.preventDefault(); get.textContent='Starting…'; fetch('/api/update-download',{method:'POST'}).catch(()=>{}); if(!timer) timer=setInterval(poll,800); };
-  } else {
-    // macOS / dev: open the release download in the browser (auto-update needs a signed app on Mac).
-    get.textContent=`Download ${j.latest}`; const upUrl=j.installerUrl||j.dmgUrl||j.htmlUrl||''; get.href=/^https?:\/\//i.test(upUrl)?upUrl:'#';
-  }
-  bar.hidden=false;
-}).catch(()=>{});
+const updateBanner=JDUpdates.createUpdateBanner({document,fetch,storage:localStorage});
+void updateBanner.check();
+window.addEventListener('focus',updateBanner.focus);
+setInterval(()=>updateBanner.check(),15*60*1000);
 function codeLine(cmd){ return el('div',{style:'font:12px var(--mono);background:var(--well);border:2px solid;border-color:var(--sb);padding:8px 10px;margin:6px 0'},cmd); }
 function installPanel(p,needs){
   p.append(el('div',{className:'ds',style:'margin-bottom:8px'},'The downloader (yt-dlp) isn’t available, so this tool can’t run yet.'));
@@ -1910,6 +1905,7 @@ window.addEventListener('paste',e=>{ let f=[...(e.clipboardData?.files||[])];
   if(f.length)intake(f); });
 $('#navPrivacy').onclick=e=>{ e.preventDefault(); toast('Everything runs locally. Files never leave your machine.'); };
 const _root=document.documentElement;
+$('#checkUpdates').onclick=()=>updateBanner.check(true);
 $('#themeToggle').onclick=e=>{ e.preventDefault(); const t=_root.dataset.theme==='dark'?'light':'dark'; _root.dataset.theme=t; try{localStorage.setItem('jd-theme',t);}catch{} };
 
 /* ---- tiny inline icons ---- */
@@ -1962,14 +1958,23 @@ pollCards(); setInterval(pollCards,8000);
 // and return to the start screen, from anywhere in the app.
 const goHome=e=>{ if(e)e.preventDefault(); clearAll(); $('#heroHome').style.display=''; window.scrollTo(0,0); };
 $('#resetBtn').onclick=goHome; $('#brandHome').onclick=goHome;
+document.querySelectorAll('[data-nav]').forEach(button=>button.onclick=()=>{const route=button.dataset.nav;document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b===button));if(route==='home')return goHome();if(['pdf','image','arc'].includes(route)){goHome();return showCategory(route);}if(route==='identify')return openTool(T.find(t=>t.nm==='Look Inside a File'));if(route==='convert'){const files=state.files||(state.file?[state.file]:null);return files?conversionPanel(files):pickFiles(true,conversionPanel);}if(route==='compress')return $('#starTools').children[1].click();});
+$('#sidebarIntegration').onclick=()=>renderDesktopIntegration();
+if(new URLSearchParams(location.search).has('quick'))document.body.classList.add('quick-mode');
+
 
 
 async function renderDesktopIntegration(){
-  resetStage();openStage();const p=$('#panel');p.innerHTML='';p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Start from your files'})]),el('p',{textContent:'Select files in Explorer, right-click, then choose Send to → Junk Drawer. On Windows 11 you may need Show more options first. This opens file actions and keeps your default viewers.'}));
+  resetStage();openStage();const p=$('#panel');p.innerHTML='';p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Within reach'})]),el('p',{className:'ds',textContent:'Use Junk Drawer without finding and opening the full app. Your default file viewers stay the same.'}));
   let current;try{current=await(await fetch('/api/desktop-integration')).json();}catch{current={available:false};}
-  const message=el('p',{className:'note',textContent:current.note||'Available in the Windows desktop build.'});const button=el('button',{className:'btn',disabled:!current.available,textContent:current.enabled?'Remove Send to shortcut':'Add Send to shortcut'});
-  button.onclick=async()=>{button.disabled=true;try{const r=await fetch('/api/desktop-integration',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!current.enabled})});const j=await r.json();if(!r.ok)throw Error(j.detail||'Could not update the shortcut.');current=j;button.textContent=current.enabled?'Remove Send to shortcut':'Add Send to shortcut';message.textContent=current.enabled?'Ready. You can process selected files without opening the home screen.':'Shortcut removed. Your default file apps stay the same.';}catch(e){message.textContent=e.message;}finally{button.disabled=!current.available;}};
-  p.append(message,button);
+  const preferences=el('div',{className:'integration-preferences'});p.append(preferences);
+  const save=async change=>{const r=await fetch('/api/desktop-integration',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(change)});const j=await r.json();if(!r.ok)throw Error(j.detail||'Could not change this setting.');current=j;};
+  function row(title,note,label,disabled,handler){const button=el('button',{className:'btn ghost',textContent:label,disabled});button.onclick=async()=>{button.disabled=true;try{await handler();render();}catch(e){toast(e.message);button.disabled=false;}};preferences.append(el('div',{className:'integration-preference'},[el('div',{},[el('b',{textContent:title}),el('small',{textContent:note})]),button]));}
+  function render(){preferences.innerHTML='';const q=current.quickAccess;
+    row('Explorer: Send to','Select files → right-click → Send to → Junk Drawer. Windows 11 may show this under Show more options.',current.enabled?'Remove shortcut':'Add shortcut',!current.available,()=>save({enabled:!current.enabled}));
+    row('Tray & keyboard',q?.tray?('Click the tray icon or press '+q.shortcut+'. Closing the window keeps quick access available. Quit from the tray menu.'):'Available when running the packaged desktop app.',q?.shortcutRegistered?'Shortcut ready':q?.tray?'Shortcut unavailable':'Desktop only',true,()=>{});
+    row('Start with Windows','Keep the tray and shortcut ready after signing in.',q?.startup?'Turn off':'Turn on',!q?.startupAvailable,()=>save({startup:!q.startup}));
+  }render();
 }
 $('#desktopIntegration').onclick=e=>{e.preventDefault();renderDesktopIntegration();};$('#integrationHome').onclick=renderDesktopIntegration;
 let readingInbox=false;

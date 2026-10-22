@@ -1,6 +1,6 @@
 {
   "name": "junk-drawer",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Every annoying file tool in one place.",
   "author": "Abhay Shah",
   "license": "MIT",
@@ -45,7 +45,8 @@
       "electron/**/*",
       "vendor/**/*",
       "icon.ico",
-      "package.json"
+      "package.json",
+      "branding/**/*"
     ],
     "mac": {
       "target": [
@@ -63,7 +64,8 @@
             "!sherpa{,/**}"
           ]
         }
-      ]
+      ],
+      "icon": "branding/logo.png"
     },
     "win": {
       "icon": "icon.ico",

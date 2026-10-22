@@ -397,16 +397,16 @@ function handleUpdateCheck(res, updater) {
   const canAutoUpdate = !!(updater && updater.enabled);
   let done = false;
   const finish = o => { if (done) return; done = true; sendJSON(res, Object.assign({ current, hasUpdate: false, canAutoUpdate }, o)); };
-  if (process.env.JD_DEV) return finish({});  // dev build never nags about updates
+  if (process.env.JD_DEV) return finish({development:true});  // dev build never nags about updates
   const r = ghRepo();
-  if (!r) return finish({});
+  if (!r) return finish({checkError:'missing-release-config'});
   const req = https.get(`https://api.github.com/repos/${r.owner}/${r.repo}/releases/latest`,
     { headers: { 'User-Agent': 'JunkDrawer', 'Accept': 'application/vnd.github+json' } }, gr => {
       // Cap the response body so a tampered/MITM'd endpoint can't exhaust memory.
       let data = ''; gr.on('data', d => { data += d; if (data.length > 512 * 1024) { gr.destroy(); finish({}); } });
       gr.on('end', () => {
-        if (gr.statusCode !== 200) return finish({});
-        let j; try { j = JSON.parse(data); } catch { return finish({}); }
+        if (gr.statusCode !== 200) return finish({checkError:'release-service-unavailable'});
+        let j; try { j = JSON.parse(data); } catch { return finish({checkError:'invalid-release-metadata'}); }
         const latest = (j.tag_name || '').replace(/^v/, '');
         // Only trust asset URLs that live on github.com/githubusercontent.com — these flow
         // to the renderer and get opened externally, so don't relay an arbitrary URL.
@@ -417,15 +417,15 @@ function handleUpdateCheck(res, updater) {
         const exeUrl = safeUrl(exe && exe.browser_download_url);
         // pick the asset that matches the OS this app is running on
         const installerUrl = process.platform === 'win32' ? exeUrl : dmgUrl;
-        finish({ latest, hasUpdate: !!latest && cmpVer(latest, current) > 0,
+        finish({ latest, canAutoUpdate:canAutoUpdate && !!exeUrl && (j.assets||[]).some(a=>a.name==='latest.yml'), hasUpdate: !!latest && cmpVer(latest, current) > 0,
           htmlUrl: safeUrl(j.html_url),
           dmgUrl, dmgName: dmg ? dmg.name : '',
           exeUrl, exeName: exe ? exe.name : '',
           installerUrl });
       });
     });
-  req.setTimeout(6000, () => { req.destroy(); finish({}); });
-  req.on('error', () => finish({}));
+  req.setTimeout(6000, () => { req.destroy(); finish({checkError:'update-check-timeout'}); });
+  req.on('error', () => finish({checkError:'update-check-failed'}));
 }
 
 // Only the app's own loopback page may reach the /api/* backend. Blocks a malicious
@@ -768,7 +768,7 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
         if(req.method==='GET')return sendJSON(res,desktopIntegration?.status()||{available:false,enabled:false,note:'Use the packaged Windows app.'});
         if(req.method!=='POST')return sendJSON(res,{error:'method-not-allowed'},405);
         let body='',tooLarge=false;req.on('data',chunk=>{if(tooLarge)return;body+=chunk;if(body.length>1024){tooLarge=true;sendJSON(res,{error:'bad-body'},413);}});
-        req.on('end',()=>{if(tooLarge)return;try{const j=JSON.parse(body);if(typeof j.enabled!=='boolean')throw Error('Choose enabled or disabled.');if(!desktopIntegration)return sendJSON(res,{error:'desktop-only'},501);sendJSON(res,desktopIntegration.setEnabled(j.enabled));}catch(e){sendJSON(res,{error:'integration-failed',detail:e.message},400);}});return;
+        req.on('end',()=>{if(tooLarge)return;try{const j=JSON.parse(body);if(typeof j.startup==='boolean'){if(!desktopIntegration?.setStartup)return sendJSON(res,{error:'desktop-only'},501);desktopIntegration.setStartup(j.startup);return sendJSON(res,desktopIntegration.status());}if(typeof j.enabled!=='boolean')throw Error('Choose enabled or disabled.');if(!desktopIntegration)return sendJSON(res,{error:'desktop-only'},501);sendJSON(res,desktopIntegration.setEnabled(j.enabled));}catch(e){sendJSON(res,{error:'integration-failed',detail:e.message},400);}});return;
       }
       if (url === '/api/media-capabilities') return sendJSON(res, mediaService.capabilities(findBin('ffmpeg', binDir)));
       if (url === '/api/probe-media' && req.method === 'POST') return void mediaService.probe(req, res, findBin('ffmpeg', binDir));

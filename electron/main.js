@@ -1,13 +1,15 @@
-const { app, BrowserWindow, shell, Menu, dialog } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog, Tray, globalShortcut, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { startServer } = require('./server');
 const { createUpdater } = require('./updates');
 const {createFileInbox,selectedPaths,createDesktopIntegration}=require('./desktop-integration');
 const fileInbox=createFileInbox();
-const desktopIntegration=createDesktopIntegration({app,shell});
+const {createQuickAccess}=require('./quick-access');
+let quickAccess=null;
+const desktopIntegration=createDesktopIntegration({app,shell,quickAccess:()=>quickAccess});
 
-let win, srv;
+let win, quickWin, srv, appOrigin, quitting=false, updateTimer;
 
 // Resolve the optional updater only after the local window is ready.
 const updater = createUpdater(() => require('electron-updater').autoUpdater, error => {
@@ -59,83 +61,40 @@ const appRoot = () => app.isPackaged ? app.getAppPath() : path.join(__dirname, '
 const devBinSub = process.platform === 'win32' ? 'win' : 'mac';
 const binDir  = () => app.isPackaged ? path.join(process.resourcesPath, 'bin') : path.join(__dirname, '..', 'resources', 'bin', devBinSub);
 
-async function create() {
-  // On macOS, offer to move out of the disk image / Downloads into /Applications on first
-  // run (the Mac analogue of a clean install — keeps the app off the DMG). Relaunches if moved.
-  if (process.platform === 'darwin' && app.isPackaged && !app.isInApplicationsFolder()) {
-    const pick = dialog.showMessageBoxSync({
-      type: 'question', buttons: ['Move to Applications', 'Not Now'], defaultId: 0, cancelId: 1,
-      message: 'Move Junk Drawer to your Applications folder?',
-      detail: 'Recommended — keeps the app handy so you can eject and delete the disk image.',
-    });
-    if (pick === 0) { try { if (app.moveToApplicationsFolder()) return; } catch {} }
+
+function showWindow(window){if(window.isMinimized())window.restore();window.show();window.focus();}
+function makeWindow(quick=false){
+  const target=new BrowserWindow({width:quick?560:1240,height:quick?420:900,minWidth:quick?400:720,minHeight:quick?360:560,title:quick?'Junk Drawer · Quick actions':'Junk Drawer',backgroundColor:'#f5f6f8',show:false,skipTaskbar:quick,autoHideMenuBar:true,icon:path.join(appRoot(),'icon.ico'),webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true,allowRunningInsecureContent:false,experimentalFeatures:false}});
+  target.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
+  const block=(event,url)=>{if(!url.startsWith(appOrigin+'/'))event.preventDefault();};
+  target.webContents.on('will-navigate',block);target.webContents.on('will-redirect',block);
+  target.webContents.setWindowOpenHandler(({url})=>{try{const parsed=new URL(url);if(['http:','https:'].includes(parsed.protocol))void shell.openExternal(url);}catch{}return {action:'deny'};});
+  target.on('close',event=>{if(!quitting&&quickAccess?.status().tray){event.preventDefault();target.hide();}});
+  if(quick)target.webContents.on('before-input-event',(event,input)=>{if(input.key==='Escape'){event.preventDefault();target.hide();}});
+  target.once('ready-to-show',()=>showWindow(target));
+  void target.loadURL(appOrigin+'/index.html'+(quick?'?quick=1':''));return target;
+}
+function showMain(){if(!appOrigin)return;if(!win||win.isDestroyed())win=makeWindow();else showWindow(win);}
+function showQuick(){if(!appOrigin)return;if(!quickWin||quickWin.isDestroyed()){quickWin=makeWindow(true);}else showWindow(quickWin);const cursor=screen.getCursorScreenPoint(),area=screen.getDisplayNearestPoint(cursor).workArea,[width,height]=quickWin.getSize();quickWin.setPosition(Math.max(area.x,Math.min(cursor.x-width/2,area.x+area.width-width))|0,Math.max(area.y,Math.min(cursor.y+16,area.y+area.height-height))|0);}
+async function create(){
+  if(process.platform==='darwin'&&app.isPackaged&&!app.isInApplicationsFolder()){
+    const choice=dialog.showMessageBoxSync({type:'question',buttons:['Move to Applications','Not Now'],defaultId:0,cancelId:1,message:'Move Junk Drawer to Applications?',detail:'Keeps quick access available after you eject the disk image.'});
+    if(choice===0){try{if(app.moveToApplicationsFolder())return;}catch{}}
   }
-  buildAppMenu();
-  desktopIntegration.init();
-  fileInbox.queue(selectedPaths(process.argv));
-  // Don't nag about updates while developing (npm start) — only the packaged app checks.
-  process.env.JD_DEV = app.isPackaged ? '' : '1';
-
-  const { port, server } = await startServer(appRoot(), binDir(), updater, fileInbox,
-    path.join(app.getPath('userData'), 'models'), desktopIntegration); // download-on-first-use models (whisper) live outside the app dir so updates don't re-download them
-  srv = server;
-
-  win = new BrowserWindow({
-    width: 1180, height: 840, minWidth: 720, minHeight: 560,
-    title: 'Junk Drawer', backgroundColor: '#f7f8fa', show: false,
-    icon: path.join(__dirname, '..', 'icon.ico'),
-    // Pin the renderer-hardening flags explicitly so a future edit can't silently regress
-    // the sandbox. The renderer processes untrusted file contents + pasted/dragged URLs.
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-      allowRunningInsecureContent: false,
-      experimentalFeatures: false,
-    },
-  });
-  win.once('ready-to-show', () => {
-    win.show();
-    updater.init(app.isPackaged && process.platform === 'win32');
-    if (updater.enabled) void updater.check();
-  });
-  // The app needs no web permissions (camera/mic/geolocation/notifications/etc.). Deny every
-  // permission request outright so untrusted file content can never prompt for or gain one.
-  win.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
-  const appOrigin = `http://127.0.0.1:${port}`;
-  win.loadURL(`${appOrigin}/index.html`);
-  // Lock the main frame to our loopback origin — a stray in-page navigation (or a
-  // javascript:/file: href) can't take the window off-app.
-  const blockNav = (e, url) => { if (!url.startsWith(appOrigin + '/')) e.preventDefault(); };
-  win.webContents.on('will-navigate', blockNav);
-  win.webContents.on('will-redirect', blockNav);
-  // open real external links (LinkedIn, X) in the system browser, not the app window.
-  // Parse-and-allowlist the scheme: shell.openExternal hands the OS the URL, so only
-  // ever pass a well-formed http/https URL (never file:, smb:, javascript:, etc.).
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    try { const u = new URL(url); if (u.protocol === 'http:' || u.protocol === 'https:') shell.openExternal(url); }
-    catch {}
-    return { action: 'deny' };
-  });
+  buildAppMenu();desktopIntegration.init();fileInbox.queue(selectedPaths(process.argv));
+  process.env.JD_DEV=app.isPackaged?'':'1';updater.init(app.isPackaged&&process.platform==='win32');
+  const started=await startServer(appRoot(),binDir(),updater,fileInbox,path.join(app.getPath('userData'),'models'),desktopIntegration);
+  srv=started.server;appOrigin='http://127.0.0.1:'+started.port;
+  quickAccess=createQuickAccess({app,Tray,Menu,globalShortcut,nativeImage,iconPath:path.join(appRoot(),'branding','logo.png'),showQuick,showMain,quit:()=>app.quit()});quickAccess.init();
+  if(selectedPaths(process.argv).length)showQuick();else if(!process.argv.includes('--background'))showMain();
+  if(updater.enabled){void updater.check();updateTimer=setInterval(()=>updater.check(),15*60*1000);}
 }
-
-// The app uses no <webview> tags; forbid attaching one (defense-in-depth).
-app.on('web-contents-created', (_e, contents) => {
-  contents.on('will-attach-webview', (e) => e.preventDefault());
-});
-
-// Keep one utility window per user.
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-} else {
-  app.on('second-instance', (_event, argv) => { fileInbox.queue(selectedPaths(argv)); if (win) { if(win.isMinimized())win.restore();win.show();win.focus(); } });
-  app.whenReady().then(create).catch(error => {
-    try { fs.appendFileSync(path.join(app.getPath('userData'), 'startup-errors.log'), String(error?.stack || error) + '\n'); } catch {}
-    dialog.showErrorBox('Junk Drawer could not start', String(error?.message || error));
-    app.quit();
-  });
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) create(); });
+app.on('web-contents-created',(_event,contents)=>contents.on('will-attach-webview',event=>event.preventDefault()));
+if(!app.requestSingleInstanceLock())app.quit();else{
+  app.on('second-instance',(_event,argv)=>{const files=selectedPaths(argv);if(files.length){fileInbox.queue(files);showQuick();}else showMain();});
+  app.whenReady().then(create).catch(error=>{try{fs.appendFileSync(path.join(app.getPath('userData'),'startup-errors.log'),String(error?.stack||error)+'\n');}catch{}dialog.showErrorBox('Junk Drawer could not start',String(error?.message||error));app.quit();});
+  app.on('activate',showMain);
 }
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('quit', () => { try { srv && srv.close(); } catch {} });
+app.on('before-quit',()=>{quitting=true;quickAccess?.dispose();if(updateTimer)clearInterval(updateTimer);});
+app.on('window-all-closed',()=>{if(!quickAccess?.status().tray&&process.platform!=='darwin')app.quit();});
+app.on('quit',()=>{try{srv?.close();}catch{}});

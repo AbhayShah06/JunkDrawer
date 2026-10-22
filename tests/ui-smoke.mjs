@@ -67,8 +67,17 @@ try{
  for(let i=0;i<50;i++){if(await evaluate(`!!document.querySelector('#output a[download]')`))break;await wait(100);}
  check(await evaluate(`(async()=>{const {unzipSync}=await import('./vendor/fflate.mjs');const bytes=new Uint8Array(await(await fetch(document.querySelector('#output a[download]').href)).arrayBuffer());const files=unzipSync(bytes);return Object.keys(files).length===2 && new TextDecoder().decode(files['same.txt'])==='one' && new TextDecoder().decode(files['same (2).txt'])==='two';})()`),'ZIP retains duplicate-named source files');
 
+
+ // Exercise the real banner DOM with a deterministic update service; no installer runs.
+ await evaluate(`document.querySelector('#resetBtn').click();globalThis.bannerFixture={state:{status:'available',version:'1.7.1'},posts:[]};globalThis.testBanner=JDUpdates.createUpdateBanner({document,storage:localStorage,onTimer:()=>1,offTimer:()=>{},fetch:async(url,options)=>{if(options?.method==='POST'){bannerFixture.posts.push(url);bannerFixture.state={status:'downloading',version:'1.7.1',percent:42};return {ok:true,json:async()=>({ok:true})};}return {ok:true,json:async()=>url.includes('update-state')?bannerFixture.state:{hasUpdate:true,current:'1.7.0',latest:'1.7.1',canAutoUpdate:true}};}});testBanner.check(true)`);
+ check(await evaluate(`!document.querySelector('#updateBar').hidden && document.querySelector('#updateBar').textContent.includes('1.7.1')`),'new update banner is visible');await snap('update-available');
+ await evaluate(`document.querySelector('#updateBar .ub-get').click()`);await wait(100);check(await evaluate(`document.querySelector('#updateBar').textContent.includes('42%')`),'update progress visible');
+ await evaluate(`bannerFixture.state={status:'ready',version:'1.7.1'};testBanner.poll()`);check(await evaluate(`document.querySelector('#updateBar .ub-get').textContent==='Restart & install' && bannerFixture.posts.length===1`),'restart remains an explicit action');await snap('update-ready');
+ await evaluate(`testBanner.dispose();document.querySelector('#updateBar .ub-x').click()`);
+
  await evaluate(`document.querySelector('#resetBtn').click();document.querySelector('#themeToggle').click()`);await snap('dark');
  await send('Emulation.setDeviceMetricsOverride',{width:720,height:700,deviceScaleFactor:1,mobile:false});await wait(200);await snap('small');
  check(await evaluate(`document.documentElement.scrollWidth<=innerWidth`),'no horizontal overflow');
+ await send('Page.navigate',{url:url+'?quick=1'});await wait(600);await send('Emulation.setDeviceMetricsOverride',{width:560,height:420,deviceScaleFactor:1,mobile:false});await wait(200);check(await evaluate(`document.body.classList.contains('quick-mode')&&getComputedStyle(document.querySelector('.sidebar')).display==='none'`),'compact quick access panel');await snap('quick-panel');
  assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,screenshots:out,checks:['home catalog','search MTS','native MTS conversion','mixed batch failure','dark theme','720px layout','no runtime exceptions']}));ws.close();
 }finally{spawnSync('taskkill',['/pid',String(child.pid),'/t','/f'],{stdio:'ignore',windowsHide:true});child.unref();}

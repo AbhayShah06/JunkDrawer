@@ -39,3 +39,15 @@ test('installation requires a fully downloaded update and catches installer fail
   updater.apply(); await new Promise(setImmediate);
   assert.equal(installs, 1); assert.match(updater.state().error, /installer unavailable/);
 });
+
+test('checking and downloading are deduplicated and ready state cannot regress', async () => {
+  const engine=new EventEmitter();let checks=0,downloads=0,finish;
+  engine.checkForUpdates=async()=>{checks++;engine.emit('update-available',{version:'1.7.0'});};
+  engine.downloadUpdate=()=>{downloads++;return new Promise(resolve=>finish=resolve);};
+  const updater=createUpdater(()=>engine);updater.init(true);await Promise.all([updater.check(),updater.check()]);assert.equal(checks,1);
+  const one=updater.download(),two=updater.download();await new Promise(setImmediate);assert.equal(downloads,1);assert.equal(checks,1);
+  engine.emit('download-progress',{percent:37});assert.equal(updater.state().percent,37);engine.emit('update-downloaded',{version:'1.7.0'});finish();await Promise.all([one,two]);await updater.check();assert.equal(checks,1);engine.emit('update-available',{version:'1.7.0'});assert.equal(updater.state().status,'ready');
+});
+test('synchronous engine failures do not permanently lock future checks', async () => {
+  const engine=new EventEmitter();let attempts=0;engine.checkForUpdates=()=>{if(++attempts===1)throw Error('offline');engine.emit('update-not-available');};const updater=createUpdater(()=>engine);updater.init(true);await updater.check();assert.equal(updater.state().status,'error');await updater.check();assert.equal(updater.state().status,'none');assert.equal(attempts,2);
+});
