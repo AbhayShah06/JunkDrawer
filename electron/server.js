@@ -619,11 +619,6 @@ function handleTool(req, res, binDir, modelsDir) {
       outName = 'out.json';
       plan = [{ bin, args: ['-j', '-DateTimeOriginal', '-CreateDate', '-Model', inName], stdout: outName }];
     } else return reject({ error: 'unknown-op' }, 400);
-  } else if (tool === 'vtracer') {
-    const bin = toolBin(binDir, 'vtracer', 'vtracer');
-    if (!bin) return reject({ error: 'tool-missing' }, 501);
-    outName = 'out.svg';
-    plan = [{ bin, args: ['--input', inName, '--output', outName] }];
   } else return reject({ error: 'unknown-tool' }, 400);
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'jd-tool-'));
@@ -756,7 +751,7 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
           whisperSmall: modelReady(modelsDir, 'ggml-small.bin'), whisperMedium: modelReady(modelsDir, 'ggml-medium.bin'),
           whisperTurbo: modelReady(modelsDir, 'ggml-large-v3-turbo.bin'),
           raw: !!toolBin(binDir, 'libraw', 'dcraw_emu'),
-          exif: !!toolBin(binDir, 'exiftool', 'exiftool'), vtracer: !!toolBin(binDir, 'vtracer', 'vtracer'),
+          exif: !!toolBin(binDir, 'exiftool', 'exiftool'),
           });
       if (url === '/api/inbox-files') return sendJSON(res, {files:inbox?.take()||[]});
       if (url === '/api/inbox-file') {
@@ -768,7 +763,7 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
         if(req.method==='GET')return sendJSON(res,desktopIntegration?.status()||{available:false,enabled:false,note:'Use the packaged Windows app.'});
         if(req.method!=='POST')return sendJSON(res,{error:'method-not-allowed'},405);
         let body='',tooLarge=false;req.on('data',chunk=>{if(tooLarge)return;body+=chunk;if(body.length>1024){tooLarge=true;sendJSON(res,{error:'bad-body'},413);}});
-        req.on('end',()=>{if(tooLarge)return;try{const j=JSON.parse(body);if(typeof j.startup==='boolean'){if(!desktopIntegration?.setStartup)return sendJSON(res,{error:'desktop-only'},501);desktopIntegration.setStartup(j.startup);return sendJSON(res,desktopIntegration.status());}if(typeof j.enabled!=='boolean')throw Error('Choose enabled or disabled.');if(!desktopIntegration)return sendJSON(res,{error:'desktop-only'},501);sendJSON(res,desktopIntegration.setEnabled(j.enabled));}catch(e){sendJSON(res,{error:'integration-failed',detail:e.message},400);}});return;
+        req.on('end',async()=>{if(tooLarge)return;try{const j=JSON.parse(body);if(j.action==='startup-settings'){if(!desktopIntegration?.openStartupSettings)return sendJSON(res,{error:'desktop-only'},501);await desktopIntegration.openStartupSettings();return sendJSON(res,desktopIntegration.status());}if(typeof j.startup==='boolean'){if(!desktopIntegration?.setStartup)return sendJSON(res,{error:'desktop-only'},501);desktopIntegration.setStartup(j.startup);return sendJSON(res,desktopIntegration.status());}if(typeof j.enabled!=='boolean')throw Error('Choose enabled or disabled.');if(!desktopIntegration)return sendJSON(res,{error:'desktop-only'},501);sendJSON(res,desktopIntegration.setEnabled(j.enabled));}catch(e){sendJSON(res,{error:'integration-failed',detail:e.message},400);}});return;
       }
       if (url === '/api/media-capabilities') return sendJSON(res, mediaService.capabilities(findBin('ffmpeg', binDir)));
       if (url === '/api/probe-media' && req.method === 'POST') return void mediaService.probe(req, res, findBin('ffmpeg', binDir));

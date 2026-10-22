@@ -25,6 +25,7 @@ function createDesktopIntegration({app,shell,platform=process.platform,quickAcce
     fs.mkdirSync(path.dirname(settings),{recursive:true});fs.writeFileSync(settings,JSON.stringify({enabled}));return status();
   }
   function init(){if(!available)return;let enabled=true;try{enabled=JSON.parse(fs.readFileSync(settings,'utf8')).enabled!==false;}catch{}try{setEnabled(enabled);}catch{}}
-  return {status,setEnabled,init,setStartup:value=>quickAccess()?.setStartup(value)};
+  function openStartupSettings(){if(!available)throw Error('Windows Settings is available in the installed Windows app.');return shell.openExternal('ms-settings:startupapps');}
+  return {status,setEnabled,init,setStartup:value=>quickAccess()?.setStartup(value),openStartupSettings};
 }
 module.exports={createFileInbox,selectedPaths,createDesktopIntegration};

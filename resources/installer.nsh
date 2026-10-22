@@ -2,5 +2,6 @@
   Delete "$APPDATA\Microsoft\Windows\SendTo\Junk Drawer.lnk"
   ${ifNot} ${isUpdated}
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "JunkDrawerQuickAccess"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "JunkDrawerQuickAccess"
   ${endIf}
 !macroend

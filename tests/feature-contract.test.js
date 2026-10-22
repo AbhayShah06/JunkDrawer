@@ -66,7 +66,7 @@ test('the friendly error layer covers core failure families', () => {
 test('the home screen exposes drawers instead of hiding the catalog', () => {
   assert.match(source, /id="drawerBrowser"/);
   assert.match(source, /function renderDrawerBrowser\(selected\)/);
-  assert.ok(source.includes("task('Convert files'"));
+  assert.ok(source.includes("task('Convert images to JPG'"));
   assert.ok(source.includes("task('Make files smaller'"));
   assert.ok(source.includes('id="integrationHome"'));
   assert.match(source, /e\.key\.toLowerCase\(\)==='k'/);
@@ -75,7 +75,11 @@ test('the home screen exposes drawers instead of hiding the catalog', () => {
 
 test('file tools replace editor and viewer entry points', () => {
   assert.doesNotMatch(source, /function openVideoStudio|function openViewer|openWorkspace\(/);
-  for (const name of ['Convert Video', 'Convert Audio', 'Convert Unknown Media', 'Batch Convert Media']) assert.ok(source.includes("nm:'"+name+"'"));
+  for (const name of ['Convert Video', 'Convert Audio', 'Convert Unknown Media']) assert.ok(source.includes("nm:'"+name+"'"));
   const pkg=JSON.parse(fs.readFileSync(path.join(__dirname,'..','package.json'),'utf8'));
   assert.equal(pkg.build.fileAssociations,undefined);
+});
+
+test('specialist creator and developer tools are retired',()=>{
+  for(const name of ['Save a Photo from a Video','Podcast Loudness Fix','Picture to SVG','Make App Icons','Add a Background','Fix Phone Video for Editing','Cut Out Silence','Even Out Volume','Tidy Up JSON','Switch Between JSON and YAML','Batch Convert Media'])assert.ok(!source.includes("nm:'"+name+"'"),name);
 });

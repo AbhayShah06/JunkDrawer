@@ -172,12 +172,7 @@ async function main() {
     console.log('  -> resources/bin/win/exiftool/');
   }
 
-  await zipGrab('VTracer 0.6.4 (windows)',
-    'https://github.com/visioncortex/vtracer/releases/download/0.6.4/vtracer-x86_64-pc-windows-msvc.zip', [
-    ['vtracer.exe', 'vtracer/vtracer.exe'],
-  ]);
-
-  console.log('\nDone. resources/bin/win/ now has yt-dlp, ffmpeg, whisper/, libraw/, exiftool/, vtracer/.');
+  console.log('\nDone. resources/bin/win/ now has yt-dlp, ffmpeg, whisper/, libraw/, exiftool/.');
   console.log('Next: npm run dist:win');
 }
 

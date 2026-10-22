@@ -1,6 +1,6 @@
 {
   "name": "junk-drawer",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Every annoying file tool in one place.",
   "author": "Abhay Shah",
   "license": "MIT",
@@ -61,7 +61,8 @@
           "filter": [
             "**/*",
             "!esrgan{,/**}",
-            "!sherpa{,/**}"
+            "!sherpa{,/**}",
+            "!vtracer{,/**}"
           ]
         }
       ],
@@ -79,7 +80,8 @@
           "filter": [
             "**/*",
             "!esrgan{,/**}",
-            "!sherpa{,/**}"
+            "!sherpa{,/**}",
+            "!vtracer{,/**}"
           ]
         }
       ]

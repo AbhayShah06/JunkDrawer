@@ -25,7 +25,7 @@ async function main() {
     assert.equal((await fetch(origin+'/app.css')).status,200);
     assert.equal((await fetch(origin+'/electron/media.js')).status,200);
     assert.equal((await fetch(origin+'/api/opened-file')).status,404);
-    for(const retired of ['esrgan','sherpa'])assert.equal(fs.existsSync(path.join(binDir,retired)),false);
+    for(const retired of ['esrgan','sherpa','vtracer'])assert.equal(fs.existsSync(path.join(binDir,retired)),false);
     const presets=await(await fetch(origin+'/api/media-capabilities')).json();assert.ok(presets.formats.some(f=>f.ext==='mp4'));
     const native=path.join(binDir,process.platform==='win32'?'ffmpeg.exe':'ffmpeg');
     const fixture=spawnSync(native,['-v','error','-f','lavfi','-i','color=c=blue:size=64x48:rate=10','-t','0.2','-c:v','libx264','-f','mpegts','pipe:1'],{windowsHide:true});assert.equal(fixture.status,0);

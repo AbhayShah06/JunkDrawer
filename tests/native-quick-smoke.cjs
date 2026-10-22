@@ -8,8 +8,9 @@ app.whenReady().then(async()=>{
  let server,access,window;
  try {
    const {createQuickAccess}=require('../electron/quick-access');
-   access=createQuickAccess({app:{isPackaged:true,getLoginItemSettings:()=>({openAtLogin:false}),setLoginItemSettings:()=>assert.fail('startup must remain unchanged')},Tray,Menu,globalShortcut,nativeImage,iconPath:path.join(root,'branding','logo.png'),showQuick:()=>{},showMain:()=>{},quit:()=>{},platform:process.platform});access.init();
-   assert.equal(access.status().tray,true);assert.equal(access.status().shortcutRegistered,true,'the default quick-access shortcut is already occupied');
+   const testShortcut='Control+Alt+Shift+F12';const isolatedShortcut={register:(_key,fn)=>globalShortcut.register(testShortcut,fn),unregister:()=>globalShortcut.unregister(testShortcut)};
+   access=createQuickAccess({app:{isPackaged:true,getLoginItemSettings:()=>({openAtLogin:true,executableWillLaunchAtLogin:false,launchItems:[{name:'JunkDrawerQuickAccess',scope:'user',enabled:false}]}),setLoginItemSettings:()=>assert.fail('startup must remain unchanged')},Tray,Menu,globalShortcut:isolatedShortcut,nativeImage,iconPath:path.join(root,'branding','logo.png'),showQuick:()=>{},showMain:()=>{},quit:()=>{},platform:process.platform});access.init();
+   assert.equal(access.status().tray,true);assert.equal(access.status().shortcutRegistered,true,'the temporary native-test shortcut is already occupied');
    const started=await require('../electron/server').startServer(root,path.join(root,'resources','bin',process.platform==='win32'?'win':'mac'),null,null,path.join(scratch,'models'));server=started.server;
    window=new BrowserWindow({show:false,width:560,height:420,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
    await window.loadURL('http://127.0.0.1:'+started.port+'/index.html?quick=1');

@@ -29,7 +29,7 @@ A local drawer of useful file tools. People bring files, choose a concrete job, 
 
 ### Complete registered-tool disposition
 
-Baseline: 67 registered tools. Current: 55 registered tools. This is a source inventory, not a claim that every operation has been manually verified on every OS.
+Baseline: 67 registered tools. Current: 44 registered tools (1.7.1). This is a source inventory, not a claim that every operation has been manually verified on every OS.
 
 | Previous tool | Decision | Family |
 | --- | --- | --- |
@@ -43,34 +43,34 @@ Baseline: 67 registered tools. Current: 55 registered tools. This is a source in
 | Strip Location Only | Keep | image |
 | Fix Photo Dates | Keep | image |
 | Rename Photos by Date Taken | Keep | image |
-| Picture to SVG | Keep | image |
+| Picture to SVG | Remove in 1.7.1 | image |
 | Camera RAW to JPG | Keep | image |
 | Upscale an Image (4×) | Remove | image |
 | Grab Text from a Picture | Keep | image |
 | AI Image Checker | Remove | image |
 | Open Any Archive | Merge into Extract an Archive | arc |
 | See Hidden Info | Keep | image |
-| Add a Background | Keep | image |
-| Make App Icons | Keep | image |
+| Add a Background | Remove in 1.7.1 | image |
+| Make App Icons | Remove in 1.7.1 | image |
 | Image to PDF | Keep | image |
 | Video to GIF | Keep | video |
 | Shrink a Video | Keep | video |
 | Save the Audio as MP3 | Keep | video |
 | Make It an MP4 | Merge into Convert Video | video |
 | Trim a Video | Keep | video |
-| Fix Phone Video for Editing | Keep | video |
+| Fix Phone Video for Editing | Remove in 1.7.1 | video |
 | Burn In Subtitles | Keep | video |
 | Mute a Video | Keep | video |
-| Save a Photo from a Video | Keep | video |
+| Save a Photo from a Video | Remove in 1.7.1 | video |
 | Convert Audio | Keep / rebuild | audio |
-| Even Out Volume | Keep | audio |
+| Even Out Volume | Remove in 1.7.1 | audio |
 | Split a Song into Vocals & Instrumental | Remove | audio |
 | Find the BPM | Remove | audio |
 | Make a Voiceover | Remove | audio |
 | Transcribe to Text or Subtitles | Keep | audio |
 | Caption Studio | Remove | video |
-| Podcast Loudness Fix | Keep | audio |
-| Cut Out Silence | Keep | audio |
+| Podcast Loudness Fix | Remove in 1.7.1 | audio |
+| Cut Out Silence | Remove in 1.7.1 | audio |
 | Trim Audio | Keep | audio |
 | Shrink Audio File | Keep | audio |
 | Sign & Fill PDF | Keep | pdf |
@@ -84,8 +84,8 @@ Baseline: 67 registered tools. Current: 55 registered tools. This is a source in
 | Combine PDFs | Keep | pdf |
 | CSV to JSON | Keep | data |
 | JSON to CSV | Keep | data |
-| Tidy Up JSON | Keep | dev |
-| Switch Between JSON and YAML | Keep | dev |
+| Tidy Up JSON | Remove in 1.7.1 | dev |
+| Switch Between JSON and YAML | Remove in 1.7.1 | dev |
 | Scramble Text to Base64 | Remove | dev |
 | Make Text Safe for a Web Link | Remove | dev |
 | Make a Text Fingerprint | Remove | dev |
@@ -101,7 +101,7 @@ Baseline: 67 registered tools. Current: 55 registered tools. This is a source in
 | YouTube to Video | Keep | web |
 | YouTube to MP3 | Keep | web |
 
-New or newly named entries: Create a ZIP, Extract an Archive, Convert Video, Convert Unknown Media, Batch Convert Media.
+New or newly named entries: Create a ZIP, Extract an Archive, Convert Video, Convert Unknown Media. Batch conversion now uses the standard conversion panel; its duplicate catalog entry was removed in 1.7.1.
 
 ## Integration and scope refinement
 

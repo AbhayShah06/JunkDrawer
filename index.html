@@ -240,7 +240,7 @@
 <body>
 <aside class="sidebar" aria-label="Main navigation">
   <button class="brand" id="brandHome" title="Home"><img src="/branding/mark.svg" alt=""/>Junk Drawer</button>
-  <div class="sidebar-label">WORKSPACE</div>
+  <div class="sidebar-label">FILE TASKS</div>
   <nav class="side-nav">
     <button data-nav="home" class="active"><span>⌂</span>Home</button>
     <button data-nav="convert"><span>⇄</span>Convert files</button>
@@ -250,14 +250,14 @@
     <button data-nav="arc"><span>▣</span>Archives</button>
     <button data-nav="identify"><span>⌕</span>Identify a file</button>
   </nav>
-  <div class="sidebar-bottom"><div class="sidebar-label">ALWAYS CLOSE BY</div><button id="sidebarIntegration">Quick access <kbd>Ctrl Alt J</kbd></button><p>From Explorer, the tray, or a shortcut.</p><span class="app-version">Junk Drawer 1.7</span></div>
+  <div class="sidebar-bottom"><div class="sidebar-label">QUICK ACCESS</div><button id="sidebarIntegration">Quick access <kbd>Ctrl Alt J</kbd></button><p>From Explorer, the tray, or a shortcut.</p><span class="app-version">Junk Drawer 1.7.1</span></div>
 </aside>
 <header><div class="topbar">
   <div class="cmd">
       <span class="pmt"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="7"/><path d="M21 21l-5.2-5.2"/></svg></span>
-      <input id="q" autocomplete="off" placeholder="Find a tool or format — MTS, compress PDF, extract audio…" aria-label="Search tools" />
+      <input id="q" autocomplete="off" placeholder="Find a task — JPG, compress PDF, MP4, MP3…" aria-label="Search tools" />
       <div class="pal" id="pal"></div>
-    </div><div class="header-context"><span>Workspace</span><b>File tools, within reach.</b></div>
+    </div><div class="header-context"><b>File tools</b></div>
   <div class="toolsdd" id="toolsDD">
     <button class="toolsbtn" id="toolsBtn" aria-haspopup="true" aria-expanded="false">Tools ▾</button>
     <div class="dd" id="toolsMenu" hidden></div>
@@ -265,7 +265,7 @@
   </div>
   <nav>
     <a href="#" id="resetBtn" title="Clear everything and start over">Home</a>
-    <a href="#" id="themeToggle">Theme</a><button class="nav-update" id="checkUpdates">Check for updates</button>
+    <a href="#" id="themeToggle">Theme</a><a href="#" id="settingsNav">Settings</a><button class="nav-update" id="checkUpdates">Check for updates</button>
     <a href="#" id="navPrivacy">Privacy</a>
     <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">About</a>
   </nav>
@@ -279,11 +279,11 @@
 <div id="cardBar" hidden></div>
 
 <main>
-  <section class="hero" id="heroHome"><div class="hero-intro"><span class="eyebrow">A little less file friction</span><h1>Small jobs. Sorted.</h1><p>Convert it. Shrink it. Get on with your day.</p></div>
+  <section class="hero" id="heroHome"><div class="hero-intro"><h1>File tools</h1><p>Choose a task, or drop a file to see what you can do with it.</p></div>
     <div id="drop" tabindex="0" role="button" aria-label="Choose files to process">
       <span class="open-icon" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15V3m-4 4 4-4 4 4M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg></span>
       <span class="big">Drop your files here</span>
-      <span class="sub">or browse files</span><span class="drop-note">Images, videos, audio, PDFs, and the odd unknown file.</span>
+      <span class="sub">or browse files</span><span class="drop-note">Images · Video · Audio · PDF · Archives</span>
     </div>
     <input type="file" id="file" multiple hidden />
 
@@ -294,11 +294,11 @@
 
 
     <div class="home-index">
-      <section class="home-pane shortcut-pane" aria-label="Quick actions and recent work"><div class="home-pane-title"><span>What would you like to do?</span><span>Choose a task</span></div>
+      <section class="home-pane shortcut-pane" aria-label="Quick actions and recent work"><div class="home-pane-title"><span>Common tasks</span></div>
         <div class="quick qrow" id="recentRow"><span class="qlabel">Recent work</span><div id="recentPlaceholder" class="drawer-summary">Tools you use will appear here.</div><div class="qtools" id="recentTools"></div></div>
         <div class="quick qrow"><span class="qlabel"><span id="modeLabel">File tasks</span></span><div class="qtools" id="starTools"></div></div>
       </section>
-      <section class="home-pane" aria-label="More tools"><details class="more-tools"><summary>More tools <span>The rest of your drawer</span></summary><div id="drawerBrowser"></div></details><div class="integration-home"><span class="integration-badge">QUICK ACCESS</span><b>A drawer, not a destination.</b><p>Use Explorer’s Send to menu, the tray icon, or Ctrl+Alt+J.</p><button class="pastebtn" id="integrationHome">Desktop integration</button></div></section>
+      <section class="home-pane" aria-label="More tools"><details class="more-tools"><summary>All tools</summary><div id="drawerBrowser"></div></details><div class="integration-home"><b>Use it from your files</b><p>Right-click → Send to → Junk Drawer.<br>Or press Ctrl+Alt+J for the small panel.</p><button class="pastebtn" id="integrationHome">Settings & quick access</button></div></section>
     </div>
   </section>
 
@@ -311,7 +311,7 @@
 <footer><div class="wrap">
   <div>Built by <a href="https://www.linkedin.com/in/abhay-shah1/" target="_blank" rel="noopener">Abhay Shah</a>
     · <a href="https://x.com/AbhayShahCA" target="_blank" rel="noopener">@AbhayShahCA</a>
-    · <a href="#" id="manageStorage">Manage storage</a> · <a href="#" id="desktopIntegration">Desktop integration</a></div>
+    · <a href="#" id="manageStorage">Manage storage</a> · <a href="#" id="desktopIntegration">Settings & quick access</a></div>
   <div class="cr">Local processing · No account · No file uploads
     <details class="credits" style="margin-top:6px">
       <summary style="cursor:pointer; font-weight:bold; color:var(--ink)">Open-source credits</summary>
@@ -328,12 +328,9 @@
       <a href="https://github.com/nodeca/js-yaml" target="_blank" rel="noopener">js-yaml</a>,
       <a href="https://github.com/ggml-org/whisper.cpp" target="_blank" rel="noopener">whisper.cpp</a>,
       <a href="https://www.libraw.org/" target="_blank" rel="noopener">LibRaw</a>,
-      <a href="https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan" target="_blank" rel="noopener">Real-ESRGAN</a>,
       <a href="https://github.com/naptha/tesseract.js" target="_blank" rel="noopener">tesseract.js</a>,
       <a href="https://github.com/nika-begiashvili/libarchivejs" target="_blank" rel="noopener">libarchive.js</a>,
-      <a href="https://exiftool.org/" target="_blank" rel="noopener">ExifTool</a>,
-      <a href="https://github.com/k2-fsa/sherpa-onnx" target="_blank" rel="noopener">sherpa-onnx</a>,
-      <a href="https://github.com/visioncortex/vtracer" target="_blank" rel="noopener">VTracer</a>, and
+      <a href="https://exiftool.org/" target="_blank" rel="noopener">ExifTool</a>, and
       <a href="https://github.com/electron/electron" target="_blank" rel="noopener">Electron</a>.
       Full list and licenses in CREDITS.md.
     </details>
@@ -734,7 +731,7 @@ const CATS = {
   data: {label:'Data',  color:'var(--data)',icon:icon('grid'), blurb:'switch between spreadsheet and JSON'},
   arc:  {label:'Archive',color:'var(--arc)',icon:icon('box'),  blurb:'zip and unzip files'},
   weird:{label:'File info', color:'var(--weird)',icon:icon('star'),blurb:'the odd jobs'},
-  dev:  {label:'Text & QR',   color:'var(--dev)', icon:icon('code'), blurb:'structured text and QR codes'},
+  dev:  {label:'QR codes',   color:'var(--dev)', icon:icon('code'), blurb:'make or read a QR code'},
 };
 const T = []; // tools
 const add = t => { T.push(t); return t; };
@@ -881,12 +878,7 @@ add({cat:'image',kinds:['image','raw'],multi:true,nm:'Rename Photos by Date Take
       used[nm]=(used[nm]||0)+1; if(used[nm]>1) nm+=' ('+used[nm]+')';
       out.push({name:nm+'.'+ext(fs[i].name),data:new Uint8Array(await fs[i].arrayBuffer())}); }
     showMulti(out,'renamed-photos.zip',`${out.length} photos renamed by date taken${missing?` (${missing} had no date and kept their name)`:''}.`); }});
-add({cat:'image',kinds:['image'],nm:'Picture to SVG',ds:'Trace a logo or sketch into a crisp vector',kw:'svg vector trace vectorize logo sticker cricut laser sketch convert',
-  more:'Traces a picture into an SVG vector, edges stay crisp at any size. Great for logos, sketches, and sticker or Cricut work. Simple, high-contrast images trace best.',
-  run:async f=>{ const info=await nativeInfo(); if(!info.vtracer) return showGuide(needDesktop('Tracing'));
-    let src=f; if(!['jpg','jpeg','png'].includes(ext(f.name)))
-      src=new File([await imgConvert(f,{type:'image/png'})],'in.png',{type:'image/png'});
-    showResult(await runTool(src,'vtracer',{},'out.svg','Tracing'),base(f.name)+'.svg'); }});
+
 add({cat:'image',kinds:['raw'],multi:true,rec:1,nm:'Camera RAW to JPG',ds:'Develop RAW photos into ready-to-send JPGs',kw:'raw cr2 cr3 nef arw raf dng orf rw2 convert develop batch camera canon nikon sony fuji',
   more:'Turns camera RAW files (Canon CR2/CR3, Nikon NEF, Sony ARW, Fuji RAF, DNG and more) into JPGs with the camera’s own white balance. Great for sending a shoot to a client fast. It’s a clean, neutral develop, not a Lightroom edit.',
   opts:oSel('save as',[['jpg','JPG'],['png','PNG']],'to'),
@@ -932,19 +924,7 @@ add({cat:'image',kinds:['image','pdf'],rec:1,nm:'See Hidden Info',ds:'Read the G
         if(ex.ISO)row('ISO',ex.ISO); if(ex.FocalLength)row('focal len',Math.round(ex.FocalLength)+'mm'); if(ex.Orientation)row('orientation',ex.Orientation); } }
     const body=lines.length?lines.join('\n'):'No embedded metadata found.\nThis file carries no EXIF / GPS / camera tags, it may already be clean.';
     showText('HIDDEN INFO, '+f.name+'\n──────────────────────────────\n'+body+'\n', base(f.name)+'-info.txt'); }});
-add({cat:'image',kinds:['image'],nm:'Add a Background',ds:'Put a solid color behind clear areas',kw:'white background flatten backdrop solid',
-  more:'Puts a solid color behind a see-through image, like a white card behind a logo or a colored backdrop behind a cut-out.',
-  opts:oSel('color',[['#ffffff','White'],['#000000','Black'],['#e9dec7','Paper'],['#0b57d0','Blue']],'bg'),
-  run:async (f,o)=>{ const {img,url}=await toImage(f); const c=el('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
-    const x=c.getContext('2d'); x.fillStyle=o.bg; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0); URL.revokeObjectURL(url);
-    showResult(await blobOf(c,'image/jpeg',.92),base(f.name)+'-bg.jpg'); }});
-add({cat:'image',kinds:['image'],nm:'Make App Icons',ds:'Square icons in every size, zipped',kw:'favicon icon app icon set',
-  more:'Makes a set of square icons from 16 up to 512 pixels for a website or app, all in one zip file.',
-  run:async f=>{ const onP=progress('Stamping icons'); const {img,url}=await toImage(f); const sizes=[16,32,48,64,180,192,512]; const out=[];
-    for(let i=0;i<sizes.length;i++){ onP((i+1)/sizes.length); const s=sizes[i]; const c=el('canvas'); c.width=c.height=s;
-      c.getContext('2d').drawImage(img,0,0,s,s); const b=await blobOf(c,'image/png',1);
-      out.push({name:`icon-${s}.png`,data:new Uint8Array(await b.arrayBuffer())}); }
-    URL.revokeObjectURL(url); showMulti(out,base(f.name)+'-icons.zip','7 PNG sizes (16→512). Rename icon-32 to favicon.png for the web.'); }});
+
 add({cat:'image',kinds:['image'],nm:'Image to PDF',ds:'Turn an image into a one-page PDF',kw:'image to pdf',
   more:'Puts a single image into a one-page PDF, sized to fit the picture.',
   run:async f=>{ const onP=progress('Making PDF'); onP(.3); const png=await imgConvert(f,{type:'image/png'});
@@ -983,10 +963,7 @@ add({cat:'video',kinds:['video'],nm:'Trim a Video',ds:'Keep just one part of the
   opts:()=>{ const a=el('input',{type:'text',value:'00:00',placeholder:'mm:ss'}); const b=el('input',{type:'text',value:'00:10',placeholder:'mm:ss'});
     return {node:el('div',{},[el('label',{},['from ',a]),el('label',{},['to ',b])]),get:()=>({a:a.value,b:b.value})}; },
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Clipping'),base(f.name)+'-clip.mp4'); }});
-add({cat:'video',kinds:['video'],nm:'Fix Phone Video for Editing',ds:'Stop audio drifting out of sync in editors',kw:'vfr cfr variable frame rate fix editing premiere resolve final cut sync audio drift constant',
-  more:'Phone videos use a variable frame rate that makes sound slowly drift out of sync in Premiere, Resolve, or Final Cut. This re-saves the clip at the steady frame rate editors expect.',
-  opts:oSel('frame rate',[['30','30 fps'],['60','60 fps'],['24','24 fps (film)']],'r'),
-  run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-vf','fps='+(o.r||'30'),'-fps_mode','cfr','-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Steadying frame rate'),base(f.name)+'-cfr.mp4'); }});
+
 add({cat:'video',kinds:['video'],nm:'Burn In Subtitles',ds:'Print captions right onto the video',kw:'subtitles captions srt vtt burn hardcode hardsub tiktok reels muted',
   more:'Prints a subtitle file permanently onto the picture, so captions show even where subtitles aren’t supported. Most social video is watched on mute, captions keep people watching.',
   opts:()=>{ const inp=el('input',{type:'file',accept:'.srt,.vtt,.ass'});
@@ -1000,17 +977,8 @@ add({cat:'video',kinds:['video'],nm:'Burn In Subtitles',ds:'Print captions right
 add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'mute remove audio silence',
   more:'Removes the sound and keeps the picture. Good for hiding background noise before you share.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
-add({cat:'video',kinds:['video'],nm:'Save a Photo from a Video',ds:'Save one moment as a picture',kw:'thumbnail frame screenshot still poster',
-  more:'Saves a still picture from the moment you pick. Handy for a thumbnail or cover image.',
-  opts:()=>{ const t=el('input',{type:'text',value:'00:01',placeholder:'mm:ss'}); return {node:el('label',{},['at ',t]),get:()=>({t:t.value})}; },
-  run:async (f,o)=>{ showResult(await runFF(f,'out.png',(i,out)=>['-ss',o.t,'-i',i,'-vframes','1','-update','1',out],'Grabbing frame'),base(f.name)+'-frame.png'); }});
 
 /* ---- AUDIO ---- */
-
-add({cat:'audio',kinds:['audio'],nm:'Even Out Volume',ds:'Make quiet and loud parts match',kw:'normalize volume loudness level',
-  more:'Levels out the loudness so soft and loud parts sound about the same. Good for voice memos and recordings.',
-  run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-af','loudnorm','-acodec','libmp3lame','-q:a','2',out],'Normalizing'),base(f.name)+'-leveled.mp3'); }});
-
 
 
 add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitles',ds:'Turn speech into text or an SRT caption file',kw:'transcribe transcription speech to text subtitles captions srt vtt whisper voice memo interview lecture auto',
@@ -1029,12 +997,8 @@ add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitl
     if(fmt==='txt') showText((await b.text()).trim(),base(f.name)+'.txt');
     else showResult(b,base(f.name)+'.'+fmt,{note:fmt==='srt'?'Pairs perfectly with “Burn In Subtitles”.':''}); }});
 
-add({cat:'audio',kinds:['audio','video'],nm:'Podcast Loudness Fix',ds:'Match the volume podcast apps expect',kw:'loudnorm lufs podcast loudness normalize level broadcast -16 episode',
-  more:'Levels a recording to standard podcast loudness (-16 LUFS), so your episode isn’t quieter or louder than everyone else’s. Works on a video too, you get the leveled sound as an MP3.',
-  run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-af','loudnorm=I=-16:TP=-1.5:LRA=11','-acodec','libmp3lame','-q:a','2',out],'Leveling loudness'),base(f.name)+'-podcast.mp3'); }});
-add({cat:'audio',kinds:['audio','video'],nm:'Cut Out Silence',ds:'Trim dead air from a recording',kw:'silence remove dead air trim gaps pauses tighten podcast voice memo',
-  more:'Snips long silent stretches out of a recording, dead air at the start, the end, and gaps in the middle, while keeping a natural little pause. Great for voice memos and podcast takes.',
-  run:async f=>{ showResult(await runFF(f,'out.mp3',(i,out)=>['-i',i,'-vn','-af','silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.2:stop_periods=-1:stop_threshold=-45dB:stop_duration=0.8:stop_silence=0.25','-acodec','libmp3lame','-q:a','2',out],'Removing silence'),base(f.name)+'-tight.mp3'); }});
+
+
 add({cat:'audio',kinds:['audio'],nm:'Trim Audio',ds:'Keep only the part you want',kw:'trim cut audio',
   more:'Set a start and end time and keep just that stretch of sound. The rest gets cut away.',
   opts:()=>{ const a=el('input',{type:'text',value:'00:00'}); const b=el('input',{type:'text',value:'00:30'});
@@ -1114,17 +1078,6 @@ add({cat:'data',kinds:['data'],input:'text',rec:1,nm:'JSON to CSV',ds:'Turn JSON
   fileToText:1, run:(text)=>showText(jsonToCSV(text),'data.csv')});
 
 /* ---- DEV (text in / text out) ---- */
-add({cat:'dev',input:'text',nm:'Tidy Up JSON',ds:'Clean up or shrink a JSON file',kw:'json format pretty minify beautify tidy',
-  more:'Paste messy JSON and get it laid out neatly, or squeezed onto one line. It flags any mistake in the JSON.',
-  opts:oSel('mode',[['pretty','Prettify'],['min','Minify']],'m'),
-  run:(text,o)=>showText(JSON.stringify(JSON.parse(text),null,o.m==='min'?0:2),'tidy.json')});
-add({cat:'dev',input:'text',nm:'Switch Between JSON and YAML',ds:'Turn JSON into YAML or back again',kw:'json yaml convert',
-  more:'Converts a settings file between the two common formats, JSON and YAML. Pick which way to convert and paste your text.',
-  opts:oSel('direction',[['j2y','JSON → YAML'],['y2j','YAML → JSON']],'d'),
-  run:async (text,o)=>{ const YAML=await import("./vendor/js-yaml.mjs");
-    if(o.d==='j2y') showText(YAML.dump(JSON.parse(text)),'out.yaml'); else showText(JSON.stringify(YAML.load(text),null,2),'out.json'); }});
-
-
 
 
 add({cat:'dev',input:'text',rec:1,nm:'Make a QR Code',ds:'Turn a link or text into a QR code',kw:'qr code generate make url link create barcode',
@@ -1156,17 +1109,16 @@ add({cat:'web',input:'url',mode:'video',needs:'ytdlp',nm:'YouTube to Video',ds:'
 add({cat:'web',input:'url',mode:'audio',needs:'ytdlp',nm:'YouTube to MP3',ds:'Save just the sound as an MP3',kw:'youtube download audio mp3 song music rip',
   more:'Paste a video link and save only the sound as an MP3 file. Good for songs, talks, and podcasts.'});
 
-add({cat:'video',kinds:['video','image'],rec:1,nm:'Convert Video',ds:'MTS, MOV, MKV, AVI and more to a playable format',kw:'convert mts m2ts avchd mp4 mov mkv webm avi vob mod tod mxf dv wmv flv ts legacy camcorder',
+add({cat:'video',kinds:['video','image'],rec:1,nm:'Convert Video',ds:'Make videos playable as MP4',kw:'convert mts m2ts avchd mp4 mov mkv webm avi vob mod tod mxf dv wmv flv ts legacy camcorder',
   more:'Convert camera footage and older videos locally. Choose MP4 for broad compatibility, or another available output. The installed engine determines which codecs can be read. Originals stay untouched.',custom:f=>conversionPanel([f],'video')});
 add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Convert Audio',ds:'Convert recordings or extract sound from a video',kw:'convert audio mp3 wav m4a aac flac opus ogg wma aiff amr ac3 ape caf au mp2',
   more:'Save audio in a common or legacy format, or extract the first audio track from a video. Lossless output cannot restore detail already lost in the original.',custom:f=>conversionPanel([f],'audio')});
-add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'Convert photos, scans, textures, and older image files',kw:'convert image jpg png webp heic heif avif jxl tiff bmp tga ppm pgm pcx exr jp2',
+add({cat:'image',kinds:['image'],rec:1,nm:'Change Image Type',ds:'HEIC, WebP, PNG and more to JPG or PNG',kw:'convert image jpg png webp heic heif avif jxl tiff bmp tga ppm pgm pcx exr jp2',
   more:'Choose a format for your image. Transparency is retained only by formats that support it; animated inputs export their first frame. Camera RAW files have a separate conversion tool.',custom:f=>conversionPanel([f],'image')});
 add({cat:'weird',kinds:['any'],nm:'Convert Unknown Media',ds:'Try readable media hidden in a .dat or unknown file',kw:'dat skype unknown convert recover recording legacy bin',
   more:'The local engine reads the contents rather than trusting the extension. Works only when it recognizes actual media. Databases, encrypted files, and proprietary Skype SILK require dedicated exporters.',custom:f=>conversionPanel([f])});
-add({cat:'video',kinds:['video','audio','image','other'],multi:true,nm:'Batch Convert Media',ds:'Convert several files, with a result for every file',kw:'batch bulk multiple mts m2ts convert queue audio video images',
-  more:'Choose an output and process files one at a time. Save each result as it finishes. Failures stay visible, and cancelling keeps completed results. Image output saves the first frame only.',custom:fs=>conversionPanel(fs)});
-async function conversionPanel(files,initial){
+
+async function conversionPanel(files,initial,preferred){
   if(!Array.isArray(files))files=[files];
   openStage(); const epoch=conversionEpoch; const host=$('#panel');host.innerHTML='';
   host.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:files.length>1?'Convert files':'Convert file'})]));
@@ -1186,9 +1138,14 @@ async function conversionPanel(files,initial){
   groups.forEach(k=>group.append(el('option',{value:k,textContent:({video:'Video',audio:'Audio',image:'Image'})[k]})));
   group.value=initial||(['video','audio','image'].includes(kind(files[0]))?kind(files[0]):'video');
   const target=el('select',{'aria-label':'Output format'}), detail=el('p',{className:'note'});
-  const fill=()=>{target.innerHTML='';formats.filter(f=>f.kind===group.value).forEach(f=>target.append(el('option',{value:f.ext,textContent:f.label})));detail.textContent=group.value==='image'?'Saves a still image. JPG replaces transparency with a solid background.':group.value==='audio'?'Saves the first audio track. A silent video has no audio to extract.':'Saves the first video track and its first audio track, when present. Additional tracks and subtitles are not copied.';};
-  group.onchange=fill;fill();
-  host.append(el('div',{className:'opts'},[el('label',{},['Output type ',group]),el('label',{},['Save as ',target])]),detail);
+  const allFormats=el('input',{type:'checkbox','aria-label':'Show all output formats'});
+  const common={image:['jpg','png','webp'],video:['mp4','mov','webm'],audio:['mp3','m4a','wav','flac']};
+  const fill=()=>{const previous=target.value;target.innerHTML='';const list=formats.filter(f=>f.kind===group.value);const everyday=common[group.value];const shown=allFormats.checked?list:[...everyday.map(ext=>list.find(f=>f.ext===ext)).filter(Boolean)];
+    shown.sort((a,b)=>{const rank=f=>everyday.includes(f.ext)?everyday.indexOf(f.ext):-1;return (rank(a)<0?999:rank(a))-(rank(b)<0?999:rank(b));}).forEach(f=>target.append(el('option',{value:f.ext,textContent:f.label})));
+    if([...target.options].some(o=>o.value===preferred))target.value=preferred;else if([...target.options].some(o=>o.value===previous))target.value=previous;
+    detail.textContent=group.value==='image'?'Saves a still image. JPG replaces transparency with a solid background.':group.value==='audio'?'Saves the first audio track. A silent video has no audio to extract.':'Saves the first video track and its first audio track, when present. Additional tracks and subtitles are not copied.';};
+  group.onchange=()=>{preferred=null;fill();};allFormats.onchange=fill;fill();
+  host.append(el('div',{className:'opts'},[el('label',{},['Output type ',group]),el('label',{},['Save as ',target]),el('label',{},[allFormats,' All formats (including specialist formats)'])]),detail);
   const queue=el('div',{className:'conversion-queue'}); const rows=files.map(f=>{const status=el('span',{className:'queue-state',textContent:'Ready'});const row=el('div',{className:'queue-item'},[el('span',{textContent:f.name}),status]);queue.append(row);return {row,status};});host.append(queue);
   const go=el('button',{className:'btn',textContent:files.length>1?'Convert '+files.length+' files':'Convert file'}),cancel=el('button',{className:'btn ghost',textContent:'Cancel',disabled:true});let stopped=false;
   cancel.onclick=()=>{stopped=true;if(_jobCtl)_jobCtl.abort();};
@@ -1212,9 +1169,12 @@ async function conversionPanel(files,initial){
     }
     if(epoch!==conversionEpoch)return;
     clearStatus();summary.textContent=completed+' converted · '+failed+' failed'+(stopped?' · cancelled':'');cancel.disabled=true;
-    go.textContent='Start another conversion';go.disabled=false;go.onclick=()=>{resetStage();conversionPanel(files,initial);};
+    go.textContent='Start another conversion';go.disabled=false;go.onclick=()=>{resetStage();conversionPanel(files,initial,preferred);};
   };
 }
+
+const toolPriority=['Shrink File Size','Change Image Type','Resize Image','Image to PDF','Combine PDFs','Shrink a PDF','Split into Single Pages','Sign & Fill PDF','Convert Video','Shrink a Video','Convert Audio','Save the Audio as MP3','Create a ZIP','Extract an Archive','Grab Text from a Picture','Remove Background'];
+T.sort((a,b)=>{const rank=t=>toolPriority.includes(t.nm)?toolPriority.indexOf(t.nm):100;return rank(a)-rank(b);});
 
 /* magic byte sniffer */
 function magic(b){ const s=(...x)=>x.every((v,i)=>b[i]===v);
@@ -1232,25 +1192,30 @@ const state={ file:null, files:null, pending:null };
 /* balloon-help tooltip */
 const tipEl=el('div',{className:'tip'}); document.body.append(tipEl);
 function bindTip(node,text){ if(!text)return;
-  node.addEventListener('mouseenter',()=>{ tipEl.textContent=text; tipEl.style.display='block'; });
-  node.addEventListener('mousemove',e=>{ tipEl.style.left=Math.min(e.clientX+14,innerWidth-296)+'px'; tipEl.style.top=(e.clientY+18)+'px'; });
-  node.addEventListener('mouseleave',()=>{ tipEl.style.display='none'; }); }
+  let timer=null,point={x:0,y:0};
+  const position=()=>{tipEl.style.left=Math.max(8,Math.min(point.x+14,innerWidth-296))+'px';tipEl.style.top=Math.max(8,Math.min(point.y+18,innerHeight-tipEl.offsetHeight-8))+'px';};
+  const hide=()=>{clearTimeout(timer);timer=null;tipEl.style.display='none';};
+  node.addEventListener('mouseenter',e=>{hide();point={x:e.clientX,y:e.clientY};timer=setTimeout(()=>{if(!node.isConnected)return;tipEl.textContent=text;tipEl.style.display='block';position();},1000);});
+  node.addEventListener('mousemove',e=>{point={x:e.clientX,y:e.clientY};if(tipEl.style.display==='block')position();});
+  node.addEventListener('mouseleave',hide);node.addEventListener('mousedown',hide);
+}
 
 /* recent quick-access tools (no forced setup, recents fill in as you go) */
 function recentList(){ try{ return JSON.parse(localStorage.getItem('jd-recent')||'[]'); }catch{ return []; } }
 function pushRecent(nm){ let r=recentList().filter(x=>x!==nm); r.unshift(nm); try{ localStorage.setItem('jd-recent',JSON.stringify(r.slice(0,5))); }catch{} }
+function pickCompression(){pickFiles(false,files=>{state.file=files[0];const name=({image:'Shrink File Size',video:'Shrink a Video',pdf:'Shrink a PDF',audio:'Shrink Audio File'})[kind(files[0])];if(name)openTool(T.find(t=>t.nm===name));else showGuide({msg:'Choose an image, video, audio file, or PDF to compress.'});});}
 function renderQuick(){
   const fill=(host,tools)=>{ if(!host)return 0; host.innerHTML=''; let n=0;
     tools.forEach(t=>{ if(t){ host.append(toolCard(t,CATS[t.cat].color)); n++; } }); return n; };
   const lbl=$('#modeLabel'); if(lbl)lbl.textContent='File tasks';
   const primary=$('#starTools');primary.innerHTML='';
   const task=(name,description,action)=>{const card=el('button',{className:'tool',type:'button',onclick:action},[el('div',{},[el('div',{className:'nm',textContent:name}),el('div',{className:'ds',textContent:description})])]);primary.append(card);};
-  task('Convert files','Images, video, and audio. One file or a batch.',()=>pickFiles(true,files=>conversionPanel(files)));
-  task('Make files smaller','Compress an image, video, or PDF.',()=>pickFiles(false,files=>{state.file=files[0];const name=({image:'Shrink File Size',video:'Shrink a Video',pdf:'Shrink a PDF',audio:'Shrink Audio File'})[kind(files[0])];if(name)openTool(T.find(t=>t.nm===name));else showGuide({msg:'Choose an image, video, audio file, or PDF to compress.'});}));
-  task('PDF tools','Sign, merge, split, and prepare documents.',()=>showCategory('pdf'));
-  task('Image tools','Resize, clean up, and prepare pictures.',()=>showCategory('image'));
-  task('Archives','Pack files together or extract an archive.',()=>showCategory('arc'));
-  task('Identify a file','Find out what an old or unknown file contains.',()=>openTool(T.find(t=>t.nm==='Look Inside a File')));
+  task('Make files smaller','Fit an image, PDF, video, or recording under a size limit.',pickCompression);
+  task('Convert images to JPG','Make HEIC, WebP, and PNG photos easy to share.',()=>pickFiles(true,files=>conversionPanel(files,'image','jpg'), 'image/*,.heic,.heif,.webp'));
+  task('Combine PDFs','Join documents into one PDF.',()=>openTool(T.find(t=>t.nm==='Combine PDFs')));
+  task('Convert video to MP4','Make MOV, MKV, and other videos easy to play.',()=>pickFiles(true,files=>conversionPanel(files,'video','mp4'),'video/*,.mkv,.mts,.m2ts'));
+  task('Save audio as MP3','Convert recordings or extract the sound from a video.',()=>pickFiles(true,files=>conversionPanel(files,'audio','mp3'),'audio/*,video/*'));
+  task('Resize an image','Set picture dimensions for an upload or attachment.',()=>openTool(T.find(t=>t.nm==='Resize Image')));
 
   const rr=$('#recentRow'), n=fill($('#recentTools'),recentList().map(nm=>T.find(x=>x.nm===nm))); if(rr) rr.hidden=!n;
   const placeholder=$('#recentPlaceholder');if(placeholder)placeholder.hidden=!!n;
@@ -1336,7 +1301,7 @@ function openTool(t){
   if(ok) return t.custom ? t.custom(f) : renderRun(t,f);
   state.pending=t; pickFiles(false, fs=>{ state.file=fs[0]; state.pending=null; t.custom ? t.custom(fs[0]) : renderRun(t,fs[0]); });
 }
-function pickFiles(multiple,cb){ const inp=$('#file'); inp.multiple=multiple; inp.value='';
+function pickFiles(multiple,cb,accept=''){ const inp=$('#file'); inp.multiple=multiple; inp.accept=accept; inp.value='';
   inp.onchange=e=>{ const fs=[...e.target.files]; if(fs.length)cb(fs); }; inp.click(); }
 
 /* run panel for file tools */
@@ -1958,14 +1923,14 @@ pollCards(); setInterval(pollCards,8000);
 // and return to the start screen, from anywhere in the app.
 const goHome=e=>{ if(e)e.preventDefault(); clearAll(); $('#heroHome').style.display=''; window.scrollTo(0,0); };
 $('#resetBtn').onclick=goHome; $('#brandHome').onclick=goHome;
-document.querySelectorAll('[data-nav]').forEach(button=>button.onclick=()=>{const route=button.dataset.nav;document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b===button));if(route==='home')return goHome();if(['pdf','image','arc'].includes(route)){goHome();return showCategory(route);}if(route==='identify')return openTool(T.find(t=>t.nm==='Look Inside a File'));if(route==='convert'){const files=state.files||(state.file?[state.file]:null);return files?conversionPanel(files):pickFiles(true,conversionPanel);}if(route==='compress')return $('#starTools').children[1].click();});
+document.querySelectorAll('[data-nav]').forEach(button=>button.onclick=()=>{const route=button.dataset.nav;document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b===button));if(route==='home')return goHome();if(['pdf','image','arc'].includes(route)){goHome();return showCategory(route);}if(route==='identify')return openTool(T.find(t=>t.nm==='Look Inside a File'));if(route==='convert'){const files=state.files||(state.file?[state.file]:null);return files?conversionPanel(files):pickFiles(true,conversionPanel);}if(route==='compress')return pickCompression();});
 $('#sidebarIntegration').onclick=()=>renderDesktopIntegration();
 if(new URLSearchParams(location.search).has('quick'))document.body.classList.add('quick-mode');
 
 
 
 async function renderDesktopIntegration(){
-  resetStage();openStage();const p=$('#panel');p.innerHTML='';p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Within reach'})]),el('p',{className:'ds',textContent:'Use Junk Drawer without finding and opening the full app. Your default file viewers stay the same.'}));
+  resetStage();openStage();const p=$('#panel');p.innerHTML='';p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Settings & quick access'})]),el('p',{className:'ds',textContent:'Use Junk Drawer without finding and opening the full app. Your default file viewers stay the same.'}));
   let current;try{current=await(await fetch('/api/desktop-integration')).json();}catch{current={available:false};}
   const preferences=el('div',{className:'integration-preferences'});p.append(preferences);
   const save=async change=>{const r=await fetch('/api/desktop-integration',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(change)});const j=await r.json();if(!r.ok)throw Error(j.detail||'Could not change this setting.');current=j;};
@@ -1973,10 +1938,14 @@ async function renderDesktopIntegration(){
   function render(){preferences.innerHTML='';const q=current.quickAccess;
     row('Explorer: Send to','Select files → right-click → Send to → Junk Drawer. Windows 11 may show this under Show more options.',current.enabled?'Remove shortcut':'Add shortcut',!current.available,()=>save({enabled:!current.enabled}));
     row('Tray & keyboard',q?.tray?('Click the tray icon or press '+q.shortcut+'. Closing the window keeps quick access available. Quit from the tray menu.'):'Available when running the packaged desktop app.',q?.shortcutRegistered?'Shortcut ready':q?.tray?'Shortcut unavailable':'Desktop only',true,()=>{});
-    row('Start with Windows','Keep the tray and shortcut ready after signing in.',q?.startup?'Turn off':'Turn on',!q?.startupAvailable,()=>save({startup:!q.startup}));
+    const toggle=el('input',{type:'checkbox',role:'switch','aria-label':'Start with Windows',checked:!!q?.startup,disabled:!q?.startupAvailable});
+    toggle.onchange=async()=>{toggle.disabled=true;try{await save({startup:toggle.checked});render();}catch(e){toast(e.message);toggle.checked=!!current.quickAccess?.startup;toggle.disabled=!q?.startupAvailable;}};
+    preferences.append(el('label',{className:'integration-preference'},[el('div',{},[el('b',{textContent:'Start with Windows'}),el('small',{textContent:'Optional. Starts quietly in the tray after sign-in. Turn it off here or in Windows Settings → Apps → Startup.'})]),toggle]));
+    row('Windows startup apps','Manage Junk Drawer alongside your other startup apps. No uninstall needed.','Open Windows Settings',!q?.startupAvailable,()=>save({action:'startup-settings'}));
   }render();
+  const refresh=async()=>{if(!preferences.isConnected){window.removeEventListener('focus',refresh);return;}try{current=await(await fetch('/api/desktop-integration')).json();render();}catch{}};window.addEventListener('focus',refresh);
 }
-$('#desktopIntegration').onclick=e=>{e.preventDefault();renderDesktopIntegration();};$('#integrationHome').onclick=renderDesktopIntegration;
+$('#settingsNav').onclick=e=>{e.preventDefault();renderDesktopIntegration();};$('#desktopIntegration').onclick=e=>{e.preventDefault();renderDesktopIntegration();};$('#integrationHome').onclick=renderDesktopIntegration;
 let readingInbox=false;
 async function checkIncomingFiles(){if(readingInbox)return;readingInbox=true;try{const r=await fetch('/api/inbox-files');if(!r.ok)return;const {files}=await r.json();if(!files?.length)return;const picked=[];for(const selected of files){const r=await fetch('/api/inbox-file?token='+encodeURIComponent(selected.token));if(!r.ok){toast('A selected file is no longer available. Select it again in Explorer.');continue;}picked.push(new File([await r.blob()],selected.name));}if(!picked.length)return;intake(picked);if(picked.every(f=>['image','video','audio','other'].includes(kind(f))))conversionPanel(picked);}catch{toast('Could not read the selected files. Select them again in Explorer.');}finally{readingInbox=false;}}
 window.addEventListener('focus',checkIncomingFiles);checkIncomingFiles();

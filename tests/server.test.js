@@ -155,7 +155,7 @@ test('backend features reject malformed requests with structured errors', async 
 
 test('every native engine fails clearly when its dependency is unavailable', async () => {
   const headers = { Origin: missingOrigin, 'Content-Type': 'application/octet-stream' };
-  const engines = ['whisper', 'raw', 'exif', 'vtracer'];
+  const engines = ['whisper', 'raw', 'exif'];
   for (const tool of engines) {
     const meta = encodeURIComponent(JSON.stringify({ tool, inName: 'input.bin', opts: {} }));
     const response = await fetch(`${missingOrigin}/api/tool?meta=${meta}`, {

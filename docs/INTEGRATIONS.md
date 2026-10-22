@@ -7,7 +7,7 @@ Junk Drawer processes files locally. A workflow should produce a concrete file o
 - `POST /api/probe-media?ext=mts` streams a user-selected file into an isolated temporary directory and identifies streams with native FFmpeg. The optional suffix is restricted to alphanumeric characters. Filenames are never treated as proof of format. Probe processes have a timeout and are killed on disconnect; temporary files are removed.
 - `POST /api/ffmpeg` runs local conversions. The renderer's output choices use the shared preset contract. The existing endpoint retains its argument validation for the other media utilities, restricts native input protocols to local files/pipes, and streams input/output through temporary disk storage.
 - `POST /api/video-compress` retains the existing two-pass size-target pipeline.
-- `/api/tool` supports Whisper transcription, LibRaw development, ExifTool metadata operations, and VTracer tracing. Retired voice, song separation, and upscaling execution routes are removed.
+- `/api/tool` supports Whisper transcription, LibRaw development, ExifTool metadata operations. Retired tracing, voice, song separation, and upscaling execution routes are removed.
 - PDF.js/pdf-lib, fflate/libarchive, QR, OCR, background removal, and text libraries remain local, lazily loaded browser engines.
 
 There is no planned or active editor integration. No OpenCut or CapCut project/API dependency is part of the app.

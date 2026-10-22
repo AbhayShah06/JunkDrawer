@@ -1,25 +1,25 @@
 # Junk Drawer
 
-Local tools for the file jobs that get in the way: convert an old recording, shrink a video, sign a PDF, extract an archive, or clean up a folder of photos. No account and no file uploads.
+Local tools for the file jobs that get in the way: convert a photo, shrink a video, sign a PDF, extract an archive, or clean up a folder of photos. No account and no file uploads.
 
-Drop files, choose an action, and save the result. Your originals stay untouched. The home screen has six task entry points; specialized jobs are under More tools. Search understands format names such as MTS.
+Drop files, choose an action, and save the result. Your originals stay untouched. The home screen has six task entry points; specialized jobs are under More tools. The first choices are smaller files, JPG, PDF merge, MP4, MP3, and image resizing. Search still understands older formats such as MTS.
 
 ## Quick access
 
-Click the tray icon or press **Ctrl+Alt+J** (Mac: **Command+Option+J**) for a compact file panel. The tray also opens the full workspace. Closing the window keeps quick access ready; choose Quit from the tray menu to exit. **Start with Windows** is optional under Desktop integration.
+Click the tray icon or press **Ctrl+Alt+J** (Mac: **Command+Option+J**) for a compact file panel. The tray also opens the full workspace. Closing the window keeps quick access ready; choose Quit from the tray menu to exit. **Start with Windows** is optional under Settings & quick access. It starts disabled, remains listed in Windows Settings → Apps → Startup, and honors changes made there.
 
 In the Windows desktop build, select files, then right-click → **Send to → Junk Drawer** (Windows 11 may require **Show more options**). Media opens directly in conversion; other files show matching actions. Default PDF, photo, and video viewers stay the same.
 
-The Send to shortcut is created when the packaged app first runs. Use **Desktop integration** to remove or restore it. The Windows uninstaller removes the shortcut.
+The Send to shortcut is created when the packaged app first runs. Use **Settings & quick access** to remove or restore it. The Windows uninstaller removes the shortcut.
 
 ## What's inside
 
 - **Media conversion:** individual files or a sequential batch, with a save button and status for each file. MTS/M2TS/AVCHD camera footage is recognized as video.
-- **Video:** convert, compress, trim, mute, extract audio, save a frame, make a GIF, burn existing subtitles, or fix variable frame rate.
-- **Audio:** convert, trim, reduce bitrate, normalize loudness, remove silence, and transcribe speech locally.
-- **Images:** convert, resize, rotate, compress, remove backgrounds, OCR, develop camera RAW, inspect/remove metadata, fix dates, rename photos, create icons, trace to SVG, and export PDFs.
+- **Video:** convert, compress, trim, mute, extract audio, make a GIF, or burn existing subtitles.
+- **Audio:** convert, trim, reduce bitrate, and transcribe speech locally.
+- **Images:** convert, resize, rotate, compress, remove backgrounds, OCR, develop camera RAW, inspect/remove metadata, fix dates, rename photos, and export PDFs.
 - **PDF:** sign/fill, merge, split, compress, rotate, number, watermark, delete pages, and export page images.
-- **Archives and data:** create/extract ZIPs, extract supported RAR/7z/TAR archives, CSV/JSON/YAML conversion, QR codes, and structured data cleanup.
+- **Archives and data:** create/extract ZIPs, extract supported RAR/7z/TAR archives, CSV/JSON conversion and QR codes.
 - **File identification:** inspect the signature and native media streams of an unknown file.
 - **Downloads:** save supported media from a URL. This feature needs the internet; file processing stays local.
 
