@@ -24,12 +24,12 @@
         const j=await request('/api/update-check'+(manual?'?manual=1':''));release=j;
         const s=await request('/api/update-state');
         if(['ready','downloading','installing'].includes(s.status)){if(!timer)timer=onTimer(poll,800);await poll();return;}
-        if(j.checkError){show('Could not check for updates. Check your connection and try again.','Retry',()=>check(true));return;}
-        if(!j.hasUpdate){if(manual)show(j.development?'Development build · updates are checked in the installed app.':'You’re up to date · Junk Drawer '+j.current,'',null);return;}
+        if(j.checkError){if(manual)show('Could not check for updates. Check your connection and try again.','Retry',()=>check(true));return;}
+        if(!j.hasUpdate){if(manual)show(j.development?'Development build · updates are checked in the installed app.':'You’re up to date · Junk Drawer '+j.current,'',null);else bar.hidden=true;return;}
         if(!manual&&stored('jd-skip-update')===j.latest)return;
         if(j.canAutoUpdate)show('Junk Drawer '+j.latest+' is available. You have '+j.current+'.','Download update',()=>post('/api/update-download'));
         else {const url=j.installerUrl||j.htmlUrl;show('Junk Drawer '+j.latest+' is available.','Download installer',()=>{if(/^https:\/\/(?:[a-z0-9-]+\.)?github\.com\//i.test(url||''))root.open(url,'_blank','noopener');});}
-      }catch{show('Could not check for updates. Check your connection and try again.','Retry',()=>check(true));}
+      }catch{if(manual)show('Could not check for updates. Check your connection and try again.','Retry',()=>check(true));}
       finally{busy=false;}
     }
     dismiss.onclick=()=>{try{if(release?.latest)storage.setItem('jd-skip-update',release.latest);}catch{}bar.hidden=true;};
