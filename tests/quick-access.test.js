@@ -4,7 +4,7 @@ const {createQuickAccess}=require('../electron/quick-access');
 function fixture({exists=false,enabled=false,platform='win32',shortcut=true}={}){
  let menu,registered,unregistered,quick=0,main=0,destroyed=false;const writes=[];
  class Tray extends EventEmitter{setToolTip(){}setContextMenu(value){menu=value;}destroy(){destroyed=true;}}
- const app={isPackaged:true,getLoginItemSettings:options=>{assert.deepEqual(options,{args:['--background']});return {openAtLogin:exists,executableWillLaunchAtLogin:exists&&enabled,launchItems:exists?[{name:'JunkDrawerQuickAccess',scope:'user',enabled}]:[]};},setLoginItemSettings:settings=>{writes.push(settings);exists=settings.openAtLogin;enabled=settings.enabled;}};
+ const app={isPackaged:true,getLoginItemSettings:options=>{assert.deepEqual(options,{args:['--background']});return {openAtLogin:false,executableWillLaunchAtLogin:exists&&enabled,launchItems:exists?[{name:'JunkDrawerQuickAccess',scope:'user',enabled}]:[]};},setLoginItemSettings:settings=>{writes.push(settings);exists=settings.openAtLogin;enabled=settings.enabled;}};
  const access=createQuickAccess({app,Tray,Menu:{buildFromTemplate:v=>v},globalShortcut:{register:(key,fn)=>{registered={key,fn};return shortcut;},unregister:key=>unregistered=key},nativeImage:{createFromPath:()=>({resize:()=>({})})},iconPath:'icon.png',showQuick:()=>quick++,showMain:()=>main++,quit:()=>{},platform});
  return {access,writes,disableInWindows:()=>{enabled=false;},enableInWindows:()=>{enabled=true;},get menu(){return menu;},get registered(){return registered;},get result(){return {unregistered,quick,main,destroyed};}};
 }

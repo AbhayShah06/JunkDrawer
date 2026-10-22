@@ -11,7 +11,7 @@ function createQuickAccess({app,Tray,Menu,globalShortcut,nativeImage,iconPath,sh
     const settings=loginSettings();
     // Windows can disable a Run entry while leaving openAtLogin true.
     const entry=settings.launchItems?.find(item=>item.name===startupName&&item.scope==='user');
-    return !!settings.openAtLogin&&(entry?entry.enabled:settings.executableWillLaunchAtLogin??true);
+    return entry?!!entry.enabled:!!(settings.executableWillLaunchAtLogin??settings.openAtLogin);
   }
   const status=()=>({available,tray:!!tray,shortcut,shortcutRegistered:registered,startupAvailable:available&&platform==='win32',startup:startupEnabled()});
   function menu(){if(!tray)return;tray.setContextMenu(Menu.buildFromTemplate([{label:'Quick drawer  ·  '+shortcut,click:showQuick},{label:'Open full workspace',click:showMain},{type:'separator'},...(platform==='win32'?[{label:'Start with Windows',type:'checkbox',checked:status().startup,click:item=>setStartup(item.checked)}]:[]),{label:'Quit Junk Drawer',click:quit}]));}
