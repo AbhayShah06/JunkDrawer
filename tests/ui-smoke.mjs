@@ -31,6 +31,7 @@ try{
  const drop=`(()=>{const bytes=Uint8Array.from(atob('${b64}'),c=>c.charCodeAt(0));const d=new DataTransfer();d.items.add(new File([bytes],'camera.mts'));document.dispatchEvent(new DragEvent('drop',{dataTransfer:d,bubbles:true,cancelable:true}));})()`;
  await evaluate(drop);await wait(500);
  await evaluate(`[...document.querySelectorAll('#receipt button')].find(b=>b.textContent.includes('Convert Video')).click()`);await wait(500);
+ for(let i=0;i<100;i++){if(await evaluate(`!!document.querySelector('select[aria-label="Output format"] option[value="mp4"]')`))break;await wait(100);}
  check(await evaluate(`!!document.querySelector('select[aria-label="Output format"] option[value="mp4"]')`),'MP4 available');
  await snap('conversion');await evaluate(`[...document.querySelectorAll('#panel button')].find(b=>b.textContent==='Convert file').click()`);
  for(let i=0;i<50;i++){if(await evaluate(`!!document.querySelector('.conversion-queue a[download]')`))break;await wait(100);}
