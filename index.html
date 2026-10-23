@@ -250,7 +250,7 @@
     <button data-nav="arc"><span>▣</span>Archives</button>
     <button data-nav="identify"><span>⌕</span>Identify a file</button>
   </nav>
-  <div class="sidebar-bottom"><div class="sidebar-label">QUICK ACCESS</div><button id="sidebarIntegration">Quick access <kbd>Ctrl Alt J</kbd></button><p>From Explorer, the tray, or a shortcut.</p><span class="app-version">Junk Drawer 1.8.0</span></div>
+  <div class="sidebar-bottom"><div class="sidebar-label">QUICK ACCESS</div><button id="sidebarIntegration">Quick access <kbd>Ctrl Alt J</kbd></button><p>From Explorer, the tray, or a shortcut.</p><span class="app-version">Junk Drawer 1.8.1</span></div>
 </aside>
 <header><div class="topbar">
   <div class="cmd">
@@ -279,6 +279,7 @@
 <div id="cardBar" hidden></div>
 
 <main>
+<div id="modelDownloads" class="model-downloads" aria-live="polite" hidden></div>
   <section class="hero" id="heroHome"><div class="hero-intro"><h1>File tools</h1><p>Choose a task, or drop a file to see what you can do with it.</p></div>
     <div id="drop" tabindex="0" role="button" aria-label="Choose files to process">
       <span class="open-icon" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15V3m-4 4 4-4 4 4M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg></span>
@@ -514,14 +515,12 @@ async function runTool(file,tool,opts,outName,label){
 async function ensureModel(name,readyFlag,label){
   const info=await nativeInfo();
   if(info[readyFlag]) return;
-  const onP=progress(label); onP(.02);
-  const poll=setInterval(async()=>{ try{ const r=await fetch('/api/ffmpeg-progress?id=model-'+name); const j=await r.json();
-    if(j&&typeof j.percent==='number') onP(Math.max(.02,j.percent)); }catch{} },700);
+  const epoch=conversionEpoch;refreshModelDownloads();
   try{
     const r=await fetch('/api/fetch-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
-    if(!r.ok) throw new Error('Couldn’t download the model. Check your internet connection and try again, it only has to work once.');
+    if(!r.ok){const body=await r.json().catch(()=>({}));throw new Error(body.detail||'Could not download the model. Try again from Manage storage.');}
     _nativeInfo=null; // it changed on disk; re-ask next time
-  } finally { clearInterval(poll); }
+  }catch(e){if(epoch!==conversionEpoch){toast(e.message);throw Object.assign(e,{jdAborted:true});}throw e;}finally{refreshModelDownloads();}
 }
 const needDesktop=what=>({title:'This one needs the desktop app',
   msg:`${what} runs an engine bundled with the Junk Drawer desktop app, which isn’t reachable from a plain browser tab. Grab the app from the GitHub releases page and it’ll work offline.`});
@@ -959,15 +958,29 @@ add({cat:'video',kinds:['video'],nm:'Trim a Video',ds:'Keep just one part of the
   run:async (f,o)=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-ss',o.a,'-to',o.b,'-c:v','libx264','-pix_fmt','yuv420p','-crf','18','-preset','slow','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Clipping'),base(f.name)+'-clip.mp4'); }});
 
 add({cat:'video',kinds:['video'],nm:'Burn In Subtitles',ds:'Print captions right onto the video',kw:'subtitles captions srt vtt burn hardcode hardsub tiktok reels muted',
-  more:'Makes the selected subtitle file a permanent part of the video picture.',
-  opts:()=>{ const inp=el('input',{type:'file',accept:'.srt,.vtt,.ass'});
+  more:'Use a subtitle file, or generate subtitles from the video and review them before burning them in.',
+  runLabel:o=>o.source==='generate'?'Generate subtitles':'Burn subtitles into video',
+  opts:()=>{ const source=el('select',{'aria-label':'Subtitle source'}); [['file','Use a subtitle file'],['generate','Generate from this video']].forEach(([v,l])=>source.append(el('option',{value:v,textContent:l})));
+    const inp=el('input',{type:'file',accept:'.srt,.vtt,.ass','aria-label':'Subtitle file'});
+    const fileRow=el('label',{},['Subtitle file ',inp]);
+    const model=el('select',{'aria-label':'Subtitle model'}); [['base','Whisper base (148 MB download)'],['small','Whisper small (488 MB download)']].forEach(([v,l])=>model.append(el('option',{value:v,textContent:l})));
+    const generateRow=el('div',{},[el('label',{},['Model ',model]),el('p',{className:'note',textContent:'Runs on your computer using the CPU. The model downloads once if needed. Speech language is detected automatically. You can edit the subtitles before burning them in.'})]);
+    const update=()=>{fileRow.hidden=source.value!=='file';generateRow.hidden=source.value!=='generate';}; source.onchange=update;update();
     const sz=el('select'); [['18','Small'],['28','Medium'],['40','Large']].forEach(([v,l])=>sz.append(el('option',{value:v,textContent:l}))); sz.value='28';
     const pos=el('select'); [['bottom','Bottom'],['top','Top']].forEach(([v,l])=>pos.append(el('option',{value:v,textContent:l})));
-    return {node:el('div',{},[el('label',{},['subtitle file ',inp]),' ',el('label',{},['size ',sz]),' ',el('label',{},['position ',pos])]),get:()=>({sub:inp.files&&inp.files[0],fsize:sz.value,fpos:pos.value})}; },
-  check:(f,o)=>!o.sub?{msg:'Pick the subtitle file (.srt or .vtt) that goes with this video. You can export one from a captions app, or write one in any text editor.'}:null,
-  run:async (f,o)=>{ const se=ext(o.sub.name); const sn='sub.'+(['srt','vtt','ass'].includes(se)?se:'srt');
-    const fstyle=jdCapStyle(o.fsize,o.fpos);
-    showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-vf',`subtitles=${sn}:force_style='${fstyle}'`,'-c:v','libx264','-pix_fmt','yuv420p','-crf','21','-preset','veryfast','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Burning in captions',{name:sn,data:o.sub}),base(f.name)+'-captioned.mp4'); }});
+    return {node:el('div',{},[el('label',{},['Subtitles ',source]),fileRow,generateRow,el('label',{},['Size ',sz]),el('label',{},['Position ',pos])]),get:()=>({source:source.value,model:model.value,sub:inp.files&&inp.files[0],fsize:sz.value,fpos:pos.value})}; },
+  check:(f,o)=>o.source!=='generate'&&!o.sub?{msg:'Choose an SRT, VTT or ASS file, or select “Generate from this video”.'}:null,
+  run:async (f,o)=>{ const epoch=conversionEpoch;
+    if(o.source!=='generate')return burnSubtitleFile(f,o.sub,o,epoch);
+    const info=await nativeInfo();if(epoch!==conversionEpoch)return;
+    if(!info.whisper)return showGuide(needDesktop('Generating subtitles'));
+    const small=o.model==='small',name=small?'ggml-small.bin':'ggml-base.bin',flag=small?'whisperSmall':'whisperModel';
+    await ensureModel(name,flag,`Downloading Whisper ${small?'small (488 MB)':'base (148 MB)'}`);if(epoch!==conversionEpoch)return;
+    const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Preparing audio');if(epoch!==conversionEpoch)return;
+    const subtitles=await runTool(new File([wav],'input.wav',{type:'audio/wav'}),'whisper',{fmt:'srt',model:small?'small':'base',language:'auto'},'out.srt','Generating subtitles');if(epoch!==conversionEpoch)return;
+    const text=(await subtitles.text()).trim();if(epoch!==conversionEpoch)return;
+    if(!/\d{2}:\d{2}:\d{2},\d{3}\s*-->/.test(text))throw Error('No timed speech was found. Try a video with clearer speech, or use a subtitle file.');
+    reviewBurnSubtitles(f,text,o,epoch); }});
 add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'mute remove audio silence',
   more:'Removes audio from the video copy.',
   run:async f=>{ showResult(await runFF(f,'out.mp4',(i,out)=>['-i',i,'-c:v','copy','-an',out],'Muting'),base(f.name)+'-muted.mp4'); }});
@@ -1310,7 +1323,8 @@ function renderRun(t,fileOrFiles){
   if(t.opts){ const o=t.opts(); const wrap=el('div',{className:'opts'}); wrap.append(o.node); p.append(wrap); get=o.get; }
   const ni=p.querySelector('input[type=number]');
   if(state.pendingMb!=null && ni){ ni.value=state.pendingMb; state.pendingMb=null; }
-  const go=el('button',{className:'btn',textContent:'Run '+t.nm});
+  const go=el('button',{className:'btn',textContent:t.runLabel?t.runLabel(get()):'Run '+t.nm});
+  if(t.runLabel)p.addEventListener('change',()=>go.textContent=t.runLabel(get()));
   const ch=el('button',{className:'btn ghost',textContent:'Choose different file'}); ch.onclick=()=>pickFiles(false,fs=>{ state.file=fs[0]; renderRun(t,fs[0]); });
   go.onclick=async()=>{ go.disabled=true; clearStatus(); $('#output').innerHTML='';
     state.ctx={t,f}; const pre=preCheck(t,fileOrFiles,get());
@@ -1344,46 +1358,40 @@ const MODEL_LABELS={
   'ggml-medium.bin':'Whisper medium',
   'UVR-MDX-NET-Voc_FT.onnx':'Retired song separation model',
   'vits-piper-en_US-amy-medium':'Text-to-speech voice (Amy, en-US)',
+  'paddleocr-v6':'PaddleOCR v6','birefnet-lite':'BiRefNet Lite 512','qwen3-asr':'Qwen3-ASR 0.6B',
 };
-async function renderStorage(){ openStage();
-  const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.dev.color); $('#output').innerHTML=''; clearStatus();
-  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Manage storage'}),el('span',{className:'badge',textContent:'Storage'})]));
-  p.append(el('div',{className:'ds',textContent:'Downloaded models are stored on this computer. You can remove them here.'}));
-  const list=el('div',{className:'opts'}); p.append(list);
-  const load=async()=>{
-    list.innerHTML='';
-    let j; try{ j=await (await fetch('/api/models')).json(); }
-    catch{ list.append(el('div',{className:'ds',textContent:'This only works in the Junk Drawer desktop app, a plain browser tab has no models to manage.'})); return; }
-    let totalMB=0;
-    try{const {packs}=await(await fetch('/api/model-packs')).json();for(const pack of packs){if(pack.ready)totalMB+=pack.sizeMB;
-      const button=el('button',{className:'btn ghost',textContent:pack.ready?'Remove':'Download',disabled:pack.downloading});
-      button.onclick=async()=>{button.disabled=true;try{if(pack.ready){const response=await fetch('/api/delete-model-pack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:pack.id})});if(!response.ok)throw Error('Could not remove model.');}else await ensureModelPack(pack.id);}catch(e){toast(e.message);}await load();};
-      list.append(el('div',{className:'integration-preference'},[el('div',{},[el('b',{textContent:pack.label}),el('small',{textContent:(pack.ready?'Installed · ':pack.downloading?'Downloading · ':'Not installed · ')+pack.sizeMB+' MB'})]),button]));
-    }}catch{}
-    const models=j.models||[];
-    for(const m of models){
-      const label=MODEL_LABELS[m.name]||m.name;
-      const size=(m.sizeMB>=1000?(m.sizeMB/1000).toFixed(2)+' GB':m.sizeMB+' MB');
-      if(m.ready) totalMB+=m.sizeMB;
-      const status=el('span',{style:'font:11px var(--mono); opacity:.75',
-        textContent:m.ready?('Installed · '+size):('Not installed · '+size+' if downloaded')});
-      const kids=[el('div',{style:'flex:1 1 auto'},[el('div',{style:'font-weight:bold',textContent:label}),status])];
-      if(m.ready){
-        const del=el('button',{className:'btn ghost',textContent:'Delete'});
-        del.onclick=async()=>{ if(!confirm('Delete "'+label+'"? You can re-download it later.')) return;
-          del.disabled=true; del.textContent='Deleting…';
-          try{ const r=await fetch('/api/delete-model',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:m.name})});
-            if(!(await r.json()).ok) throw 0; toast('Deleted, disk freed'); }
-          catch{ toast('Couldn’t delete that one'); }
-          _nativeInfo=null; await load(); };
-        kids.push(del);
-      }
-      list.append(el('div',{style:'display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--sh2)'},kids));
-    }
-    const totStr=(totalMB>=1000?(totalMB/1000).toFixed(2)+' GB':totalMB+' MB');
-    list.append(el('div',{style:'margin-top:10px; font-weight:bold',textContent:'Total installed: '+(totalMB?totStr:'nothing yet')}));
-  };
-  await load();
+const MODEL_USES={'ggml-base.bin':'Speech to text · timed subtitles','ggml-small.bin':'Speech to text · timed subtitles','ggml-medium.bin':'Speech to text · timed subtitles','ggml-large-v3-turbo.bin':'Speech to text · timed subtitles','UVR-MDX-NET-Voc_FT.onnx':'Retired · separate music and vocals','vits-piper-en_US-amy-medium':'Retired · text to speech','paddleocr-v6':'Read text from images · multilingual','birefnet-lite':'Remove image backgrounds','qwen3-asr':'Speech to text · no subtitle timing'};
+let storageReload=null,downloadRefreshBusy=false;
+const modelSize=bytes=>bytes>=1e9?(bytes/1e9).toFixed(2)+' GB':Math.ceil(bytes/1e6)+' MB';
+async function storageModels(){
+  const [legacy,packs]=await Promise.all([fetch('/api/models').then(r=>r.json()),fetch('/api/model-packs').then(r=>r.json())]);
+  return [...(legacy.models||[]).map(m=>({...m,id:m.name,label:MODEL_LABELS[m.name]||m.name,kind:'legacy'})),...(packs.packs||[]).map(m=>({...m,label:MODEL_LABELS[m.id]||m.label,kind:'pack',sizeBytes:m.sizeBytes||m.sizeMB*1e6}))].filter(m=>!m.retired||m.ready||m.downloading).sort((a,b)=>(a.sizeBytes||a.sizeMB*1e6)-(b.sizeBytes||b.sizeMB*1e6));
+}
+async function modelAction(model,action){
+  const route=model.kind==='pack'?(action==='remove'?'/api/delete-model-pack':'/api/download-model-pack'):(action==='remove'?'/api/delete-model':action==='cancel'?'/api/cancel-model-download':'/api/fetch-model');
+  const r=await fetch(route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(model.kind==='pack'?{id:model.id}:{name:model.id})});const j=await r.json();if(!r.ok)throw Error(j.detail||j.error||'Model request failed.');_nativeInfo=null;
+}
+async function refreshModelDownloads(){
+  if(downloadRefreshBusy)return;downloadRefreshBusy=true;
+  try{const models=await storageModels(),active=models.filter(m=>m.downloading),bar=$('#modelDownloads');bar.hidden=!active.length;bar.innerHTML='';
+    for(const model of active){const text=el('span',{textContent:model.label+' · '+Math.floor((model.progress||0)*100)+'% · continues while you use other tools'}),row=el('div',{className:'model-download-row'},[text]);
+      if(model.kind==='legacy'){const cancel=el('button',{className:'btn ghost',textContent:'Cancel'});cancel.onclick=async()=>{cancel.disabled=true;try{await modelAction(model,'cancel');}catch(e){toast(e.message);}await refreshModelDownloads();};row.append(cancel);}bar.append(row);}
+    if(storageReload)storageReload(models);
+  }catch{}finally{downloadRefreshBusy=false;}
+}
+setInterval(refreshModelDownloads,1500);void refreshModelDownloads();
+async function renderStorage(){resetStage();openStage();const p=$('#panel');p.innerHTML='';p.style.setProperty('--c',CATS.dev.color);$('#output').innerHTML='';clearStatus();
+  p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:'Manage storage'})]),el('p',{className:'ds',textContent:'Models download once and run locally. Ordered by download size, smallest first.'}));
+  const summary=el('p',{className:'storage-summary'}),list=el('div',{className:'storage-models'});p.append(summary,list);
+  const draw=models=>{if(!document.body.contains(list)){storageReload=null;return;}summary.textContent='Installed: '+modelSize(models.filter(m=>m.ready).reduce((n,m)=>n+(m.sizeBytes||m.sizeMB*1e6),0));
+    list.innerHTML='';models.forEach((model,index)=>{const color='hsl('+Math.round(index/Math.max(1,models.length-1)*125)+' 48% 43%)';
+      const size=el('span',{className:'storage-size',textContent:modelSize(model.sizeBytes||model.sizeMB*1e6)});size.style.setProperty('--size-color',color);
+      const status=model.downloading?'Downloading · '+Math.floor((model.progress||0)*100)+'%':model.ready?'Installed':model.error||'Not installed';
+      const action=model.downloading?'cancel':model.ready?'remove':'download';const button=el('button',{className:'btn ghost',textContent:action==='cancel'?'Cancel':action==='remove'?'Remove':'Download',disabled:model.downloading&&model.kind==='pack'});
+      button.onclick=async()=>{button.disabled=true;try{await modelAction(model,action);}catch(e){toast(e.message);}await refreshModelDownloads();};
+      list.append(el('div',{className:'storage-model'},[size,el('div',{className:'storage-description'},[el('b',{textContent:model.label}),el('span',{textContent:MODEL_USES[model.id]||'Local file processing'})]),el('span',{className:'storage-status',textContent:status}),button]));
+    });};storageReload=draw;
+  try{draw(await storageModels());}catch{list.textContent='Model storage is available in the installed desktop app.';}
 }
 $('#manageStorage').onclick=(e)=>{ e.preventDefault(); renderStorage(); };
 
@@ -1531,6 +1539,22 @@ const reco=(label,fn)=>{ const b=el('button',{className:'reco',textContent:label
 
 /* ===== Subtitle helpers ===== */
 function jdCapStyle(size,pos){ const fs=/^\d+$/.test(String(size))?size:'28'; return 'FontName=Arial,FontSize='+fs+',Outline=1'+(pos==='top'?',Alignment=8':''); }
+async function burnSubtitleFile(file,sub,options,epoch){
+  if(epoch!==conversionEpoch)return;
+  const se=ext(sub.name),sn='sub.'+(['srt','vtt','ass'].includes(se)?se:'srt'),style=jdCapStyle(options.fsize,options.fpos);
+  const result=await runFF(file,'out.mp4',(i,out)=>['-i',i,'-vf',`subtitles=${sn}:force_style='${style}'`,'-c:v','libx264','-threads','4','-pix_fmt','yuv420p','-crf','21','-preset','veryfast','-c:a','aac','-b:a','192k','-movflags','+faststart',out],'Burning in subtitles',{name:sn,data:sub});
+  if(epoch===conversionEpoch)showResult(result,base(file.name)+'-captioned.mp4');
+}
+function reviewBurnSubtitles(file,text,options,epoch){
+  clearStatus();const out=$('#output');out.innerHTML='';freeResUrls();
+  const editor=el('textarea',{'aria-label':'Generated subtitles',value:text,spellcheck:false,style:'width:100%;min-height:240px;font:13px var(--mono)'});
+  const burn=el('button',{className:'btn',textContent:'Burn subtitles into video'}),download=el('a',{className:'btn ghost',textContent:'Save subtitles',download:base(file.name)+'.srt'});
+  let subtitleUrl;const refreshDownload=()=>{if(subtitleUrl){URL.revokeObjectURL(subtitleUrl);_resUrls=_resUrls.filter(u=>u!==subtitleUrl);}subtitleUrl=URL.createObjectURL(new Blob([editor.value],{type:'text/plain'}));_resUrls.push(subtitleUrl);download.href=subtitleUrl;};editor.oninput=refreshDownload;refreshDownload();
+  const box=el('div',{className:'result'},[el('h3',{textContent:'Review subtitles'}),el('p',{className:'note',textContent:'Check the words and timestamps. These subtitles become a permanent part of the video.'}),editor,el('div',{className:'actions'},[burn,download])]);out.append(box);
+  burn.onclick=async()=>{if(epoch!==conversionEpoch)return;if(!editor.value.trim())return showGuide({msg:'The subtitle file is empty. Add subtitles before burning them in.'});burn.disabled=true;editor.disabled=true;
+    try{await burnSubtitleFile(file,new File([editor.value],base(file.name)+'.srt',{type:'text/plain'}),options,epoch);}catch(e){if(epoch===conversionEpoch)fail(e);}finally{burn.disabled=false;editor.disabled=false;}};
+  out.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 async function pdfSignFill(file){
   openStage();
   const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',CATS.pdf.color); $('#output').innerHTML=''; clearStatus();

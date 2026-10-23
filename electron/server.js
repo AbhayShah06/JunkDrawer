@@ -10,6 +10,7 @@ const { spawn, spawnSync } = require('child_process');
 const https = require('https');
 const { integrationCatalog } = require('./integrations');
 const {createModelPacks}=require('./model-packs');
+const {createModelDownloads}=require('./model-downloads');
 const {createJobQueue}=require('./job-queue');
 const compressionService = require('./compression-service');
 const mediaService = require('./media-service');
@@ -419,62 +420,17 @@ function modelReady(modelsDir, name) {
     return fs.statSync(modelPath(modelsDir, name)).size === m.size;
   } catch { return false; }
 }
-function fetchWithRedirects(url, depth, cb) {
-  if (depth > 5) return cb(new Error('too many redirects'));
-  https.get(url, r => {
-    if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location) { r.resume(); return fetchWithRedirects(r.headers.location, depth + 1, cb); }
-    if (r.statusCode !== 200) { r.resume(); return cb(new Error('http ' + r.statusCode)); }
-    cb(null, r);
-  }).on('error', cb);
-}
-function handleFetchModel(req, res, modelsDir) {
-  let chunks = [];
-  req.on('data', c => { chunks.push(c); if (Buffer.concat(chunks).length > 4096) req.destroy(); });
-  req.on('end', () => {
-    let j; try { j = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return sendJSON(res, { error: 'bad body' }, 400); }
-    const name = j.name;
-    if (!Object.hasOwn(MODELS, name)) return sendJSON(res, { error: 'unknown-model' }, 400);
-    const m = MODELS[name];
-    if (m.retired) return sendJSON(res, { error: 'retired-feature' }, 410);
-    if (modelReady(modelsDir, name)) return sendJSON(res, { ok: true, ready: true });
-    try { fs.mkdirSync(modelsDir, { recursive: true }); } catch {}
-    const dest = modelPath(modelsDir, name), part = dest + '.part';
-    fetchWithRedirects(m.url, 0, (err, r) => {
-      if (err) return sendJSON(res, { error: 'download-failed', detail: String(err.message || err) }, 502);
-      const ws = fs.createWriteStream(part);
-      let got = 0; const total = +r.headers['content-length'] || m.size;
-      r.on('data', c => { got += c.length; ffProgress.set('model-' + name, Math.min(0.999, got / total)); });
-      r.pipe(ws);
-      ws.on('finish', () => {
-        ffProgress.delete('model-' + name);
-        let ok = false; try { ok = fs.statSync(part).size === m.size; } catch {}
-        if (!ok) { try { fs.rmSync(part); } catch {} return sendJSON(res, { error: 'download-corrupt' }, 502); }
-        if (m.archive) { // .tar.bz2 bundle — extract into modelsDir with the OS tar (bsdtar)
-          const x = spawn(bsdtar(), ['-xjf', part, '-C', modelsDir]);
-          x.on('error', () => { try { fs.rmSync(part); } catch {} sendJSON(res, { error: 'extract-failed' }, 500); });
-          x.on('close', code => {
-            try { fs.rmSync(part); } catch {}
-            if (code !== 0 || !modelReady(modelsDir, name)) return sendJSON(res, { error: 'extract-failed' }, 500);
-            sendJSON(res, { ok: true });
-          });
-          return;
-        }
-        try { fs.renameSync(part, dest); } catch { return sendJSON(res, { error: 'write-failed' }, 500); }
-        sendJSON(res, { ok: true });
-      });
-      ws.on('error', () => { ffProgress.delete('model-' + name); try { fs.rmSync(part); } catch {} sendJSON(res, { error: 'write-failed' }, 500); });
-      r.on('error', () => { ffProgress.delete('model-' + name); try { ws.destroy(); fs.rmSync(part); } catch {} try { sendJSON(res, { error: 'download-failed' }, 502); } catch {} });
-    });
+function handleFetchModel(req,res,downloads) {
+  let body='';req.on('error',()=>{});req.on('data',c=>{body+=c;if(body.length>4096)req.destroy();});
+  req.on('end',async()=>{let name;try{name=JSON.parse(body).name;}catch{return sendJSON(res,{error:'bad body'},400);}
+    if(!Object.hasOwn(MODELS,name))return sendJSON(res,{error:'unknown-model'},400);
+    if(MODELS[name].retired)return sendJSON(res,{error:'retired-feature'},410);
+    try{await downloads.download(name);if(!res.destroyed)sendJSON(res,{ok:true,ready:true});}catch(e){if(!res.destroyed)sendJSON(res,{error:'download-failed',detail:e.message},502);}
   });
 }
-function handleModels(res, modelsDir) { // list installed/downloadable models for the "Manage storage" panel
-  const out = Object.keys(MODELS).map(name => ({
-    name, ready: modelReady(modelsDir, name),
-    sizeMB: Math.round(MODELS[name].size / 1e6),
-  }));  // note: no absolute path returned — it leaks the OS username to any local reader
-  return sendJSON(res, { models: out });
-}
-function handleDeleteModel(req, res, modelsDir) { // remove a model file (+ .part, + extracted dir) to reclaim disk
+function handleModels(res,downloads){return sendJSON(res,{models:downloads.list()});}
+function handleCancelModel(req,res,downloads){let body='';req.on('error',()=>{});req.on('data',c=>{body+=c;if(body.length>4096)req.destroy();});req.on('end',async()=>{try{const {name}=JSON.parse(body);await downloads.cancel(name);sendJSON(res,{ok:true});}catch(e){sendJSON(res,{error:e.message},400);}});}
+function handleDeleteModel(req, res, modelsDir, downloads) { // remove a model file (+ .part, + extracted dir) to reclaim disk
   let chunks = [];
   req.on('error', () => {});
   req.on('data', c => { chunks.push(c); if (Buffer.concat(chunks).length > 4096) req.destroy(); });
@@ -482,6 +438,7 @@ function handleDeleteModel(req, res, modelsDir) { // remove a model file (+ .par
     let j; try { j = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return sendJSON(res, { error: 'bad body' }, 400); }
     const name = j.name;
     if (!Object.hasOwn(MODELS, name)) return sendJSON(res, { error: 'unknown-model' }, 400);
+    if(downloads.isDownloading(name))return sendJSON(res,{error:'download-active',detail:'Cancel the download before removing it.'},409);
     const m = MODELS[name];
     const dest = modelPath(modelsDir, name);
     try { fs.rmSync(dest + '.part', { force: true }); } catch {}
@@ -528,7 +485,7 @@ function handleTool(req, res, binDir, modelsDir) {
     // For subtitles, cap segment length and split on word boundaries so cues stay short and
     // don't merge across pauses/speaker turns (plain text wants whole paragraphs, so skip there).
     const seg = fmt === 'txt' ? [] : ['-ml', '60', '-sow'];
-    plan = [{ bin, args: ['-m', modelPath(modelsDir, modelFile), '-f', inName, '-o' + fmt, '-of', 'out', ...seg, '--print-progress'],
+    plan = [{ bin, args: ['-m', modelPath(modelsDir, modelFile), '-f', inName, '-o' + fmt, '-of', 'out', '-t', '4', '-ng', ...(opts.language==='auto'?['-l','auto']:[]), ...seg, '--print-progress'],
       prog: s => { const m = /progress\s*=\s*(\d+)%/.exec(s); return m ? +m[1] / 100 : null; } }];
   } else if (tool === 'raw') {
     const dcraw = toolBin(binDir, 'libraw', 'dcraw_emu'), ffmpeg = findBin('ffmpeg', binDir);
@@ -665,7 +622,8 @@ function handleImportCard(req, res) {
 function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegration) {
   // absolute: tool subprocesses run from throwaway temp cwds, so a relative path would break
   modelsDir = path.resolve(modelsDir || path.join(os.homedir(), '.junkdrawer', 'models'));
-  const modelPacks=createModelPacks(modelsDir);
+  const modelPacks=createModelPacks(modelsDir,{cleanupStale:true});
+  const modelDownloads=createModelDownloads(modelsDir,{catalog:MODELS,onProgress:(name,p)=>p===null?ffProgress.delete('model-'+name):ffProgress.set('model-'+name,p)});
   const nativeJobs=createJobQueue();
   return new Promise(resolve => {
     let expectedHost = null;  // set once the ephemeral port is known (below)
@@ -738,10 +696,11 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
       if (url === '/api/video-compress' && req.method === 'POST') return nativeJobs.enqueue(req,res,()=>handleVideoCompress(req,res,binDir));
       if (url === '/api/ffmpeg-extra' && req.method === 'POST') return handleFFmpegExtra(req, res);
       if (url === '/api/tool' && req.method === 'POST') return nativeJobs.enqueue(req,res,()=>handleTool(req,res,binDir,modelsDir));
-      if (url === '/api/fetch-model' && req.method === 'POST') return handleFetchModel(req, res, modelsDir);
+      if (url === '/api/fetch-model' && req.method === 'POST') return handleFetchModel(req, res, modelDownloads);
       if(url.startsWith('/api/model-pack')||url==='/api/download-model-pack'||url==='/api/delete-model-pack'){void modelPacks.route(req,res).then(handled=>{if(!handled)sendJSON(res,{error:'not-found'},404);}).catch(()=>{if(!res.destroyed&&!res.writableEnded)sendJSON(res,{error:'model-file-unavailable'},404);});return;}
-      if (url === '/api/models') return handleModels(res, modelsDir);
-      if (url === '/api/delete-model' && req.method === 'POST') return handleDeleteModel(req, res, modelsDir);
+      if (url === '/api/models') return handleModels(res, modelDownloads);
+      if(url === '/api/cancel-model-download' && req.method==='POST')return handleCancelModel(req,res,modelDownloads);
+      if (url === '/api/delete-model' && req.method === 'POST') return handleDeleteModel(req, res, modelsDir, modelDownloads);
       if (url === '/api/cards') {
         listCards().then(cards => sendJSON(res, { cards })).catch(() => sendJSON(res, { cards: [] }));
         return;

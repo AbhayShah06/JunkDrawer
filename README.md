@@ -12,6 +12,10 @@ The included OCR/background tools remain available offline. Optional downloads a
 
 The Windows build bundles speech.cpp 0.8.11. There is no Python, cloud inference service, or required GPU. Native media/transcription jobs are queued; image inference uses workers that are terminated after each job. Model downloads can be removed under Manage storage.
 
+Burn In Subtitles accepts an SRT, VTT or ASS file, or generates timed subtitles from the video using Whisper. Generated captions can be edited and saved before burning them in. Generation defaults to the 148 MB base model on four CPU threads; the 488 MB small model is also available. Speech language is detected automatically.
+
+Model downloads continue when you switch tools, with progress shown above the workspace. Whisper downloads can be cancelled. Failed or cancelled transfers remove their unfinished files; after an app exit or crash, known unfinished files are removed on the next launch. Downloads restart from the beginning rather than resume. Manage storage lists models by download size and states what each is used for. Retired models appear only when installed, so they can be removed.
+
 ## Quick access
 
 Click the tray icon or press **Ctrl+Alt+J** (Mac: **Command+Option+J**) for a compact file panel. The tray also opens the full workspace. Closing the window keeps quick access ready; choose Quit from the tray menu to exit. **Start with Windows** is optional under Settings & quick access. It starts disabled, remains listed in Windows Settings → Apps → Startup, and honors changes made there.
@@ -23,7 +27,7 @@ The Send to shortcut is created when the packaged app first runs. Use **Settings
 ## What's inside
 
 - **Media conversion:** individual files or a sequential batch, with a save button and status for each file. MTS/M2TS/AVCHD camera footage is recognized as video.
-- **Video:** convert, compress, trim, mute, extract audio, make a GIF, or burn existing subtitles.
+- **Video:** convert, compress, trim, mute, extract audio, make a GIF, or generate/review/burn subtitles.
 - **Audio:** convert, trim, reduce bitrate, and transcribe speech locally.
 - **Images:** convert, resize, rotate, compress, remove backgrounds, OCR, develop camera RAW, inspect/remove metadata, fix dates, rename photos, and export PDFs.
 - **PDF:** sign/fill, merge, split, compress, rotate, number, watermark, delete pages, and export page images.
