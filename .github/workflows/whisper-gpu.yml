@@ -1,0 +1,37 @@
+name: Build Whisper GPU helper
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  vulkan:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vulkan development SDK
+        shell: pwsh
+        run: |
+          $version='1.4.350.0'
+          curl.exe --fail --location --retry 3 -o "$env:RUNNER_TEMP\vulkan.exe" "https://sdk.lunarg.com/sdk/download/$version/windows/vulkansdk-windows-X64-$version.exe"
+          if($LASTEXITCODE -ne 0){throw 'SDK download failed'}
+          $expected='855b27ba05d2d8119c5114c5d4ff870ca38f2c632b11e1bb9923b9b7e6ecfe7b'
+          if((Get-FileHash "$env:RUNNER_TEMP\vulkan.exe" -Algorithm SHA256).Hash.ToLower() -ne $expected){throw 'SDK checksum mismatch'}
+          $process=Start-Process -FilePath "$env:RUNNER_TEMP\vulkan.exe" -ArgumentList '--root C:\VulkanSDK\1.4.350.0 --accept-licenses --default-answer --confirm-command install' -WindowStyle Hidden -Wait -PassThru
+          if($process.ExitCode -ne 0){throw 'SDK installation failed'}
+          Add-Content $env:GITHUB_ENV 'VULKAN_SDK=C:\VulkanSDK\1.4.350.0'
+      - name: Build pinned whisper.cpp with portable CPU and Vulkan backends
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch b5130 https://github.com/ggml-org/whisper.cpp.git "$env:RUNNER_TEMP\whisper"
+          cmake -S "$env:RUNNER_TEMP\whisper" -B "$env:RUNNER_TEMP\whisper-build" -A x64 -DGGML_VULKAN=ON -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DWHISPER_BUILD_TESTS=OFF -DWHISPER_SDL2=OFF
+          if($LASTEXITCODE -ne 0){throw 'Configuration failed'}
+          cmake --build "$env:RUNNER_TEMP\whisper-build" --config Release --parallel 4 --target whisper-cli
+          if($LASTEXITCODE -ne 0){throw 'Compilation failed'}
+          New-Item -ItemType Directory -Path gpu-helper
+          Get-ChildItem "$env:RUNNER_TEMP\whisper-build\bin\Release" | Where-Object {$_.Extension -eq '.dll' -or $_.Name -eq 'whisper-cli.exe'} | Copy-Item -Destination gpu-helper
+          Copy-Item "$env:RUNNER_TEMP\whisper\LICENSE" gpu-helper
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-gpu-windows-x64
+          path: gpu-helper
