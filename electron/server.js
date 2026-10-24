@@ -12,6 +12,9 @@ const { integrationCatalog } = require('./integrations');
 const {createModelPacks}=require('./model-packs');
 const {createModelDownloads}=require('./model-downloads');
 const {createJobQueue}=require('./job-queue');
+const {createDurableJobs}=require('./durable-jobs');
+const {createTranscriptionEngine}=require('./transcription-engine');
+const {createBatchApi}=require('./batch-api');
 const compressionService = require('./compression-service');
 const mediaService = require('./media-service');
 let PKG = {}; try { PKG = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')); } catch {}
@@ -625,6 +628,9 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
   const modelPacks=createModelPacks(modelsDir,{cleanupStale:true});
   const modelDownloads=createModelDownloads(modelsDir,{catalog:MODELS,onProgress:(name,p)=>p===null?ffProgress.delete('model-'+name):ffProgress.set('model-'+name,p)});
   const nativeJobs=createJobQueue();
+  const batchEngine=createTranscriptionEngine({ffmpeg:findBin('ffmpeg',binDir),whisper:toolBin(binDir,'whisper','whisper-cli'),gpuWhisper:toolBin(binDir,'whisper-gpu','whisper-cli'),speech:toolBin(binDir,'speech','speech'),modelsDir});
+  const batchJobs=createDurableJobs(path.join(path.dirname(modelsDir),'batch-jobs'),batchEngine.runner);
+  const batchApi=createBatchApi(batchJobs,batchEngine.hardware);
   return new Promise(resolve => {
     let expectedHost = null;  // set once the ephemeral port is known (below)
     const rootResolved = path.resolve(appRoot);
@@ -643,6 +649,7 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
       try { url = decodeURIComponent(req.url.split('?')[0]); }
       catch { res.statusCode = 400; return res.end('bad request'); }
       if (url.startsWith('/api/') && !localOnly(req, expectedHost)) { res.statusCode = 403; return res.end('forbidden'); }
+      if(batchApi(req,res))return;
       if (url === '/api/check')
         return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir),
           whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), qwen:!!toolBin(binDir,'speech','speech'), whisperModel: modelReady(modelsDir, 'ggml-base.bin'),
@@ -723,7 +730,8 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
     server.listen(0, '127.0.0.1', () => {
       const port = server.address().port;
       expectedHost = '127.0.0.1:' + port;
-      resolve({ port, server });
+      server.once('close',()=>batchJobs.close());
+      resolve({ port, server, batchJobs });
     });
   });
 }

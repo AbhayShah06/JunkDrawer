@@ -4,6 +4,10 @@ Local tools for the file jobs that get in the way: convert a photo, shrink a vid
 
 Drop files, choose an action, and save the result. Your originals stay untouched. The home screen has six task entry points; specialized jobs are under More tools. The first choices are smaller files, JPG, PDF merge, MP4, MP3, and image resizing. Search still understands older formats such as MTS.
 
+Media conversions and speech transcription support saved batches, percentage progress, pause/retry, and an estimated time remaining once enough work has run. Sleep pauses jobs; wake resumes work interrupted by sleep. After an app restart, use Resume. Files become recoverable after copying into the queue; working copies stay local until you remove the job.
+
+Whisper recordings use checkpointed five-minute blocks with overlapping context. Optional parallel processing uses up to two CPU workers when memory allows. Auto uses a detected compatible GPU engine and falls back to CPU if inference fails. Windows GPU processing uses Vulkan (Intel/AMD/NVIDIA with a compatible driver); macOS can use Metal. NPU transcription is not enabled in this build. Performance varies by device and model.
+
 ## Compression and local models
 
 Video compression offers H.264 MP4, HEVC, and AV1. CPU encoding is the default. The optional faster mode tests hardware encoding and falls back to CPU. Size limits use a two-pass H.264 encode with a final byte-size check. Larger results are rejected. HDR input requires HEVC or AV1; it is not silently converted to 8-bit H.264.

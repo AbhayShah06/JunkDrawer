@@ -234,6 +234,7 @@
   .pdfedit-sigpad canvas{background:#fff; border:1px solid var(--line); width:100%; max-width:460px; height:160px; touch-action:none; cursor:crosshair; display:block}
   .pdfedit-tabs{display:flex; gap:6px; margin-bottom:8px}
   .pdfedit-tabs .on{outline:2px solid #2b6fd6}
+.batch-panel{margin:20px 0;padding:16px;border:1px solid var(--sb);border-radius:8px}.batch-panel summary{cursor:pointer;font-weight:700}.batch-panel>p{font-size:13px;color:var(--ink2)}.batch-job{padding:12px 0;border-top:1px solid var(--sb)}.batch-job strong{display:block;overflow-wrap:anywhere}.batch-job progress{display:block;width:100%;height:12px;margin:8px 0;accent-color:var(--aud)}
 </style>
 <link rel="stylesheet" href="/app.css">
 </head>
@@ -342,6 +343,7 @@
 
 <script src="/electron/compression.js"></script>
 <script src="/electron/media.js"></script>
+<script src="/electron/batch-panel.js"></script>
 <script src="/electron/update-banner.js"></script>
 <script type="module">
 import { PDFDocument, degrees, rgb, StandardFonts } from "./vendor/pdf-lib.mjs";
@@ -354,6 +356,7 @@ const $ = s => document.querySelector(s);
 const el = (t, p={}, kids=[]) => { const e=document.createElement(t);
   for(const k in p){ if(k==='style') e.style.cssText=p[k]; else if(k in e) e[k]=p[k]; else e.setAttribute(k,p[k]); }
   for(const c of [].concat(kids)) if(c!=null) e.append(c); return e; };
+JDBatch.attach(document.querySelector('main'));
 const fmt = b => b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(2)+' MB';
 const ext = n => (n.split('.').pop()||'').toLowerCase();
 // Escape untrusted text (filenames, typed input, error detail) before it touches innerHTML.
@@ -620,8 +623,8 @@ function jsonToCSV(text){ const a=JSON.parse(text); if(!Array.isArray(a))throw n
   return [keys.map(esc).join(','),...a.map(o=>keys.map(k=>esc(o[k])).join(','))].join('\n'); }
 
 /* ---------------- progress + results ---------------- */
-function progress(label){ $('#status').innerHTML=`<div><span class="spin"></span>${label} …</div><div class="prog"><i id="bar"></i></div>`;
-  return p=>{ const b=$('#bar'); if(b)b.style.width=Math.round((p||0)*100)+'%'; }; }
+function progress(label){ const start=performance.now(); $('#status').innerHTML=`<div><span class="spin"></span>${label} …</div><div class="prog"><i id="bar"></i></div><span id="progressText" role="status">Preparing…</span>`;
+  return p=>{ const value=Math.max(0,Math.min(1,p||0)),b=$('#bar'),text=$('#progressText'); if(b)b.style.width=Math.round(value*100)+'%'; if(text){const elapsed=(performance.now()-start)/1000;const eta=elapsed>8&&value>.08&&value<1?Math.ceil(elapsed/value*(1-value)/60):null;text.textContent=Math.round(value*100)+'%'+(eta?' · About '+eta+' min left':'');} }; }
 const clearStatus=()=>{ $('#status').innerHTML=''; };
 /* ---- gentle guidance instead of scary red errors ----
    fail() is the single sink for thrown errors; friendly() maps a raw error (+ the current
@@ -988,21 +991,27 @@ add({cat:'video',kinds:['video'],nm:'Mute a Video',ds:'Take out the sound',kw:'m
 /* ---- AUDIO ---- */
 
 
-add({cat:'audio',kinds:['audio','video'],rec:1,nm:'Transcribe to Text or Subtitles',ds:'Turn speech into text or an SRT caption file',kw:'transcribe transcription speech to text subtitles captions srt vtt whisper voice memo interview lecture auto',
+add({cat:'audio',kinds:['audio','video'],rec:1,multi:true,nm:'Transcribe to Text or Subtitles',ds:'Turn speech into text or an SRT caption file',kw:'transcribe transcription speech to text subtitles captions srt vtt whisper voice memo interview lecture auto',
   more:'Runs speech recognition locally. Whisper supports subtitles; Qwen3 outputs text.',
-  opts:()=>{ const fmt=el('select'); [['srt','Subtitles (SRT)'],['txt','Plain text'],['vtt','Web captions (VTT)']].forEach(([v,l])=>fmt.append(el('option',{value:v,textContent:l})));
-    const q=el('select'); [['base','Whisper base (~148 MB)'],['small','Whisper small (~488 MB)'],['medium','Whisper medium (~1.5 GB)'],['turbo','Whisper turbo (~1.6 GB)']].forEach(([v,l])=>q.append(el('option',{value:v,textContent:l}))); q.value='turbo';const qwenOption=el('option',{value:'qwen',textContent:'Qwen3-ASR 0.6B (843 MB download, text only)',disabled:true});q.append(qwenOption);nativeInfo().then(info=>qwenOption.disabled=!info.qwen);q.onchange=()=>{fmt.disabled=q.value==='qwen';if(q.value==='qwen')fmt.value='txt';};
-    return {node:el('div',{},[el('label',{},['Output ',fmt]),el('label',{style:'margin-left:12px'},['Model ',q])]),get:()=>({fmt:fmt.value,model:q.value})}; },
-  run:async (f,o)=>{const transcriptionEpoch=conversionEpoch;if(o.model==='qwen'){const epoch=conversionEpoch;await ensureModelPack('qwen3-asr');if(epoch!==conversionEpoch)return;if(transcriptionEpoch!==conversionEpoch)return;const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Preparing audio');const text=await runTool(new File([wav],'input.wav',{type:'audio/wav'}),'qwen-asr',{fmt:'txt'},'out.txt','Transcribing');showText((await text.text()).trim(),base(f.name)+'.txt');return;} const info=await nativeInfo(); if(!info.whisper) return showGuide(needDesktop('Transcribing'));
-    const MODELS={base:{file:'ggml-base.bin',flag:'whisperModel',label:'Whisper base',size:'~140 MB'},small:{file:'ggml-small.bin',flag:'whisperSmall',label:'Whisper small',size:'~465 MB'},medium:{file:'ggml-medium.bin',flag:'whisperMedium',label:'Whisper medium',size:'~1.5 GB'},turbo:{file:'ggml-large-v3-turbo.bin',flag:'whisperTurbo',label:'Whisper turbo',size:'~1.5 GB'}};
-    const model=['base','small','medium','turbo'].includes(o.model)?o.model:'turbo';
-    const m=MODELS[model];
-    if(!info[m.flag]) await ensureModel(m.file,m.flag,`Downloading ${m.label} (${m.size})`);
-    if(transcriptionEpoch!==conversionEpoch)return;const wav=await runFF(f,'out.wav',(i,out)=>['-i',i,'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',out],'Getting the audio ready');
-    const fmt=['srt','txt','vtt'].includes(o.fmt)?o.fmt:'srt';
-    const b=await runTool(new File([wav],'in.wav',{type:'audio/wav'}),'whisper',{fmt,model},'out.'+fmt,'Listening and writing (a long recording takes a while)');
-    if(fmt==='txt') showText((await b.text()).trim(),base(f.name)+'.txt');
-    else showResult(b,base(f.name)+'.'+fmt,{note:fmt==='srt'?'Use this file with Burn In Subtitles.':''}); }});
+  opts:()=>{
+    const fmt=el('select',{'aria-label':'Transcript format'});[['txt','Plain text'],['srt','Subtitles (SRT)'],['vtt','Web captions (VTT)']].forEach(([value,textContent])=>fmt.append(el('option',{value,textContent})));
+    const model=el('select',{'aria-label':'Speech model'});[['base','Whisper base · fast'],['small','Whisper small'],['medium','Whisper medium'],['turbo','Whisper turbo · recommended'],['qwen','Qwen3-ASR · text only']].forEach(([value,textContent])=>model.append(el('option',{value,textContent})));model.value='turbo';model.options[4].disabled=true;nativeInfo().then(info=>model.options[4].disabled=!info.qwen);
+    const device=el('select',{'aria-label':'Transcription processor'});[['auto','Auto · compatible GPU, otherwise CPU'],['cpu','CPU · 4 threads'],['gpu','GPU · checking compatibility…']].forEach(([value,textContent])=>device.append(el('option',{value,textContent})));device.options[2].disabled=true;
+    const hardwareNote=el('p',{className:'note',textContent:'Checking the local engine…'});
+    JDBatch.hardware().then(hw=>{device.options[2].disabled=!hw.gpu;device.options[2].textContent=hw.gpu?'GPU · detected':'GPU · not available';hardwareNote.textContent=(hw.gpu?(hw.gpuName||'Compatible GPU engine detected.')+' Auto falls back to CPU if this model cannot run.':'CPU engine ready. No compatible GPU engine detected.')+' '+hw.npuNote;}).catch(()=>hardwareNote.textContent='Processor detection unavailable. CPU remains available.');
+    model.onchange=()=>{const q=model.value==='qwen';fmt.disabled=device.disabled=q;if(q){fmt.value='txt';device.value='cpu';}};
+    const parallel=el('input',{type:'checkbox','aria-label':'Process audio blocks in parallel'});
+    return {node:el('div',{},[el('label',{},['Output ',fmt]),el('label',{},['Model ',model]),el('label',{},['Processor ',device]),el('label',{},[parallel,' Process blocks in parallel (more memory and CPU)']),el('p',{className:'note',textContent:'Recordings use saved 5-minute blocks with overlapping context. Parallel processing uses up to two CPU workers when memory permits; GPU jobs use one worker.'}),hardwareNote]),get:()=>({fmt:fmt.value,model:model.value,device:device.value,parallel:parallel.checked})};
+  },
+  run:async (selected,o)=>{
+    const files=Array.isArray(selected)?selected:[selected],epoch=conversionEpoch;
+    const info=await nativeInfo();if(o.model==='qwen'){await ensureModelPack('qwen3-asr');}else{
+      if(!info.whisper)return showGuide(needDesktop('Transcribing'));
+      const modelFiles={base:['ggml-base.bin','whisperModel'],small:['ggml-small.bin','whisperSmall'],medium:['ggml-medium.bin','whisperMedium'],turbo:['ggml-large-v3-turbo.bin','whisperTurbo']};
+      const [file,flag]=modelFiles[o.model]||modelFiles.turbo;if(!info[flag])await ensureModel(file,flag,'Downloading speech model');
+    }if(epoch!==conversionEpoch)return;
+    await JDBatch.submit(files,'transcribe',{format:o.fmt,model:o.model,device:o.device,parallel:o.parallel});
+  }});
 
 
 
@@ -1129,7 +1138,7 @@ async function conversionPanel(files,initial,preferred){
   if(!Array.isArray(files))files=[files];
   openStage(); const epoch=conversionEpoch; const host=$('#panel');host.innerHTML='';
   host.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:files.length>1?'Convert files':'Convert file'})]));
-  const summary=el('p',{className:'ds',textContent:files.length===1?files[0].name:files.length+' files · processed one at a time'});
+  const summary=el('p',{className:'ds',textContent:files.length===1?files[0].name:files.length+' files · saved queue · one file at a time'});
   host.append(summary);
   const hint=el('p',{className:'note',textContent:'Checking the local media engine…'});host.append(hint);
   let formats=[];
@@ -1139,7 +1148,7 @@ async function conversionPanel(files,initial,preferred){
   const imageOnly=files.every(f=>kind(f)==='image');
   if(imageOnly)for(const [ext,label] of [['jpg','JPG · photos'],['png','PNG · transparency'],['webp','WebP · smaller images']])if(!formats.some(f=>f.ext===ext))formats.push({ext,kind:'image',label});
   if(!formats.length){hint.textContent='The media engine is missing. Reinstall the desktop app to restore conversion. Image, PDF, archive, and text tools remain available.';return;}
-  hint.textContent=files.some(f=>kind(f)==='other')?'Unknown files must contain readable media. Skype SILK and databases need a dedicated exporter.':'Originals stay untouched. Save the converted copies when they are ready.';
+  hint.textContent=files.some(f=>kind(f)==='other')?'Unknown files must contain readable media. Skype SILK and databases need a dedicated exporter.':'Originals stay untouched. Jobs and converted copies are saved locally until you remove them.';
   const group=el('select',{'aria-label':'Output type'});
   const groups=initial?[initial]:imageOnly?['image']:['video','audio','image'];
   groups.forEach(k=>group.append(el('option',{value:k,textContent:({video:'Video',audio:'Audio',image:'Image'})[k]})));
@@ -1159,6 +1168,12 @@ async function conversionPanel(files,initial,preferred){
   host.append(el('div',{className:'runrow'},[go,cancel]));
   go.onclick=async()=>{
     if(!target.value)return;
+    if(await nativeFFAvailable()){
+      go.disabled=true;
+      try{await JDBatch.submit(files,'convert',{format:target.value});summary.textContent=files.length+' files added to the saved queue below.';queue.hidden=true;cancel.hidden=true;go.textContent='Choose more files';go.onclick=()=>pickFiles(true,selected=>conversionPanel(selected,initial,preferred));}
+      catch(e){summary.textContent=e.message;}
+      finally{go.disabled=false;}return;
+    }
     const to=target.value;go.disabled=true;cancel.disabled=false;group.disabled=target.disabled=true;stopped=false;let completed=0,failed=0;
     for(let i=0;i<files.length;i++){
       if(stopped||epoch!==conversionEpoch){rows.slice(i).forEach(r=>r.status.textContent='Cancelled');break;}
@@ -1528,6 +1543,7 @@ function multiReceipt(fs){ state.files=fs; state.file=null; resetStage(); $('#he
   card.append(el('div',{className:'meta',innerHTML:fs.map(f=>`<div>${esc(f.name)} <span class="k">(${fmt(f.size)})</span></div>`).join('')}));
   const rr=el('div',{className:'recos'});
   if(fs.every(f=>['video','audio','image','other'].includes(kind(f))))rr.append(reco('Convert files',()=>conversionPanel(fs)));
+  if(fs.every(f=>['audio','video'].includes(kind(f))))rr.append(reco('Transcribe recordings',()=>renderRun(T.find(t=>t.nm==='Transcribe to Text or Subtitles'),fs)));
   const allConv=fs.every(f=>kind(f)==='image'||kind(f)==='raw');
   if(allPdf) rr.append(reco('Merge PDFs',()=>{ const t=T.find(x=>x.nm==='Combine PDFs'); renderRun(t,fs); $('#panel .btn').click(); }));
   if(allConv) rr.append(reco('Batch convert…',()=>{ const t=T.find(x=>x.nm==='Batch Convert Images'); renderRun(t,fs); }));

@@ -34,16 +34,16 @@ try{
  for(let i=0;i<100;i++){if(await evaluate(`!!document.querySelector('select[aria-label="Output format"] option[value="mp4"]')`))break;await wait(100);}
  check(await evaluate(`!!document.querySelector('select[aria-label="Output format"] option[value="mp4"]')`),'MP4 available');
  await snap('conversion');await evaluate(`[...document.querySelectorAll('#panel button')].find(b=>b.textContent==='Convert file').click()`);
- for(let i=0;i<50;i++){if(await evaluate(`!!document.querySelector('.conversion-queue a[download]')`))break;await wait(100);}
- check(await evaluate(`!!document.querySelector('.conversion-queue a[download]')`),'MTS conversion produced a downloadable file');
+ for(let i=0;i<100;i++){if(await evaluate(`!!document.querySelector('.batch-job a[download]')`))break;await wait(100);}
+ check(await evaluate(`!!document.querySelector('.batch-job a[download]')`),'MTS conversion produced a durable downloadable file');
  await snap('converted');
  // Mixed success/failure batch must keep the successful download and a visible error.
  await evaluate(`document.querySelector('#resetBtn').click()`);
  await evaluate(`(()=>{const d=new DataTransfer();d.items.add(new File([Uint8Array.from(atob('${b64}'),c=>c.charCodeAt(0))],'good.mts'));d.items.add(new File(['not media'],'broken.dat'));document.dispatchEvent(new DragEvent('drop',{dataTransfer:d,bubbles:true,cancelable:true}));})()`);
  await evaluate(`[...document.querySelectorAll('#receipt button')].find(b=>b.textContent==='Convert files').click()`);await wait(250);
  await evaluate(`[...document.querySelectorAll('#panel button')].find(b=>b.textContent==='Convert 2 files').click()`);
- for(let i=0;i<50;i++){if(await evaluate(`document.querySelector('#panel .ds').textContent.includes('1 failed')`))break;await wait(100);}
- check(await evaluate(`document.querySelectorAll('.conversion-queue a[download]').length===1 && document.querySelector('#panel .ds').textContent.includes('1 failed')`),'partial failures retain completed files');
+ for(let i=0;i<100;i++){if(await evaluate(`document.querySelector('.batch-panel').textContent.includes('Could not finish')`))break;await wait(100);}
+ check(await evaluate(`document.querySelectorAll('.batch-job a[download]').length===2 && document.querySelector('.batch-panel').textContent.includes('Could not finish')`),'partial failures retain completed files');
  await snap('batch');
 
  // Exercise retained file tools with generated, non-private fixtures.

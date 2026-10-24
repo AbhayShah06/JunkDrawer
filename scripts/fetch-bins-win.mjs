@@ -24,6 +24,7 @@ import os from 'node:os';
 import https from 'node:https';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {fetchWhisperGpu} from './fetch-whisper-gpu.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = path.join(__dirname, '..', 'resources', 'bin', 'win');
@@ -146,6 +147,7 @@ async function main() {
         fs.copyFileSync(path.join(rel, f), path.join(OUT_DIR, 'whisper', f));
     fs.rmSync(t, { recursive: true, force: true });
     console.log('  -> resources/bin/win/whisper/');
+    try{await fetchWhisperGpu();}catch(e){console.warn('Optional GPU backend unavailable; CPU transcription remains available. '+e.message);}
   }
 
   await zipGrab('LibRaw 0.22.1 (win64)', 'https://www.libraw.org/data/LibRaw-0.22.1-Win64.zip', [

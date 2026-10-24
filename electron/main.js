@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Menu, dialog, Tray, globalShortcut, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog, Tray, globalShortcut, nativeImage, screen, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { startServer } = require('./server');
@@ -12,6 +12,7 @@ let quickAccess=null;
 const desktopIntegration=createDesktopIntegration({app,shell,quickAccess:()=>quickAccess});
 
 let win, quickWin, srv, appOrigin, quitting=false, updateTimer;
+let batchJobs;
 
 // Resolve the optional updater only after the local window is ready.
 const updater = createUpdater(() => require('electron-updater').autoUpdater, error => {
@@ -92,6 +93,9 @@ async function create(){
   process.env.JD_DEV=app.isPackaged?'':'1';updater.init(app.isPackaged&&process.platform==='win32');
   const started=await startServer(appRoot(),binDir(),updater,fileInbox,path.join(app.getPath('userData'),'models'),desktopIntegration);
   srv=started.server;appOrigin='http://127.0.0.1:'+started.port;
+  batchJobs=started.batchJobs;
+  powerMonitor.on('suspend',()=>batchJobs.suspend());
+  powerMonitor.on('resume',()=>batchJobs.resume());
   quickAccess=createQuickAccess({app,Tray,Menu,globalShortcut,nativeImage,iconPath:path.join(appRoot(),'branding','logo.png'),showQuick,showMain,quit:()=>app.quit()});quickAccess.init();
   if(selectedPaths(process.argv).length)showQuick();else if(!process.argv.includes('--background'))showMain();
   if(updater.enabled){void updater.check();updateTimer=setInterval(()=>updater.check(),15*60*1000);}
@@ -102,6 +106,6 @@ if(!app.requestSingleInstanceLock())app.quit();else{
   app.whenReady().then(create).catch(error=>{try{fs.appendFileSync(path.join(app.getPath('userData'),'startup-errors.log'),String(error?.stack||error)+'\n');}catch{}dialog.showErrorBox('Junk Drawer could not start',String(error?.message||error));app.quit();});
   app.on('activate',showMain);
 }
-app.on('before-quit',()=>{quitting=true;quickAccess?.dispose();if(updateTimer)clearInterval(updateTimer);});
+app.on('before-quit',()=>{quitting=true;batchJobs?.close();quickAccess?.dispose();if(updateTimer)clearInterval(updateTimer);});
 app.on('window-all-closed',()=>{if(!quickAccess?.status().tray&&process.platform!=='darwin')app.quit();});
 app.on('quit',()=>{try{srv?.close();}catch{}});

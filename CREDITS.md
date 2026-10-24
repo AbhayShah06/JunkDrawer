@@ -34,6 +34,8 @@ Junk Drawer stands on a lot of excellent open-source work. Every engine runs loc
 
 Built by Abhay Shah.
 
+The optional Windows Vulkan speech helper is built from whisper.cpp b5130 (MIT) using the public `whisper-gpu.yml` workflow. Its original license is bundled in `bin/whisper-gpu/LICENSE`. GPU drivers supply the Vulkan runtime; no Vulkan development SDK is installed on users' computers.
+
 ## Optional local model integrations (1.8.0)
 
 - [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR), browser SDK 0.4.2 and PP-OCRv6 small detection/recognition models: Apache-2.0. Uses [OpenCV.js](https://github.com/TechStark/opencv-js) and [ONNX Runtime](https://github.com/microsoft/onnxruntime) locally. The SDK worker is rebuilt to share the pinned ORT version with its vendored WASM assets.
