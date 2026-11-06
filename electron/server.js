@@ -651,7 +651,7 @@ function startServer(appRoot, binDir, updater, inbox, modelsDir, desktopIntegrat
       if (url.startsWith('/api/') && !localOnly(req, expectedHost)) { res.statusCode = 403; return res.end('forbidden'); }
       if(batchApi(req,res))return;
       if (url === '/api/check')
-        return sendJSON(res, { ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir),
+        return sendJSON(res, { version: PKG.version, ytdlp: have('yt-dlp', binDir), spotdl: have('spotdl', binDir), ffmpeg: have('ffmpeg', binDir),
           whisper: !!toolBin(binDir, 'whisper', 'whisper-cli'), qwen:!!toolBin(binDir,'speech','speech'), whisperModel: modelReady(modelsDir, 'ggml-base.bin'),
           whisperSmall: modelReady(modelsDir, 'ggml-small.bin'), whisperMedium: modelReady(modelsDir, 'ggml-medium.bin'),
           whisperTurbo: modelReady(modelsDir, 'ggml-large-v3-turbo.bin'),

@@ -251,7 +251,7 @@
     <button data-nav="arc"><span>▣</span>Archives</button>
     <button data-nav="identify"><span>⌕</span>Identify a file</button>
   </nav>
-  <div class="sidebar-bottom"><div class="sidebar-label">QUICK ACCESS</div><button id="sidebarIntegration">Quick access <kbd>Ctrl Alt J</kbd></button><p>From Explorer, the tray, or a shortcut.</p><span class="app-version">Junk Drawer 1.8.1</span></div>
+  <div class="sidebar-bottom"><div class="sidebar-label">QUICK ACCESS</div><button id="sidebarIntegration">Quick access <kbd>Ctrl Alt J</kbd></button><p>From Explorer, the tray, or a shortcut.</p><span class="app-version">Junk Drawer</span></div>
 </aside>
 <header><div class="topbar">
   <div class="cmd">
@@ -1412,7 +1412,7 @@ $('#manageStorage').onclick=(e)=>{ e.preventDefault(); renderStorage(); };
 
 /* link-download panel (YouTube / Spotify, via the local server) */
 let backend={ ok:{ytdlp:false,spotdl:false,ffmpeg:false}, up:false };
-fetch('/api/check').then(r=>r.ok?r.json():null).then(j=>{ if(j){ backend.ok=j; backend.up=true; } }).catch(()=>{});
+fetch('/api/check').then(r=>r.ok?r.json():null).then(j=>{ if(j){ backend.ok=j; backend.up=true; if(/^\d+\.\d+\.\d+(?:[-+][\w.-]+)?$/.test(j.version||''))$('.app-version').textContent='Junk Drawer '+j.version; } }).catch(()=>{});
 
 const updateBanner=JDUpdates.createUpdateBanner({document,fetch,storage:localStorage});
 void updateBanner.check();

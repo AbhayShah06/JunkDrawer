@@ -116,6 +116,7 @@ test('rejects malformed percent encoding without crashing', async () => {
 
   const response = await fetch(origin + '/api/check');
   assert.equal(response.status, 200);
+  assert.equal((await response.json()).version, require('../package.json').version);
 });
 
 test('card polling returns a JSON array', async () => {
