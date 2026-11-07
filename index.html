@@ -664,11 +664,9 @@ function showGuide(g){ clearStatus(); $('#output').innerHTML='';
     box.append(el('div',{className:'g-act'},[b])); }
   $('#status').innerHTML=''; $('#status').append(box); }
 function fail(e){ if(e&&e.jdAborted) return; const c=state.ctx||{}; showGuide(friendly(e,c.t,c.f)); }  // a cancelled job isn't an error
-// misuse caught before running: wrong file kind (→ suggest the right tool), too-few files, or a tool's own check()
+// misuse caught before running: wrong file kind (→ suggest the right tool), or a tool's own check()
 function preCheck(t,fileOrFiles,opts){
   const multi=Array.isArray(fileOrFiles); const f=multi?fileOrFiles[0]:fileOrFiles;
-  if(t.multi && multi && fileOrFiles.length<2)
-    return {title:'Pick two or more', msg:`“${t.nm}” needs at least two files. Add another and I’ll handle them together.`};
   if(!multi && f && t.kinds && !t.kinds.includes('any')){ const fk=kind(f);
     if(!t.kinds.includes(fk)){ const s=suggestFor(t,fk);
       return {title:'Wrong kind of file', msg:`This looks like a ${KINDWORD[fk]||fk}, not something “${t.nm}” can use.`, redirect:s&&s.nm}; } }
@@ -1316,7 +1314,7 @@ function openTool(t){
   resetStage(); pushRecent(t.nm); renderQuick();
   if(t.input==='url'){ return renderUrl(t); }
   if(t.input==='text' && !t.fileToText){ return renderText(t); }
-  if(t.multi){ const use=fs=>t.custom?t.custom(fs):renderRun(t,fs); if(state.files&&state.files.every(f=>t.kinds.includes('any')||t.kinds.includes(kind(f))))return use(state.files); return pickFiles(true,use); }
+  if(t.multi){ const use=fs=>t.custom?t.custom(fs):renderRun(t,fs); const selected=state.files||(state.file?[state.file]:null); if(selected&&selected.every(f=>t.kinds.includes('any')||t.kinds.includes(kind(f))))return use(selected); return pickFiles(true,use); }
   const f=state.file;
   const ok = f && (t.kinds.includes('any') || t.kinds.includes(kind(f)));
   if(t.fileToText){ if(ok){ f.text().then(txt=>renderText(t,txt)); return; } return renderText(t); }
@@ -1333,7 +1331,7 @@ function renderRun(t,fileOrFiles){
   const p=$('#panel'); p.innerHTML=''; p.style.setProperty('--c',color);
   p.append(el('div',{className:'ph'},[el('span',{className:'nm',textContent:t.nm}),el('span',{className:'badge',textContent:CATS[t.cat].label})]));
   p.append(el('div',{className:'ds',textContent:t.more||t.ds}));
-  p.append(el('div',{className:'filechip'},[svg(icon('clip')), multi?`${fileOrFiles.length} files`:`${f.name} · ${fmt(f.size)}`]));
+  p.append(el('div',{className:'filechip'},[svg(icon('clip')), multi&&fileOrFiles.length>1?`${fileOrFiles.length} files`:`${f.name} · ${fmt(f.size)}`]));
   let get=()=>({});
   if(t.opts){ const o=t.opts(); const wrap=el('div',{className:'opts'}); wrap.append(o.node); p.append(wrap); get=o.get; }
   const ni=p.querySelector('input[type=number]');
