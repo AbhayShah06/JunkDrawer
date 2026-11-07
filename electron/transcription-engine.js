@@ -10,7 +10,9 @@ function execute(bin,args,cwd,signal,onData=()=>{},stdoutOnly=false){
   return new Promise((resolve,reject)=>{
     if(signal.aborted)return reject(Error('Paused'));
     let log='',out='',spawnError;
-    const child=spawn(bin,args,{cwd,windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,SPEECH_NO_UPDATE_CHECK:'1',HF_HUB_OFFLINE:'1'}});
+    // Intel Arc's cooperative matrix Vulkan path can return fluent-looking but false text.
+    // The standard Vulkan kernels transcribe the same recording correctly on this GPU.
+    const child=spawn(bin,args,{cwd,windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,GGML_VK_DISABLE_COOPMAT:'1',SPEECH_NO_UPDATE_CHECK:'1',HF_HUB_OFFLINE:'1'}});
     const cancel=()=>child.kill();signal.addEventListener('abort',cancel,{once:true});
     const read=data=>{const s=String(data);log=(log+s).slice(-16000);onData(s,log);};
     child.stdout.on('data',data=>{if(stdoutOnly)out+=String(data);read(data);});child.stderr.on('data',read);
@@ -19,6 +21,19 @@ function execute(bin,args,cwd,signal,onData=()=>{},stdoutOnly=false){
   });
 }
 function clock(ms,separator=','){ms=Math.round(Math.max(0,ms));return String(Math.floor(ms/3600000)).padStart(2,'0')+':'+String(Math.floor(ms/60000)%60).padStart(2,'0')+':'+String(Math.floor(ms/1000)%60).padStart(2,'0')+separator+String(ms%1000).padStart(3,'0');}
+function repetitiveTranscript(transcription){
+  const words=(transcription||[]).map(item=>String(item.text||'')).join(' ').toLowerCase().match(/[\p{L}\p{N}']+/gu)||[];
+  if(words.length<80)return false;
+  for(const size of [4,5,6,7,8]){
+    const counts=new Map();
+    for(let i=0;i<=words.length-size;i++){
+      const phrase=words.slice(i,i+size).join(' '),count=(counts.get(phrase)||0)+1;
+      if(count>=6&&count*size>=words.length*.4)return true;
+      counts.set(phrase,count);
+    }
+  }
+  return false;
+}
 function mergeBlocks(blocks,format){
   const cues=[];
   for(const block of blocks){
@@ -56,7 +71,7 @@ function createTranscriptionEngine({ffmpeg,whisper,gpuWhisper,speech,modelsDir,r
       const candidate=gpuWhisper||((process.platform==='darwin')?whisper:null);
       if(candidate)try{const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),10000);try{const log=await run(candidate,['--help'],path.dirname(candidate),ctl.signal);gpu=/Vulkan\s*:\s*\d|Metal|ggml_vulkan:.*(?:devices|Intel|AMD|NVIDIA)/i.test(log);name=log.split(/\r?\n/).find(l=>/ggml_vulkan:.*(?:Intel|AMD|NVIDIA)|Metal.*device/i.test(l))||'';}finally{clearTimeout(timer);}}catch{}
       name=name.replace(/^ggml_vulkan:.*?=\s*/,'').split(' |')[0];
-      checked={cpu:!!whisper,gpu,gpuName:name.trim(),npu:false,npuNote:'NPU transcription is not supported by the bundled engine.',parallelWorkers:os.freemem()>7*1024**3&&os.cpus().length>=4?2:1};return checked;
+      checked={cpu:!!whisper,gpu,gpuName:name.trim(),npu:false,npuNote:'GPU transcription uses the compatible Vulkan path. NPU transcription is not supported by the bundled engine.',parallelWorkers:os.freemem()>7*1024**3&&os.cpus().length>=4?2:1};return checked;
     })();try{return await checking;}finally{checking=null;}
   }
   async function runner(j,dir,signal,update){
@@ -115,8 +130,15 @@ function createTranscriptionEngine({ffmpeg,whisper,gpuWhisper,speech,modelsDir,r
         }else{
           try{await infer(gpu);}catch(e){if(!gpu||j.options.device==='gpu'||local.signal.aborted)throw e;gpu=false;update({device:'CPU',notice:'GPU could not run this model. Continuing on CPU.'});await infer(false);}
           data=JSON.parse(fs.readFileSync(path.join(dir,prefix+'.json'),'utf8'));
+          if(gpu&&repetitiveTranscript(data.transcription)){
+            if(j.options.device==='gpu')throw Error('The GPU produced repetitive, unreliable text. Select Auto or CPU and retry.');
+            gpu=false;update({device:'CPU',notice:'GPU produced unreliable text. Reprocessing this block and the remaining recording on CPU.'});
+            await infer(false);
+            data=JSON.parse(fs.readFileSync(path.join(dir,prefix+'.json'),'utf8'));
+          }
         }
         if(!Array.isArray(data.transcription))throw Error('The speech engine returned an invalid transcript.');
+        if(repetitiveTranscript(data.transcription))throw Error('The speech engine produced repetitive, unreliable text. Try a different speech model or improve the recording before retrying.');
         const completed={index:i,start,end,offset,transcription:data.transcription};
         fs.writeFileSync(path.join(dir,'block-'+i+'.json.tmp'),JSON.stringify(completed));fs.renameSync(path.join(dir,'block-'+i+'.json.tmp'),path.join(dir,'block-'+i+'.json'));chunks[i]=completed;fractions[i]=1;publish();
         for(const filename of [wav,prefix+'.json'])try{fs.unlinkSync(path.join(dir,filename));}catch{}
@@ -130,4 +152,4 @@ function createTranscriptionEngine({ffmpeg,whisper,gpuWhisper,speech,modelsDir,r
   }
   return {runner,hardware};
 }
-module.exports={createTranscriptionEngine,execute,mergeBlocks,clock};
+module.exports={createTranscriptionEngine,execute,mergeBlocks,clock,repetitiveTranscript};

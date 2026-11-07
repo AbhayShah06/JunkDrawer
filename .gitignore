@@ -1,6 +1,7 @@
 # deps & build output
 node_modules/
 dist-app/
+dist-app-*/
 build/
 
 # vendored third-party engines — regenerated from npm deps by `npm run vendor`

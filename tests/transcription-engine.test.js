@@ -1,5 +1,5 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const {createTranscriptionEngine,mergeBlocks,clock}=require('../electron/transcription-engine');
+const {createTranscriptionEngine,mergeBlocks,clock,repetitiveTranscript}=require('../electron/transcription-engine');
 test('overlapping speech blocks merge once with corrected subtitle timing',()=>{
  const blocks=[{start:0,end:300,offset:0,transcription:[{offsets:{from:298000,to:299000},text:'before'},{offsets:{from:300000,to:301000},text:'after'}]},{start:300,end:600,offset:298,transcription:[{offsets:{from:0,to:1000},text:'before'},{offsets:{from:2000,to:3000},text:'after'}]}];
  const srt=mergeBlocks(blocks,'srt');assert.equal((srt.match(/before/g)||[]).length,1);assert.equal((srt.match(/after/g)||[]).length,1);assert.match(srt,/00:05:00,000 --> 00:05:01,000/);assert.match(mergeBlocks(blocks,'vtt'),/^WEBVTT/);assert.equal(clock(3600001),'01:00:00,001');
@@ -18,10 +18,26 @@ test('chunk checkpoints survive interruption, skip finished blocks, and preserve
 });
 test('automatic GPU errors retry on CPU; explicit GPU errors are surfaced',async t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'jd-fallback-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.writeFileSync(path.join(dir,'ggml-base.bin'),'model');const devices=[];
- const run=async(bin,args,cwd)=>{if(args.includes('--help'))return 'ggml_vulkan: Found 1 Vulkan devices: Intel';if(args.length===4)throw Error('Duration: 00:00:05.00');if(args.includes('-ojf')){devices.push(bin);if(bin==='gpu')throw Error('GPU memory exhausted');fs.writeFileSync(path.join(cwd,'part-0.json'),JSON.stringify({transcription:[]}));}return '';};
+ const run=async(bin,args,cwd)=>{if(args.includes('--help'))return 'ggml_vulkan: Found 1 Vulkan devices:\nggml_vulkan: 0 = AMD Radeon | fp16: 1';if(args.length===4)throw Error('Duration: 00:00:05.00');if(args.includes('-ojf')){devices.push(bin);if(bin==='gpu')throw Error('GPU memory exhausted');fs.writeFileSync(path.join(cwd,'part-0.json'),JSON.stringify({transcription:[]}));}return '';};
  const engine=createTranscriptionEngine({ffmpeg:'ffmpeg',whisper:'cpu',gpuWhisper:'gpu',modelsDir:dir,run});const job={name:'x.wav',extension:'wav',kind:'transcribe',options:{model:'base',device:'auto'}};
  await engine.runner(job,dir,new AbortController().signal,p=>Object.assign(job,p));assert.deepEqual(devices,['gpu','cpu']);assert.equal(job.device,'CPU');assert.match(job.notice,/Continuing/);
  fs.unlinkSync(path.join(dir,'block-0.json'));job.options.device='gpu';await assert.rejects(engine.runner(job,dir,new AbortController().signal,()=>{}),/GPU memory/);
+});
+test('Intel Arc GPU remains available with the compatible Vulkan path',async()=>{
+ const run=async(_bin,args)=>args.includes('--help')?'ggml_vulkan: Found 1 Vulkan devices:\nggml_vulkan: 0 = Intel(R) Arc(TM) 140V GPU (16GB) (Intel Corporation) | fp16: 1':'';
+ const engine=createTranscriptionEngine({ffmpeg:'ffmpeg',whisper:'cpu',gpuWhisper:'gpu',modelsDir:os.tmpdir(),run});
+ const hardware=await engine.hardware();assert.equal(hardware.gpu,true);assert.match(hardware.npuNote,/compatible Vulkan path/);
+});
+test('repetitive GPU output retries on CPU and cannot be marked done if still repetitive',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'jd-quality-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.writeFileSync(path.join(dir,'ggml-base.bin'),'model');
+ const bad={transcription:[{offsets:{from:0,to:30000},text:('I do not know how to do that, ').repeat(35)}]};
+ assert.equal(repetitiveTranscript(bad.transcription),true);
+ assert.equal(repetitiveTranscript([{text:'The conversation turned to investment and the differences between Canada and the United States.'}]),false);
+ const devices=[];
+ const run=async(bin,args,cwd,_signal,onData)=>{if(args.includes('--help'))return 'ggml_vulkan: Found 1 Vulkan devices:\nggml_vulkan: 0 = AMD Radeon | fp16: 1';if(args.length===4)throw Error('Duration: 00:00:30.00');if(args.includes('-ojf')){devices.push(bin);if(bin==='gpu')onData('using Vulkan backend','using Vulkan backend');fs.writeFileSync(path.join(cwd,'part-0.json'),JSON.stringify(bin==='gpu'?bad:{transcription:[{offsets:{from:0,to:15000},text:'The people discussed an investment.'}]}));}return '';};
+ const engine=createTranscriptionEngine({ffmpeg:'ffmpeg',whisper:'cpu',gpuWhisper:'gpu',modelsDir:dir,run}),job={name:'x.wav',extension:'wav',kind:'transcribe',options:{model:'base',device:'auto',format:'txt'}};
+ await engine.runner(job,dir,new AbortController().signal,p=>Object.assign(job,p));assert.deepEqual(devices,['gpu','cpu']);assert.equal(job.device,'CPU');assert.match(fs.readFileSync(path.join(dir,job.output),'utf8'),/investment/);
+ fs.unlinkSync(path.join(dir,'block-0.json'));devices.length=0;job.options.device='gpu';await assert.rejects(engine.runner(job,dir,new AbortController().signal,()=>{}),/repetitive, unreliable/);
 });
 test('two-hour recording schedules 24 bounded blocks with no more than two workers',async t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'jd-long-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.writeFileSync(path.join(dir,'ggml-base.bin'),'model');let active=0,maximum=0,blocks=0;
