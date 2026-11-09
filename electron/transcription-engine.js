@@ -34,6 +34,26 @@ function repetitiveTranscript(transcription){
   }
   return false;
 }
+function ownedTranscription(transcription,clipOffset,blockOffset,start,end){
+  const result=[];
+  for(const item of transcription||[]){
+    const tokens=Array.isArray(item.tokens)?item.tokens.filter(token=>{
+      const from=Number(token.offsets?.from),to=Number(token.offsets?.to),mid=(from+to)/2000+clipOffset;
+      return (token.id==null||token.id<50257)&&Number.isFinite(from)&&Number.isFinite(to)&&to>=from&&mid>=start&&mid<end;
+    }):[];
+    if(Array.isArray(item.tokens)&&item.tokens.length){
+      if(tokens.length){
+        const text=tokens.map(token=>token.text||'').join('').trim();
+        if(text)result.push({offsets:{from:tokens[0].offsets.from+(clipOffset-blockOffset)*1000,to:tokens.at(-1).offsets.to+(clipOffset-blockOffset)*1000},text});
+      }
+      continue;
+    }
+    const from=Number(item.offsets?.from),to=Number(item.offsets?.to),mid=(from+to)/2000+clipOffset;
+    if(Number.isFinite(from)&&Number.isFinite(to)&&to>from&&mid>=start&&mid<end&&String(item.text||'').trim())
+      result.push({offsets:{from:from+(clipOffset-blockOffset)*1000,to:to+(clipOffset-blockOffset)*1000},text:item.text});
+  }
+  return result;
+}
 function mergeBlocks(blocks,format){
   const cues=[];
   for(const block of blocks){
@@ -120,21 +140,47 @@ function createTranscriptionEngine({ffmpeg,whisper,gpuWhisper,speech,modelsDir,r
         const start=i*blockSeconds,end=Math.min(duration,start+blockSeconds),offset=qwen?start:Math.max(0,start-2),length=(qwen?end:Math.min(duration,end+2))-offset;
         const wav='block-'+i+'.wav',prefix='part-'+i;
         await run(ffmpeg,['-nostdin','-y','-protocol_whitelist','file,pipe','-ss',String(offset),'-i',input,'-t',String(length),'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',wav],dir,local.signal);
-        const args=['-m',modelPath,'-f',wav,'-ojf','-of',prefix,'-t',String(workers===1?4:Math.max(1,Math.min(4,Math.floor(os.cpus().length/workers)))),'-l','auto','--print-progress',...(format==='txt'?[]:['-ml','60','-sow'])];
-        async function infer(useGpu){let activated=false;await run(useGpu?bin:whisper,[...args,...(useGpu?[]:['-ng'])],dir,local.signal,(_s,log)=>{if(/using (?:Vulkan\d*|Metal) backend/i.test(log))activated=true;const matches=[...log.matchAll(/progress\s*=\s*(\d+)%/g)];if(matches.length){fractions[i]=Math.min(.99,+matches.at(-1)[1]/100);report(weights.reduce((n,w,k)=>n+w*fractions[k],0)/duration,'Transcribing · '+chunks.filter(Boolean).length+' / '+count+' blocks');}});if(useGpu&&!activated)throw Error('The GPU backend did not activate for this model.');}
+        const threads=String(workers===1?4:Math.max(1,Math.min(4,Math.floor(os.cpus().length/workers))));
+        async function infer(useGpu,file=wav,out=prefix,language='auto',safe=false){
+          let activated=false;
+          const args=['-m',modelPath,'-f',file,'-ojf','-of',out,'-t',threads,'-l',language,'--print-progress',...(format==='txt'?[]:['-ml','60','-sow']),...(safe?['-mc','0','-nf','-sns']:[]),...(useGpu?[]:['-ng'])];
+          await run(useGpu?bin:whisper,args,dir,local.signal,(_s,log)=>{if(/using (?:Vulkan\d*|Metal) backend/i.test(log))activated=true;const matches=[...log.matchAll(/progress\s*=\s*(\d+)%/g)];if(matches.length){fractions[i]=Math.min(.99,+matches.at(-1)[1]/100);report(weights.reduce((n,w,k)=>n+w*fractions[k],0)/duration,'Transcribing · '+chunks.filter(Boolean).length+' / '+count+' blocks');}});
+          if(useGpu&&!activated)throw Error('The GPU backend did not activate for this model.');
+          return JSON.parse(fs.readFileSync(path.join(dir,out+'.json'),'utf8'));
+        }
         let data;
         if(qwen){
           // Text is stdout, diagnostics are stderr. Never mix engine logs into a transcript.
           const text=await run(speech,['asr',modelPath,'--vad',vad,'--max-speech-duration-s','20','--device','cpu','--threads','4','--format','text',wav],dir,local.signal,()=>{},true);
           data={transcription:[{offsets:{from:0,to:(end-start)*1000},text:text.trim()}]};
         }else{
-          try{await infer(gpu);}catch(e){if(!gpu||j.options.device==='gpu'||local.signal.aborted)throw e;gpu=false;update({device:'CPU',notice:'GPU could not run this model. Continuing on CPU.'});await infer(false);}
-          data=JSON.parse(fs.readFileSync(path.join(dir,prefix+'.json'),'utf8'));
-          if(gpu&&repetitiveTranscript(data.transcription)){
-            if(j.options.device==='gpu')throw Error('The GPU produced repetitive, unreliable text. Select Auto or CPU and retry.');
-            gpu=false;update({device:'CPU',notice:'GPU produced unreliable text. Reprocessing this block and the remaining recording on CPU.'});
-            await infer(false);
-            data=JSON.parse(fs.readFileSync(path.join(dir,prefix+'.json'),'utf8'));
+          try{data=await infer(gpu);}catch(e){if(!gpu||j.options.device==='gpu'||local.signal.aborted)throw e;gpu=false;update({device:'CPU',notice:'GPU could not run this model. Continuing on CPU.'});data=await infer(false);}
+          if(repetitiveTranscript(data.transcription)){
+            const language=/^[a-z]{2,3}$/.test(data.result?.language||'')?data.result.language:'auto';
+            update({notice:'A repeated passage was detected. Retrying this block with fresh context.'});
+            try{data=await infer(gpu,wav,prefix,language,true);}catch(e){if(local.signal.aborted)throw e;data={transcription:[]};}
+            if(repetitiveTranscript(data.transcription)||!Array.isArray(data.transcription)||!data.transcription.length){
+              if(gpu&&j.options.device!=='gpu'){
+                gpu=false;update({device:'CPU',notice:'Fresh-context GPU retry was unreliable. Retrying this block on CPU.'});
+                try{data=await infer(false,wav,prefix,language,true);}catch(e){if(local.signal.aborted)throw e;data={transcription:[]};}
+              }
+            }
+            if(repetitiveTranscript(data.transcription)||!Array.isArray(data.transcription)||!data.transcription.length){
+              update({notice:'Retrying only this difficult block in one-minute pieces.'});
+              const recovered=[];
+              for(let partStart=start,part=0;partStart<end;partStart+=60,part++){
+                const partEnd=Math.min(end,partStart+60),partOffset=Math.max(0,partStart-2),partLength=Math.min(duration,partEnd+2)-partOffset;
+                const piece='retry-'+i+'-'+part+'.wav',piecePrefix='retry-'+i+'-'+part;
+                try{
+                  await run(ffmpeg,['-nostdin','-y','-protocol_whitelist','file,pipe','-ss',String(partOffset),'-i',input,'-t',String(partLength),'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',piece],dir,local.signal);
+                  let attempt=await infer(gpu,piece,piecePrefix,language,true);
+                  if((!Array.isArray(attempt.transcription)||repetitiveTranscript(attempt.transcription))&&gpu&&j.options.device!=='gpu')attempt=await infer(false,piece,piecePrefix,language,true);
+                  if(!Array.isArray(attempt.transcription)||repetitiveTranscript(attempt.transcription))throw Error('The speech engine produced repetitive, unreliable text in a one-minute retry.');
+                  recovered.push(...ownedTranscription(attempt.transcription,partOffset,offset,partStart,partEnd));
+                }finally{for(const file of [piece,piecePrefix+'.json'])try{fs.unlinkSync(path.join(dir,file));}catch{}}
+              }
+              data={transcription:recovered};
+            }
           }
         }
         if(!Array.isArray(data.transcription))throw Error('The speech engine returned an invalid transcript.');

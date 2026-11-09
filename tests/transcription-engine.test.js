@@ -28,16 +28,31 @@ test('Intel Arc GPU remains available with the compatible Vulkan path',async()=>
  const engine=createTranscriptionEngine({ffmpeg:'ffmpeg',whisper:'cpu',gpuWhisper:'gpu',modelsDir:os.tmpdir(),run});
  const hardware=await engine.hardware();assert.equal(hardware.gpu,true);assert.match(hardware.npuNote,/compatible Vulkan path/);
 });
-test('repetitive GPU output retries on CPU and cannot be marked done if still repetitive',async t=>{
+test('repetitive output retries with fresh context before changing device',async t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'jd-quality-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.writeFileSync(path.join(dir,'ggml-base.bin'),'model');
  const bad={transcription:[{offsets:{from:0,to:30000},text:('I do not know how to do that, ').repeat(35)}]};
  assert.equal(repetitiveTranscript(bad.transcription),true);
  assert.equal(repetitiveTranscript([{text:'The conversation turned to investment and the differences between Canada and the United States.'}]),false);
  const devices=[];
- const run=async(bin,args,cwd,_signal,onData)=>{if(args.includes('--help'))return 'ggml_vulkan: Found 1 Vulkan devices:\nggml_vulkan: 0 = AMD Radeon | fp16: 1';if(args.length===4)throw Error('Duration: 00:00:30.00');if(args.includes('-ojf')){devices.push(bin);if(bin==='gpu')onData('using Vulkan backend','using Vulkan backend');fs.writeFileSync(path.join(cwd,'part-0.json'),JSON.stringify(bin==='gpu'?bad:{transcription:[{offsets:{from:0,to:15000},text:'The people discussed an investment.'}]}));}return '';};
+ const run=async(bin,args,cwd,_signal,onData)=>{if(args.includes('--help'))return 'ggml_vulkan: Found 1 Vulkan devices:\nggml_vulkan: 0 = AMD Radeon | fp16: 1';if(args.length===4)throw Error('Duration: 00:00:30.00');if(args.includes('-ojf')){devices.push({bin,safe:args.includes('-mc'),language:args[args.indexOf('-l')+1]});if(bin==='gpu')onData('using Vulkan backend','using Vulkan backend');const prefix=args[args.indexOf('-of')+1];fs.writeFileSync(path.join(cwd,prefix+'.json'),JSON.stringify(bin==='gpu'?{...bad,result:{language:'en'}}:{transcription:[{offsets:{from:0,to:15000},text:'The people discussed an investment.'}]}));}return '';};
  const engine=createTranscriptionEngine({ffmpeg:'ffmpeg',whisper:'cpu',gpuWhisper:'gpu',modelsDir:dir,run}),job={name:'x.wav',extension:'wav',kind:'transcribe',options:{model:'base',device:'auto',format:'txt'}};
- await engine.runner(job,dir,new AbortController().signal,p=>Object.assign(job,p));assert.deepEqual(devices,['gpu','cpu']);assert.equal(job.device,'CPU');assert.match(fs.readFileSync(path.join(dir,job.output),'utf8'),/investment/);
+ await engine.runner(job,dir,new AbortController().signal,p=>Object.assign(job,p));assert.deepEqual(devices.slice(0,3),[{bin:'gpu',safe:false,language:'auto'},{bin:'gpu',safe:true,language:'en'},{bin:'cpu',safe:true,language:'en'}]);assert.equal(job.device,'CPU');assert.match(fs.readFileSync(path.join(dir,job.output),'utf8'),/investment/);
  fs.unlinkSync(path.join(dir,'block-0.json'));devices.length=0;job.options.device='gpu';await assert.rejects(engine.runner(job,dir,new AbortController().signal,()=>{}),/repetitive, unreliable/);
+});
+test('fresh-context GPU retry recovers a repeated passage without CPU fallback',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'jd-gpu-retry-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.writeFileSync(path.join(dir,'ggml-base.bin'),'model');let calls=[];
+ const bad={result:{language:'en'},transcription:[{offsets:{from:0,to:30000},text:('We will have a lot of fun. ').repeat(50)}]};
+ const good={result:{language:'en'},transcription:[{offsets:{from:0,to:30000},text:'The group discussed the award and their recruiting plans.'}]};
+ const run=async(bin,args,cwd,_signal,onData)=>{if(args.includes('--help'))return 'ggml_vulkan: Found 1 Vulkan devices:\nggml_vulkan: 0 = Intel Arc | fp16: 1';if(args.length===4)throw Error('Duration: 00:00:30.00');if(args.includes('-ojf')){calls.push({bin,safe:args.includes('-mc'),noFallback:args.includes('-nf'),suppress:args.includes('-sns')});onData('using Vulkan backend','using Vulkan backend');fs.writeFileSync(path.join(cwd,args[args.indexOf('-of')+1]+'.json'),JSON.stringify(args.includes('-mc')?good:bad));}return '';};
+ const engine=createTranscriptionEngine({ffmpeg:'ffmpeg',whisper:'cpu',gpuWhisper:'gpu',modelsDir:dir,run}),job={name:'x.wav',extension:'wav',kind:'transcribe',options:{model:'base',device:'auto',format:'txt'}};
+ await engine.runner(job,dir,new AbortController().signal,p=>Object.assign(job,p));assert.deepEqual(calls,[{bin:'gpu',safe:false,noFallback:false,suppress:false},{bin:'gpu',safe:true,noFallback:true,suppress:true}]);assert.equal(job.device,'GPU');assert.match(fs.readFileSync(path.join(dir,job.output),'utf8'),/recruiting plans/);
+});
+test('one-minute recovery preserves original timestamps when whole-block retries repeat',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'jd-minute-retry-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.writeFileSync(path.join(dir,'ggml-base.bin'),'model');
+ const bad={result:{language:'en'},transcription:[{offsets:{from:0,to:120000},text:('We will have a lot of fun. ').repeat(80)}]};let pieces=0;
+ const run=async(bin,args,cwd,_signal,onData)=>{if(args.includes('--help'))return 'ggml_vulkan: Found 1 Vulkan devices:\nggml_vulkan: 0 = Intel Arc | fp16: 1';if(args.length===4)throw Error('Duration: 00:02:00.00');if(args.includes('-ojf')){if(bin==='gpu')onData('using Vulkan backend','using Vulkan backend');const file=args[args.indexOf('-f')+1],prefix=args[args.indexOf('-of')+1];let result=bad;if(file.startsWith('retry-')){assert.ok(args.includes('-mc'));const part=+file.split('-')[2].split('.')[0];pieces++;result={transcription:[{offsets:{from:2000,to:3500},text:part===0?'First minute speech.':'Second minute speech.'}]};}fs.writeFileSync(path.join(cwd,prefix+'.json'),JSON.stringify(result));}return '';};
+ const engine=createTranscriptionEngine({ffmpeg:'ffmpeg',whisper:'cpu',gpuWhisper:'gpu',modelsDir:dir,run,blockSeconds:120}),job={name:'x.wav',extension:'wav',kind:'transcribe',options:{model:'base',device:'auto',format:'srt'}};
+ await engine.runner(job,dir,new AbortController().signal,p=>Object.assign(job,p));const text=fs.readFileSync(path.join(dir,job.output),'utf8');assert.equal(pieces,2);assert.match(text,/00:00:02,000 --> 00:00:03,500\nFirst minute speech/);assert.match(text,/00:01:00,000 --> 00:01:01,500\nSecond minute speech/);
 });
 test('two-hour recording schedules 24 bounded blocks with no more than two workers',async t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'jd-long-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.writeFileSync(path.join(dir,'ggml-base.bin'),'model');let active=0,maximum=0,blocks=0;
